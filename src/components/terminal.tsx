@@ -43,51 +43,9 @@ export function Terminal() {
     <main className="relative flex h-dvh min-h-0 flex-col overflow-hidden">
       <Header model={model} />
       <div className="flex min-h-0 flex-1 flex-col px-0.5 pt-0.5">
-        {unresolved && !busy && (
-          <div
-            role="alert"
-            className="mb-0.5 flex max-h-[25dvh] shrink-0 flex-wrap items-center justify-between gap-3 overflow-y-auto rounded-lg border border-amber-200/20 bg-panel p-3 text-xs text-amber-200 shadow-xl"
-          >
-            <span>
-              有一笔订单结果待确认。{unresolved.coin} ·{' '}
-              {unresolved.cloid.slice(0, 12)}…
-            </span>
-            <Button
-              variant="bordered"
-              color="default"
-              size="sm"
-              onPress={model.reconcile}
-              isDisabled={busy || resolving}
-              className="shrink-0"
-            >
-              查询未确认订单
-            </Button>
-            {unresolved.native && (
-              <div className="flex items-center gap-3">
-                <Checkbox
-                  isSelected={acknowledged}
-                  onValueChange={setAcknowledged}
-                >
-                  已在官方页面核对委托、成交及 TWAP
-                </Checkbox>
-                <Button
-                  size="sm"
-                  variant="bordered"
-                  isDisabled={!acknowledged || busy}
-                  onPress={() => {
-                    model.acknowledgeNative()
-                    setAcknowledged(false)
-                  }}
-                >
-                  核对后解除本地保护
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
         <div className="grid min-h-0 flex-1 auto-rows-max gap-0.5 overflow-y-auto lg:auto-rows-auto lg:overflow-hidden md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_228px_264px] lg:grid-rows-[minmax(0,1fr)_minmax(140px,23%)] xl:grid-cols-[minmax(0,1fr)_18.6%_18.6%]">
           <section
-            className="flex min-h-[504px] min-w-0 flex-col overflow-hidden rounded-sm bg-panel md:col-span-2 md:min-h-[564px] lg:col-span-1 lg:min-h-0"
+            className="relative flex min-h-[504px] min-w-0 flex-col overflow-hidden rounded-sm bg-panel md:col-span-2 md:min-h-[564px] lg:col-span-1 lg:min-h-0"
             aria-label="行情图表"
           >
             <MarketHeader model={model} />
@@ -108,6 +66,48 @@ export function Terminal() {
                 />
               </Profiler>
             </ModuleBoundary>
+            {unresolved && !busy && (
+              <div
+                role="alert"
+                className="absolute bottom-3 left-3 z-40 flex max-h-[25dvh] w-[min(560px,calc(100%-24px))] flex-wrap items-center justify-between gap-3 overflow-y-auto rounded-lg border border-amber-200/20 bg-panel p-3 text-xs text-amber-200 shadow-xl"
+              >
+                <span>
+                  有一笔订单结果待确认。{unresolved.coin} ·{' '}
+                  {unresolved.cloid.slice(0, 12)}…
+                </span>
+                <Button
+                  variant="bordered"
+                  color="default"
+                  size="sm"
+                  onPress={model.reconcile}
+                  isDisabled={busy || resolving}
+                  className="shrink-0"
+                >
+                  查询未确认订单
+                </Button>
+                {unresolved.native && (
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      isSelected={acknowledged}
+                      onValueChange={setAcknowledged}
+                    >
+                      已在官方页面核对委托、成交及 TWAP
+                    </Checkbox>
+                    <Button
+                      size="sm"
+                      variant="bordered"
+                      isDisabled={!acknowledged || busy}
+                      onPress={() => {
+                        model.acknowledgeNative()
+                        setAcknowledged(false)
+                      }}
+                    >
+                      核对后解除本地保护
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
           <ModuleBoundary name="订单簿">
             <Profiler id="bookReact" onRender={recordReactRender}>

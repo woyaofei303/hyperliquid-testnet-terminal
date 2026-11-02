@@ -2097,7 +2097,9 @@ async function signPreview(page: Page) {
 test('高级订单：四种触发单、附带保护和阶梯单使用正确请求并保留部分拒单', async ({
   page,
 }) => {
-  const { writes } = await mockExchange(page, 'partial-batch')
+  // 连续完成六组签名与下单，使用 Playwright 的长流程时限。
+  test.slow()
+  const { writes, pushMarket } = await mockExchange(page, 'partial-batch')
   await ready(page)
   await page.getByRole('textbox', { name: '数量（BTC）' }).fill('0.03')
   for (const [name, trigger, type, market] of [
@@ -2108,6 +2110,7 @@ test('高级订单：四种触发单、附带保护和阶梯单使用正确请�
   ] as const) {
     await selectAdvanced(page, name)
     await page.getByRole('textbox', { name: '触发价格（USDC）' }).fill(trigger)
+    pushMarket('BTC', 70000)
     await signPreview(page)
     await expect
       .poll(() => writes.filter((write) => write.type === 'order').length)
@@ -2134,6 +2137,7 @@ test('高级订单：四种触发单、附带保护和阶梯单使用正确请�
     .getByRole('textbox', { name: '最高价格（USDC）', exact: true })
     .fill('71000')
   await page.getByRole('textbox', { name: '阶梯档数（2–50）' }).fill('3')
+  pushMarket('BTC', 70000)
   await signPreview(page)
   await expect(
     page.locator('output').filter({ hasText: '2 笔非拒绝、1 笔拒绝' }),
@@ -2152,6 +2156,7 @@ test('高级订单：四种触发单、附带保护和阶梯单使用正确请�
   await page
     .getByRole('textbox', { name: '止损触发价（USDC，可选）' })
     .fill('68000')
+  pushMarket('BTC', 70000)
   await signPreview(page)
   await expect.poll(() => writes.at(-1)?.grouping).toBe('normalTpsl')
   expect(
