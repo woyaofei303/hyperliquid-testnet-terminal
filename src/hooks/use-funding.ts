@@ -47,6 +47,7 @@ export function useFunding(
     mode: string
   } | null>(null)
   const [record, setRecord] = useState<FundingRecord | null>(null)
+  const [notification, setNotification] = useState<FundingRecord | null>(null)
   const [withdrawQuote, setWithdrawQuote] = useState<WithdrawalQuote | null>(
     null,
   )
@@ -67,6 +68,7 @@ export function useFunding(
     setChain(null)
     setError('')
     setRecord(null)
+    setNotification(null)
     setWithdrawQuote(null)
     if (!owner) return
     try {
@@ -89,11 +91,15 @@ export function useFunding(
         (stored.at === next.at && stored.status === 'credited'))
     )
       return
+    if (JSON.stringify(stored) === JSON.stringify(next)) return
     localStorage.setItem(fundingKey(next.account), JSON.stringify(next))
-    if (current.current?.address === next.account)
+    if (current.current?.address === next.account) {
+      // 仅新提交或核对后发生变化的记录触发通知，读取历史记录保持静默。
+      setNotification(next)
       setRecord((previous) =>
         JSON.stringify(previous) === JSON.stringify(next) ? previous : next,
       )
+    }
   }, [])
   const refresh = useCallback(async () => {
     if (!wallet) return
@@ -424,6 +430,7 @@ export function useFunding(
     if (!record || busy) return
     localStorage.removeItem(fundingKey(record.account))
     setRecord(null)
+    setNotification(null)
     setError('已按人工核对解除本地保护；没有重新发送资金请求。')
   }
   return {
@@ -435,6 +442,7 @@ export function useFunding(
     withdraw,
     cancelWithdrawal,
     record,
+    notification,
     chain,
     error,
     busy,

@@ -1,4 +1,4 @@
-import { Button, Input } from '@fameex/ui'
+import { Button } from '@fameex/ui'
 import type { TerminalModel } from '@/hooks/use-terminal'
 import { t, useLocale } from '@/i18n'
 import { accountTypeName, sharedAccount } from '@/lib/account-types'
@@ -11,15 +11,7 @@ import { isCash, quoteName } from '@/lib/market-catalog'
 export function AccountPanel({ model }: { model: TerminalModel }) {
   useLocale()
 
-  const {
-    account,
-    wallet,
-    watchAddress,
-    addressInput,
-    setAddressInput,
-    busy,
-    watch,
-  } = model
+  const { account, wallet, busy } = model
   const cash = isCash(model.market)
   const balances =
     model.market && account.snapshot?.spot
@@ -41,9 +33,7 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
         : model.tradingReady
           ? t('交易已启用')
           : t('已连接 · 待启用交易')
-    : watchAddress
-      ? t('只读观察')
-      : t('未连接')
+    : t('未连接')
   return (
     <section
       id="account-panel"
@@ -138,30 +128,6 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
           {t('提款')}
         </Button>
       </div>
-      <form
-        className="flex items-end gap-2 border-t border-edge p-3"
-        onSubmit={(event) => {
-          event.preventDefault()
-          watch()
-        }}
-      >
-        <Input
-          aria-label={t('只读钱包地址')}
-          value={addressInput}
-          onChange={setAddressInput}
-          placeholder={t('0x… 只读钱包地址')}
-          className="min-w-0 flex-1"
-        />
-        <Button
-          type="submit"
-          color="default"
-          size="sm"
-          className="h-10 min-w-12 px-3"
-          isDisabled={busy}
-        >
-          {t('查看')}
-        </Button>
-      </form>
     </section>
   )
 }

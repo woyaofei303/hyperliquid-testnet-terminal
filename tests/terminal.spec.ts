@@ -1214,7 +1214,7 @@ test('账户类型拒绝切换时保留原状态，不误报成功', async ({ pa
   expect(attempts).toBe(1)
 })
 
-test('账户类型取消签名或只读查看，不发送切换请求', async ({ page }) => {
+test('账户类型未连接或取消签名，不发送切换请求', async ({ page }) => {
   const { writes } = await mockExchange(page, 'deny-signature')
   await page.goto('/')
   const button = page.getByRole('button', { name: '账户类型', exact: true })
@@ -1224,17 +1224,9 @@ test('账户类型取消签名或只读查看，不发送切换请求', async ({
     dialog.getByRole('button', { name: '确认账户类型', exact: true }),
   ).toBeDisabled()
   await dialog.getByRole('button', { name: '关闭账户类型' }).click()
-  await page.getByRole('textbox', { name: '只读钱包地址' }).fill(address)
-  await page.getByRole('button', { name: '查看', exact: true }).click()
-  await expect(button).toContainText('手动')
-  await button.click()
-  await dialog
-    .getByRole('radio', { name: '统一账户（推荐）', exact: true })
-    .check()
-  await expect(
-    dialog.getByRole('button', { name: '确认账户类型', exact: true }),
-  ).toBeDisabled()
-  await dialog.getByRole('button', { name: '关闭账户类型' }).click()
+  await expect(page.getByRole('textbox', { name: '只读钱包地址' })).toHaveCount(
+    0,
+  )
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
   await expect(button).toContainText('手动')
@@ -2028,6 +2020,26 @@ test('桌面在不同高度均占满一屏，记录与下单溢出留在面板�
     { width: 1024, height: 600 },
   ]) {
     await page.setViewportSize(size)
+    const records = await page
+      .getByRole('region', { name: '交易记录', exact: true })
+      .boundingBox()
+    const overview = await page
+      .getByRole('region', { name: '账户概览', exact: true })
+      .boundingBox()
+    expect(
+      records && records.y <= size.height * 0.72 && records.height >= 260,
+    ).toBeTruthy()
+    expect(
+      overview && records && Math.abs(overview.y - records.y) < 1,
+    ).toBeTruthy()
+    await expect(
+      page.locator('#account-panel').getByRole('textbox'),
+    ).toHaveCount(0)
+    await expect(
+      page
+        .locator('#account-panel')
+        .getByRole('button', { name: '查看', exact: true }),
+    ).toHaveCount(0)
     await expect
       .poll(() =>
         page.evaluate(
@@ -4846,9 +4858,6 @@ test('断网与未捕获异常提示去重并限制数量，不暴露异常原�
     '未预期异常',
   )
   await expect(notices).not.toContainText('sensitive-payload')
-  await page.getByRole('textbox', { name: '只读钱包地址' }).fill('invalid')
-  await page.getByRole('button', { name: '查看', exact: true }).click()
-  await expect(notices.locator('output')).toHaveCount(3)
   await page.route('**/info', async (route) => {
     if (route.request().postDataJSON()?.type === 'clearinghouseState')
       await route.fulfill({ status: 503, body: 'Service unavailable' })
@@ -5092,6 +5101,13 @@ test('语言和动态元数据跟随币对，切换不刷新、不丢失下单�
     'BTC',
   )
   await expect(page).toHaveTitle(/BTC \/ USDC.*永续/)
+  const icon = page.locator('head link[rel="icon"]')
+  await expect(icon).toHaveAttribute('type', 'image/svg+xml')
+  const iconPath = await icon.getAttribute('href')
+  expect(iconPath).toMatch(/^\/icon\.svg/)
+  const iconResponse = await page.request.get(iconPath ?? '')
+  expect(iconResponse.status()).toBe(200)
+  expect(await iconResponse.text()).toContain('Hyperliquid Terminal')
   await expect(page.getByRole('navigation', { name: '交易导航' })).toHaveCount(
     0,
   )
@@ -5194,4 +5210,91 @@ test('快速盘口独立于深档快照刷新，仓位通过账户推送更新',
   expect(exchange.writes.filter((item) => item.type === 'order')).toHaveLength(
     1,
   )
+})
+
+test('刷新静默恢复连接和历史划转，主动划转只提示一次', async ({ page }) => {
+  const exchange = await mockExchange(page)
+  await mockFunding(page)
+  await ready(page)
+  await page.evaluate((account) => {
+    localStorage.setItem(
+      `hl-testnet-funding:${account}`,
+      JSON.stringify({
+        account,
+        kind: 'transfer',
+        amount: '12',
+        toPerp: false,
+        at: Date.now() - 60000,
+        status: 'confirmed',
+      }),
+    )
+  }, address)
+  await page.reload()
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toBeEnabled()
+  await page
+    .locator('#account-panel')
+    .getByRole('button', { name: '划转', exact: true })
+    .click()
+  const dialog = page.getByRole('dialog')
+  await expect(
+    dialog.getByText('USDC 划转 · 12 USDC', { exact: true }),
+  ).toBeVisible()
+  expect(await page.locator('[data-feedback="success"]').count()).toBe(0)
+  expect(exchange.writes).toHaveLength(0)
+  expect(exchange.agentRegistrations()).toBe(1)
+  await dialog.getByLabel('划转金额（USDC）').fill('10')
+  await dialog.getByRole('button', { name: '确认划转' }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.locator('[data-feedback="success"]')).toHaveCount(1)
+  await expect(page.locator('[data-feedback="success"]')).toHaveText(
+    'USDC 划转已确认。',
+  )
+  expect(exchange.writes).toHaveLength(1)
+  await page.reload()
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toBeEnabled()
+  await page
+    .locator('#account-panel')
+    .getByRole('button', { name: '划转', exact: true })
+    .click()
+  await expect(
+    dialog.getByText('USDC 划转 · 10 USDC', { exact: true }),
+  ).toBeVisible()
+  expect(await page.locator('[data-feedback="success"]').count()).toBe(0)
+  expect(exchange.writes).toHaveLength(1)
+})
+
+test('手动连接只提示本次连接并自动关闭，不重播历史资金成功', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  await mockFunding(page)
+  await page.addInitScript((account) => {
+    localStorage.setItem(
+      `hl-testnet-funding:${account}`,
+      JSON.stringify({
+        account,
+        kind: 'transfer',
+        amount: '12',
+        toPerp: false,
+        at: Date.now() - 60000,
+        status: 'confirmed',
+      }),
+    )
+  }, address)
+  await page.goto('/')
+  await page.getByRole('button', { name: '连接钱包', exact: true }).click()
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: '浏览器钱包 连接 →' })
+    .click()
+  const success = page.locator('[data-feedback="success"]')
+  await expect(success).toHaveCount(1)
+  await expect(success).toHaveText('钱包已连接，正在读取余额与交易记录。')
+  await expect(success).toHaveCount(0, { timeout: 12000 })
+  expect(exchange.agentRegistrations()).toBe(0)
+  expect(exchange.writes).toHaveLength(0)
 })

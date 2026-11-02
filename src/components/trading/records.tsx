@@ -508,11 +508,7 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
               alt=""
               className="opacity-80"
             />
-            <p>
-              {address
-                ? t('暂无记录')
-                : t('连接钱包或输入公开地址，查看账户交易数据')}
-            </p>
+            <p>{address ? t('暂无记录') : t('连接钱包，查看账户交易数据')}</p>
           </div>
         )}
       </div>

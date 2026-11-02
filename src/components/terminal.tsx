@@ -49,7 +49,7 @@ export function Terminal() {
       <MarketMetadata model={model} />
       <Header model={model} />
       <div className="flex min-h-0 flex-1 flex-col px-0.5 pt-0.5">
-        <div className="grid min-h-0 flex-1 auto-rows-max gap-0.5 overflow-y-auto lg:auto-rows-auto lg:overflow-hidden md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_228px_264px] lg:grid-rows-[minmax(0,1fr)_minmax(140px,23%)] xl:grid-cols-[minmax(0,1fr)_18.6%_18.6%]">
+        <div className="grid min-h-0 flex-1 auto-rows-max gap-0.5 overflow-y-auto lg:auto-rows-auto lg:overflow-hidden md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_228px_264px] lg:grid-rows-[minmax(0,1fr)_minmax(260px,30%)] xl:grid-cols-[minmax(0,1fr)_18.6%_18.6%]">
           <section
             className="relative flex min-h-[504px] min-w-0 flex-col overflow-hidden rounded-sm bg-panel md:col-span-2 md:min-h-[564px] lg:col-span-1 lg:min-h-0"
             aria-label={t('行情图表')}

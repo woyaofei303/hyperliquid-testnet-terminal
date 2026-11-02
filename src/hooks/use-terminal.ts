@@ -18,7 +18,6 @@ import { loadCashFunds, validateCashTicketFunds } from '@/lib/cash-order'
 import { fundingFeedback, tradeFeedbackTone } from '@/lib/feedback'
 import {
   API_URL,
-  addressOf,
   assertSession,
   assertTradingAccount,
   authorizeTrading,
@@ -91,9 +90,7 @@ export function useTerminal() {
   const [wallet, setWallet] = useState<WalletSession | null>(null)
   const activeWallet = useRef(wallet)
   activeWallet.current = wallet
-  const [watchAddress, setWatchAddress] = useState<`0x${string}` | null>(null)
-  const [addressInput, setAddressInput] = useState('')
-  const address = wallet?.address ?? watchAddress
+  const address = wallet?.address ?? null
   const activeAddress = useRef(address)
   activeAddress.current = address
   const account = useAccount(address, selectedMarket?.dex ?? '')
@@ -127,14 +124,14 @@ export function useTerminal() {
     if (funding.busy)
       notify('loading', '资金操作处理中，请在钱包中核对并确认。', 'funding')
     else if (funding.error) notify('warning', funding.error, 'funding')
-    else if (funding.record) {
+    else if (funding.notification) {
       const feedback = fundingFeedback(
-        funding.record.kind,
-        funding.record.status,
+        funding.notification.kind,
+        funding.notification.status,
       )
       notify(feedback.tone, feedback.text, 'funding')
     } else dismissNotification('funding')
-  }, [funding.busy, funding.error, funding.record])
+  }, [funding.busy, funding.error, funding.notification])
 
   useEffect(() => {
     setPending(address ? loadPending(address) : null)
@@ -148,7 +145,6 @@ export function useTerminal() {
       setConnecting(null)
       activeWallet.current = null
       setWallet(null)
-      setWatchAddress(null)
       setAction(null)
       dismissNotification('wallet-progress')
       setMessage('钱包账户已变化或断开，请重新连接。', 'warning')
@@ -232,18 +228,18 @@ export function useTerminal() {
           activeWallet.current.lifecycle.active = false
         activeWallet.current = session
         setWallet(session)
-        setWatchAddress(null)
         setWeb3Panel((panel) => (panel === 'wallet' ? null : panel))
         const restored = await restoreTrading(session)
         if (version !== connectVersion.current) return
         activeWallet.current = restored
         setWallet(restored)
-        setMessage(
-          restored.exchange
-            ? '交易连接已恢复，无需重复签名。'
-            : '钱包已连接，正在读取余额与交易记录。',
-          'success',
-        )
+        if (!silent)
+          setMessage(
+            restored.exchange
+              ? '交易连接已恢复，无需重复签名。'
+              : '钱包已连接，正在读取余额与交易记录。',
+            'success',
+          )
       } catch (e) {
         if (version !== connectVersion.current) return
         if (/钱包账户已变化|钱包会话已断开/.test(errorText(e))) {
@@ -670,22 +666,10 @@ export function useTerminal() {
     if (activeWallet.current?.lifecycle)
       activeWallet.current.lifecycle.active = false
     activeWallet.current = null
-    setWatchAddress(null)
     setWeb3Panel(null)
     setWallet(null)
     setMessage('已断开本地钱包会话。交易所授权会在到期或撤销后失效。')
     setAction(null)
-  }
-  function watch() {
-    try {
-      const watched = addressOf(addressInput)
-      disconnect()
-      setWatchAddress(watched)
-      setAction(null)
-      setMessage('只读查看账户，不具备签名权限。')
-    } catch (error) {
-      setMessage(errorText(error), 'error')
-    }
   }
   function previewLeverage(leverage: number, isCross: boolean) {
     if (wallet && market)
@@ -730,7 +714,6 @@ export function useTerminal() {
   async function transferFunds(amount: string, toPerp: boolean) {
     if (await funding.transfer(amount, toPerp)) {
       if (activeWallet.current?.lifecycle !== wallet?.lifecycle) return
-      setMessage('USDC 划转成功，余额已刷新。', 'success')
       setWeb3Panel(null)
     }
   }
@@ -812,9 +795,6 @@ export function useTerminal() {
     market,
     feed,
     wallet,
-    watchAddress,
-    addressInput,
-    setAddressInput,
     address,
     account,
     message,
@@ -831,7 +811,6 @@ export function useTerminal() {
     onboarding,
     connect,
     disconnect,
-    watch,
     selectMarket,
     previewApproval,
     previewOrder,
