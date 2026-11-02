@@ -2423,13 +2423,21 @@ test('切回基础版恢复最新蜡烛、默认间距和右侧留白，保留�
         }
         if (hits > 10) columns.push(x)
       }
-      return { left: columns[0], right: columns.at(-1), width: element.width }
+      const left = columns[0] ?? 0
+      const right = columns.at(-1) ?? 0
+      // 价格轴可因刻度文字变宽；校验相对绘图区的留白与蜡烛跨度。
+      return {
+        left,
+        right,
+        rightGap: element.width - right,
+        span: right - left,
+      }
     })
   await expect
     .poll(async () => (await candleExtent()).right ?? 0)
     .toBeGreaterThan(0)
-  const initial = await candleExtent()
   await expect(chart.locator('.pointer-events-auto')).toHaveCount(0)
+  const initial = await candleExtent()
   const host = await canvas.elementHandle()
   const box = await canvas.boundingBox()
   if (!box) throw Error('缺少图表边界')
@@ -2451,9 +2459,9 @@ test('切回基础版恢复最新蜡烛、默认间距和右侧留白，保留�
   await page.getByRole('button', { name: '基础版', exact: true }).click()
   await expect(chart.getByRole('button', { name: '回到实时' })).toBeHidden()
   await expect
-    .poll(async () => (await candleExtent()).right)
-    .toBe(initial.right)
-  await expect.poll(async () => (await candleExtent()).left).toBe(initial.left)
+    .poll(async () => (await candleExtent()).rightGap)
+    .toBe(initial.rightGap)
+  await expect.poll(async () => (await candleExtent()).span).toBe(initial.span)
   expect(
     await canvas.evaluate((element, original) => element === original, host),
   ).toBe(true)
@@ -2465,15 +2473,15 @@ test('切回基础版恢复最新蜡烛、默认间距和右侧留白，保留�
   ).toHaveAttribute('aria-pressed', 'true')
   await expect(chart.getByRole('button', { name: '回到实时' })).toBeHidden()
   await expect
-    .poll(async () => (await candleExtent()).right)
-    .toBe(initial.right)
-  await expect.poll(async () => (await candleExtent()).left).toBe(initial.left)
+    .poll(async () => (await candleExtent()).rightGap)
+    .toBe(initial.rightGap)
+  await expect.poll(async () => (await candleExtent()).span).toBe(initial.span)
   for (let i = 0; i < 3; i++) {
     await page.getByRole('button', { name: 'TradingView', exact: true }).click()
     await page.getByRole('button', { name: '基础版', exact: true }).click()
     await expect
-      .poll(async () => (await candleExtent()).right)
-      .toBe(initial.right)
+      .poll(async () => (await candleExtent()).rightGap)
+      .toBe(initial.rightGap)
   }
   await page.screenshot({
     path: 'output-tdd/playwright/chart-viewport/restored.png',

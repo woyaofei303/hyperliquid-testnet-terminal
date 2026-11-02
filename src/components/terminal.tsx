@@ -46,7 +46,7 @@ export function Terminal() {
         {unresolved && !busy && (
           <div
             role="alert"
-            className="fixed right-3 bottom-12 z-[1100] flex max-h-[calc(100dvh-120px)] w-[min(560px,calc(100vw-24px))] flex-wrap items-center justify-between gap-3 overflow-y-auto rounded-lg border border-amber-200/20 bg-panel p-3 text-xs text-amber-200 shadow-xl"
+            className="mb-0.5 flex max-h-[25dvh] shrink-0 flex-wrap items-center justify-between gap-3 overflow-y-auto rounded-lg border border-amber-200/20 bg-panel p-3 text-xs text-amber-200 shadow-xl"
           >
             <span>
               有一笔订单结果待确认。{unresolved.coin} ·{' '}
