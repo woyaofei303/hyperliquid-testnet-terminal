@@ -19,6 +19,7 @@ import {
   type MarketContext,
   WS_URL,
 } from './hyperliquid.ts'
+import { createLiveBook } from './live-book.ts'
 import {
   type Candle,
   type MarketTrade,
@@ -96,19 +97,32 @@ export function useMarket(coin: string, interval: Interval) {
   const [connection, setConnection] = useState<{
     transport: WebSocketTransport
     sub: SubscriptionClient
+    fastTransport: WebSocketTransport
+    fastSub: SubscriptionClient
   } | null>(null)
   useEffect(() => {
     const transport = new WebSocketTransport({ isTestnet: true, url: WS_URL })
-    setConnection({ transport, sub: new SubscriptionClient({ transport }) })
+    // SDK 按频道和币对分发，快慢深度用独立连接，避免同一回调混收两种快照。
+    const fastTransport = new WebSocketTransport({
+      isTestnet: true,
+      url: WS_URL,
+    })
+    setConnection({
+      transport,
+      sub: new SubscriptionClient({ transport }),
+      fastTransport,
+      fastSub: new SubscriptionClient({ transport: fastTransport }),
+    })
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => {
       clearInterval(timer)
+      fastTransport.close()
       transport.close()
     }
   }, [])
   useEffect(() => {
     if (!connection) return
-    const { transport, sub } = connection
+    const { transport, sub, fastSub } = connection
     let active = true
     let generation = 0
     const buffer = new Map<number, Candle>()
@@ -134,14 +148,15 @@ export function useMarket(coin: string, interval: Interval) {
         return next
       })
     })
-    let lastBookTime = 0
+    const liveBook = createLiveBook(coin)
+
     setBook((old) => (old?.coin === coin ? old : null))
     setCandles([])
     setError('')
-    function acceptBook(data: Book | null) {
-      if (!active || !data || data.coin !== coin || data.time < lastBookTime)
-        return
-      lastBookTime = data.time
+    function acceptBook(snapshot: Book | null, quick = false) {
+      if (!active) return
+      const data = liveBook.accept(snapshot, quick)
+      if (!data) return
       performanceMetrics.input('book', 1, data.time)
       performanceMetrics.queue('book', 1, pendingBook ? 1 : 0)
       pendingBook = data
@@ -191,8 +206,15 @@ export function useMarket(coin: string, interval: Interval) {
     transport.socket.addEventListener('close', closed)
     if (transport.socket.readyState === 1) opened()
     const subscriptions = [
+      fastSub
+        .l2Book({ coin, fast: true }, (data) => acceptBook(data, true), {
+          onError: () => {},
+        })
+        .catch(() => {}),
       sub
-        .l2Book({ coin }, acceptBook, { onError: subscriptionError })
+        .l2Book({ coin, fast: false }, (data) => acceptBook(data), {
+          onError: subscriptionError,
+        })
         .catch(subscriptionError),
       sub
         .candle(
@@ -377,6 +399,18 @@ export function useAccount(address: `0x${string}` | null, dex = '') {
     let active = true
     let inFlight: Promise<void> | null = null
     let refreshAgain = false
+    let latestState: AccountSnapshot['state'] | null = null
+    const stateFrame = createFrameBatch('account', () => {
+      if (!active || !latestState) return
+      const state = latestState
+      setSnapshot((previous) =>
+        previous?.address === owner &&
+        previous.dex === dex &&
+        state.time >= previous.state.time
+          ? { ...previous, state }
+          : previous,
+      )
+    })
     const transport = new WebSocketTransport({ isTestnet: true, url: WS_URL })
     const sub = new SubscriptionClient({ transport })
     function query(): Promise<void> {
@@ -390,7 +424,13 @@ export function useAccount(address: `0x${string}` | null, dex = '') {
           try {
             const data = await loadAccount(owner, dex)
             if (active) {
-              setSnapshot(data)
+              setSnapshot({
+                ...data,
+                state:
+                  latestState && latestState.time > data.state.time
+                    ? latestState
+                    : data.state,
+              })
               setError('')
             }
           } catch (e) {
@@ -410,11 +450,30 @@ export function useAccount(address: `0x${string}` | null, dex = '') {
     transport.socket.addEventListener('open', () => {
       void query()
     })
+    void sub
+      .clearinghouseState(
+        { user: address, dex },
+        (event) => {
+          if (
+            !active ||
+            event.user.toLowerCase() !== owner.toLowerCase() ||
+            event.dex !== dex ||
+            event.clearinghouseState.time < (latestState?.time ?? 0)
+          )
+            return
+          latestState = event.clearinghouseState
+          performanceMetrics.input('account', 1, latestState.time)
+          stateFrame.schedule()
+        },
+        { onError },
+      )
+      .catch(onError)
     void sub.orderUpdates({ user: address }, query, { onError }).catch(onError)
     void sub.userFills({ user: address }, query, { onError }).catch(onError)
     const timer = setInterval(query, 15000)
     return () => {
       active = false
+      stateFrame.cancel()
       reload.current = async () => {}
       clearInterval(timer)
       transport.close()

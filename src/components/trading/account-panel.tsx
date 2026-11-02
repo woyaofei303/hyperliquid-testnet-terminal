@@ -1,5 +1,6 @@
 import { Button, Input } from '@fameex/ui'
 import type { TerminalModel } from '@/hooks/use-terminal'
+import { t, useLocale } from '@/i18n'
 import { accountTypeName, sharedAccount } from '@/lib/account-types'
 import { cashBalances } from '@/lib/cash-order'
 import { display } from '@/lib/display'
@@ -8,6 +9,8 @@ import { isCash, quoteName } from '@/lib/market-catalog'
 
 /** FameEX FuturesAssetPanel 的纵向资产行；数值均取自 Hyperliquid 主账户。 */
 export function AccountPanel({ model }: { model: TerminalModel }) {
+  useLocale()
+
   const {
     account,
     wallet,
@@ -30,29 +33,29 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
   )
   const mode = wallet
     ? account.error || model.connectionError
-      ? '账户核验失败 · 请重试'
+      ? t('账户核验失败 · 请重试')
       : model.checkingAccount
         ? account.snapshot
-          ? '正在核验交易连接'
-          : '正在读取余额'
+          ? t('正在核验交易连接')
+          : t('正在读取余额')
         : model.tradingReady
-          ? '交易已启用'
-          : '已连接 · 待启用交易'
+          ? t('交易已启用')
+          : t('已连接 · 待启用交易')
     : watchAddress
-      ? '只读观察'
-      : '未连接'
+      ? t('只读观察')
+      : t('未连接')
   return (
     <section
       id="account-panel"
-      aria-label="账户概览"
+      aria-label={t('账户概览')}
       className="min-h-0 overflow-auto rounded-sm bg-panel"
     >
       <h2 className="border-b border-edge px-3 py-3 text-sm font-medium">
         {cash
-          ? '可用余额'
+          ? t('可用余额')
           : shared
-            ? accountTypeName(account.snapshot?.mode)
-            : '账户权益'}{' '}
+            ? t(accountTypeName(account.snapshot?.mode))
+            : t('账户权益')}{' '}
         <span className="ml-2 text-xs font-normal text-muted">
           {quoteName(model.market)}
         </span>
@@ -60,18 +63,18 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
       <dl className="space-y-2.5 px-3 py-3 text-xs">
         {(cash
           ? [
-              ['报价资产', display(balances?.quote, 6)],
+              [t('报价资产'), display(balances?.quote, 6)],
               [
-                '持有数量',
+                t('持有数量'),
                 display(balances?.base, model.market?.szDecimals ?? 5),
               ],
             ]
           : shared
             ? [
-                ['结算资产余额', display(collateral?.total)],
-                ['已占用', display(collateral?.hold)],
+                [t('结算资产余额'), display(collateral?.total)],
+                [t('已占用'), display(collateral?.hold)],
                 [
-                  '可提余额',
+                  t('可提余额'),
                   display(
                     account.snapshot
                       ? spotAvailable(account.snapshot.spot, quote, true)
@@ -80,11 +83,14 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
                 ],
               ]
             : [
-                ['账户权益', display(state?.marginSummary.accountValue)],
-                ['已用保证金', display(state?.marginSummary.totalMarginUsed)],
-                ['可提余额', display(state?.withdrawable)],
+                [t('账户权益'), display(state?.marginSummary.accountValue)],
                 [
-                  '现货 USDC 余额',
+                  t('已用保证金'),
+                  display(state?.marginSummary.totalMarginUsed),
+                ],
+                [t('可提余额'), display(state?.withdrawable)],
+                [
+                  t('现货 USDC 余额'),
                   display(
                     account.snapshot?.spot.balances.find(
                       (item) => item.coin === 'USDC',
@@ -94,12 +100,12 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
               ]
         )
           .concat([
-            ['账户类型', accountTypeName(account.snapshot?.mode)],
-            ['连接状态', mode],
+            [t('账户类型'), t(accountTypeName(account.snapshot?.mode))],
+            [t('连接状态'), mode],
           ])
           .map(([label, value]) => (
-            <div key={label} className="flex justify-between gap-4">
-              <dt className="text-muted">{label}</dt>
+            <div key={t(label)} className="flex justify-between gap-4">
+              <dt className="text-muted">{t(label)}</dt>
               <dd className="text-right tabular-nums">{value}</dd>
             </div>
           ))}
@@ -111,7 +117,7 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
           isDisabled={busy}
           onPress={() => model.setWeb3Panel('deposit')}
         >
-          存款
+          {t('存款')}
         </Button>
         <Button
           className="flex-1"
@@ -120,7 +126,7 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
           isDisabled={busy}
           onPress={() => model.setWeb3Panel('transfer')}
         >
-          划转
+          {t('划转')}
         </Button>
         <Button
           className="flex-1"
@@ -129,7 +135,7 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
           isDisabled={busy}
           onPress={() => model.setWeb3Panel('withdraw')}
         >
-          提款
+          {t('提款')}
         </Button>
       </div>
       <form
@@ -140,10 +146,10 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
         }}
       >
         <Input
-          aria-label="只读钱包地址"
+          aria-label={t('只读钱包地址')}
           value={addressInput}
           onChange={setAddressInput}
-          placeholder="0x… 只读钱包地址"
+          placeholder={t('0x… 只读钱包地址')}
           className="min-w-0 flex-1"
         />
         <Button
@@ -153,7 +159,7 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
           className="h-10 min-w-12 px-3"
           isDisabled={busy}
         >
-          查看
+          {t('查看')}
         </Button>
       </form>
     </section>

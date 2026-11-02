@@ -1,9 +1,11 @@
 'use client'
+
 import { BaseKlineChart } from '@fameex/kline'
 import { memo, useEffect, useMemo, useState } from 'react'
 import { useChartControls } from '@/hooks/use-chart-controls'
 import { useChartFeed } from '@/hooks/use-chart-feed'
 import { useTradingView } from '@/hooks/use-tradingview'
+import { t, useLocale } from '@/i18n'
 import type { createChartFeed } from '@/lib/chart-feed'
 import { type ChartInterval, chartPeriods } from '@/lib/chart-periods'
 import type { Candle } from '@/lib/market-data'
@@ -27,6 +29,8 @@ function TradingView(props: {
   visible: boolean
   onReady: (widget: IChartingLibraryWidget) => void
 }) {
+  useLocale()
+
   const { container, error } = useTradingView(props)
   return (
     <>
@@ -36,13 +40,16 @@ function TradingView(props: {
           role="alert"
           className="absolute inset-x-0 top-0 bg-panel p-3 text-xs text-loss"
         >
-          图表加载失败：{error}
+          {t('图表加载失败：')}
+          {t(error)}
         </p>
       )}
     </>
   )
 }
 export const Chart = memo(function Chart(props: Props) {
+  const locale = useLocale()
+
   const [engine, setEngine] = useState<ChartEngine>('kline')
   const controls = useChartControls(engine, props.onIntervalChange)
   const [tvMounted, setTvMounted] = useState(false)
@@ -74,7 +81,9 @@ export const Chart = memo(function Chart(props: Props) {
         <section
           hidden={engine !== 'kline'}
           className="absolute inset-0"
-          aria-label={`基础版 K 线图，已加载 ${count} 根蜡烛，时间使用 UTC`}
+          aria-label={
+            t('基础版 K 线图，已加载 ') + count + t(' 根蜡烛，时间使用 UTC')
+          }
         >
           <BaseKlineChart
             onChartReady={controls.onKlineReady}
@@ -83,7 +92,7 @@ export const Chart = memo(function Chart(props: Props) {
             symbolInfo={symbol}
             period={chartPeriods[props.interval]}
             klinePriceType="trade"
-            locale="zh-CN"
+            locale={locale}
             theme="dark"
             options={klineOptions}
             className="absolute inset-0 flex"
@@ -93,7 +102,11 @@ export const Chart = memo(function Chart(props: Props) {
           <section
             hidden={engine !== 'tradingview'}
             className="absolute inset-0"
-            aria-label={`TradingView K 线图，已加载 ${count} 根蜡烛，时间使用 UTC`}
+            aria-label={
+              t('TradingView K 线图，已加载 ') +
+              count +
+              t(' 根蜡烛，时间使用 UTC')
+            }
           >
             <TradingView
               source={source}
@@ -106,7 +119,7 @@ export const Chart = memo(function Chart(props: Props) {
         )}
         {loaded && !count && !error && (
           <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted">
-            此市场暂无历史成交
+            {t('此市场暂无历史成交')}
           </p>
         )}
         {error && (
@@ -114,7 +127,8 @@ export const Chart = memo(function Chart(props: Props) {
             role="alert"
             className="absolute inset-x-2 bottom-2 z-40 bg-panel p-2 text-xs text-loss"
           >
-            行情加载失败：{error}
+            {t('行情加载失败：')}
+            {t(error)}
           </p>
         )}
       </div>

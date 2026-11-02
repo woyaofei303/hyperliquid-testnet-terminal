@@ -12,6 +12,7 @@ import {
   Tabs,
 } from '@fameex/ui'
 import { cn } from '@fameex/utils'
+import { t, useLocale } from '@/i18n'
 import { type OrderKind, supportedOrderKinds } from '@/lib/order-ticket'
 import type { Market } from '@/lib/orders'
 
@@ -37,13 +38,15 @@ export function OrderTypeSelector({
   value: OrderKind
   onChange: (value: OrderKind) => void
 }) {
+  useLocale()
+
   const options = supportedOrderKinds(market)
   const basic = value === 'limit' || value === 'market'
   const { menuStyle, itemStyle } = dropdownStyle()
   return (
     <div className="flex items-end justify-start gap-4 border-b border-edge">
       <Tabs
-        aria-label="订单类型"
+        aria-label={t('订单类型')}
         selectedKey={basic ? value : 'advanced'}
         onSelectionChange={(key) => {
           if (key === 'limit' || key === 'market') onChange(key)
@@ -57,8 +60,8 @@ export function OrderTypeSelector({
             'mb-1.5 font-medium text-3 group-data-[selected=true]:text-1',
         }}
       >
-        <Tab key="limit" title="限价单" />
-        <Tab key="market" title="市价单" />
+        <Tab key="limit" title={t('限价单')} />
+        <Tab key="market" title={t('市价单')} />
       </Tabs>
       <Dropdown
         placement="bottom-start"
@@ -71,7 +74,7 @@ export function OrderTypeSelector({
       >
         <DropdownTrigger>
           <Button
-            aria-label="高级订单类型"
+            aria-label={t('高级订单类型')}
             variant="light"
             disableRipple
             className={cn(
@@ -81,7 +84,9 @@ export function OrderTypeSelector({
                 : 'text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-ink',
             )}
           >
-            {basic ? '专业' : options.find(([kind]) => kind === value)?.[1]}
+            {basic
+              ? t('专业')
+              : t(options.find(([kind]) => kind === value)?.[1] ?? '')}
             <ChartIcon
               name="arrow-drop-down"
               className="size-4 transition-transform group-aria-expanded:rotate-180"
@@ -89,7 +94,7 @@ export function OrderTypeSelector({
           </Button>
         </DropdownTrigger>
         <DropdownMenu
-          aria-label="高级订单类型选项"
+          aria-label={t('高级订单类型选项')}
           selectionMode="single"
           disallowEmptySelection
           selectedKeys={basic ? [] : [value]}
@@ -107,8 +112,8 @@ export function OrderTypeSelector({
           {options.slice(2).map(([key, label]) => (
             <DropdownItem
               key={key}
-              textValue={label}
-              description={descriptions[key]}
+              textValue={t(label)}
+              description={t(descriptions[key])}
               className={cn(
                 itemStyle(),
                 'rounded-sm px-3 py-2.5 !text-ink data-[hover=true]:!bg-hover-n data-[focus=true]:!bg-hover-n data-[selected=true]:!text-accent',
@@ -119,7 +124,7 @@ export function OrderTypeSelector({
                   'mt-1 whitespace-normal text-xs leading-4 text-muted',
               }}
             >
-              {label}
+              {t(label)}
             </DropdownItem>
           ))}
         </DropdownMenu>

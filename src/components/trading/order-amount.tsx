@@ -1,4 +1,5 @@
 import { FlatSelect, Input, Slider } from '@fameex/ui'
+import { t, useLocale } from '@/i18n'
 
 /** 沿用 FameEX Amount / Slider 的输入框内单位选择和百分比刻度。 */
 export function OrderAmount({
@@ -24,26 +25,32 @@ export function OrderAmount({
   onUnit: (value: 'base' | 'usdc') => void
   onPercent: (value: number) => void
 }) {
+  useLocale()
+
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <Input
-        label={unit === 'base' ? `数量（${base}）` : `金额（${quote}）`}
+        label={
+          unit === 'base'
+            ? t('数量（') + base + t('）')
+            : t('金额（') + quote + t('）')
+        }
         size="md"
         value={amount}
         onChange={onAmount}
         placeholder={
           unit === 'usdc'
-            ? '输入订单金额'
+            ? t('输入订单金额')
             : precision === 0
-              ? '整数份数'
-              : `最多 ${precision} 位小数`
+              ? t('整数份数')
+              : t('最多 ') + precision + t(' 位小数')
         }
         inputMode="decimal"
         autoComplete="off"
         inputClassName="min-w-0"
         endContent={
           <FlatSelect
-            aria-label="数量单位"
+            aria-label={t('数量单位')}
             value={unit}
             onChange={(value) => onUnit(value === 'usdc' ? 'usdc' : 'base')}
             items={[
@@ -58,7 +65,7 @@ export function OrderAmount({
       />
       <div className="relative h-10 w-full pt-1">
         <Slider
-          label="下单比例"
+          label={t('下单比例')}
           minValue={0}
           maxValue={100}
           step={1}

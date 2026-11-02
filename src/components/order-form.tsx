@@ -1,8 +1,10 @@
 'use client'
+
 import { Button, Checkbox, Input, Tab, Tabs } from '@fameex/ui'
 import type { ReactNode } from 'react'
 import { useMarginSettings } from '@/hooks/use-margin-settings'
 import { useOrderForm } from '@/hooks/use-order-form'
+import { t, useLocale } from '@/i18n'
 import { display } from '@/lib/display'
 import type { Book, MarketContext } from '@/lib/hyperliquid'
 import { baseName, quoteName } from '@/lib/market-catalog'
@@ -43,6 +45,8 @@ export function OrderForm({
   onLeverage,
   accountType,
 }: Props) {
+  useLocale()
+
   const quote = quoteName(market)
   const base = baseName(market)
   const settings = useMarginSettings({
@@ -69,9 +73,11 @@ export function OrderForm({
   return (
     <section
       className="flex h-full min-h-0 flex-col overflow-y-auto rounded-sm bg-panel p-3 [&>*]:shrink-0"
-      aria-label="下单面板"
+      aria-label={t('下单面板')}
     >
-      <h2 className="sr-only">交易 {base}</h2>
+      <h2 className="sr-only">
+        {t('交易')} {base}
+      </h2>
       <MarginSettings
         market={market}
         settings={settings}
@@ -88,7 +94,7 @@ export function OrderForm({
       </div>
       <Tabs
         disableAnimation={false}
-        aria-label="交易方向"
+        aria-label={t('交易方向')}
         variant="solid"
         selectedKey={f.side}
         onSelectionChange={(key) =>
@@ -102,18 +108,18 @@ export function OrderForm({
           tabContent: `px-0 py-0 text-body-regular text-3 group-data-[selected=true]:font-semibold ${f.side === 'sell' ? 'group-data-[selected=true]:text-white' : 'group-data-[selected=true]:text-6'}`,
         }}
       >
-        <Tab key="buy" title="买入 / 做多" />
-        <Tab key="sell" title="卖出 / 做空" />
+        <Tab key="buy" title={t('买入 / 做多')} />
+        <Tab key="sell" title={t('卖出 / 做空')} />
       </Tabs>
       <div className="mb-3 space-y-1 text-xs">
         <div className="flex justify-between">
-          <span className="text-muted">可用保证金</span>
+          <span className="text-muted">{t('可用保证金')}</span>
           <span>
             {display(form.available)} {quote}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted">当前仓位</span>
+          <span className="text-muted">{t('当前仓位')}</span>
           <span>
             {position} {base}
           </span>
@@ -128,7 +134,7 @@ export function OrderForm({
       >
         {(f.kind.startsWith('stop-') || f.kind.startsWith('take-')) && (
           <Input
-            label={`触发价格（${quote}）`}
+            label={t('触发价格（') + quote + t('）')}
             value={f.trigger}
             onChange={(value) => change('trigger', value)}
             inputMode="decimal"
@@ -139,12 +145,12 @@ export function OrderForm({
             <div className="flex items-center justify-between text-xs">
               <label htmlFor="order-price" className="text-muted">
                 {f.kind === 'scale'
-                  ? `最低价格（${quote}）`
+                  ? t('最低价格（') + quote + t('）')
                   : f.kind === 'chase'
                     ? f.side === 'buy'
-                      ? `最高买入价（${quote}）`
-                      : `最低卖出价（${quote}）`
-                    : `价格（${quote}）`}
+                      ? t('最高买入价（') + quote + t('）')
+                      : t('最低卖出价（') + quote + t('）')
+                    : t('价格（') + quote + t('）')}
               </label>
               <Button
                 variant="light"
@@ -152,12 +158,12 @@ export function OrderForm({
                 onPress={form.applyMarkPrice}
                 className="text-accent hover:text-ink"
               >
-                使用标记价
+                {t('使用标记价')}
               </Button>
             </div>
             <Input
               id="order-price"
-              aria-label={`价格（${quote}）`}
+              aria-label={t('价格（') + quote + t('）')}
               size="md"
               value={f.price}
               onChange={(value) => change('price', value)}
@@ -180,7 +186,7 @@ export function OrderForm({
           onPercent={form.setPercent}
         />
         <p className="flex justify-between text-[11px] text-muted">
-          <span>{f.reduceOnly ? '可减仓数量' : '最大可下'}</span>
+          <span>{f.reduceOnly ? t('可减仓数量') : t('最大可下')}</span>
           <span>{settings.current ? `${form.maxSize} ${base}` : '—'}</span>
         </p>
         <OrderOptions form={form} quote={quote} />
@@ -189,27 +195,29 @@ export function OrderForm({
             isSelected={f.reduceOnly}
             onValueChange={(value) => change('reduceOnly', value)}
           >
-            <span className="text-xs text-muted">只减仓 Reduce-only</span>
+            <span className="text-xs text-muted">
+              {t('只减仓 Reduce-only')}
+            </span>
           </Checkbox>
           {basic && !f.reduceOnly && (
             <Checkbox
               isSelected={f.protection}
               onValueChange={(value) => change('protection', value)}
             >
-              <span className="text-xs text-muted">止盈 / 止损</span>
+              <span className="text-xs text-muted">{t('止盈 / 止损')}</span>
             </Checkbox>
           )}
         </div>
         {basic && f.protection && !f.reduceOnly && (
           <div className="grid gap-2">
             <Input
-              label={`止盈触发价（${quote}，可选）`}
+              label={t('止盈触发价（') + quote + t('，可选）')}
               value={f.takeProfit}
               onChange={(value) => change('takeProfit', value)}
               inputMode="decimal"
             />
             <Input
-              label={`止损触发价（${quote}，可选）`}
+              label={t('止损触发价（') + quote + t('，可选）')}
               value={f.stopLoss}
               onChange={(value) => change('stopLoss', value)}
               inputMode="decimal"
@@ -218,7 +226,7 @@ export function OrderForm({
         )}
         {form.error && (
           <p role="alert" className="text-xs leading-5 text-loss">
-            {form.error}
+            {t(form.error)}
           </p>
         )}
         <Button
@@ -237,27 +245,27 @@ export function OrderForm({
           className="mt-auto min-h-9 w-full text-sm font-semibold"
         >
           {busy
-            ? '操作处理中…'
+            ? t('操作处理中…')
             : onboarding
-              ? onboarding
+              ? t(onboarding)
               : !enabled
-                ? '等待账户数据 / 核对未确认订单'
+                ? t('等待账户数据 / 核对未确认订单')
                 : stale
-                  ? '等待实时行情'
+                  ? t('等待实时行情')
                   : !settings.current
-                    ? '读取下单额度…'
-                    : form.reduceOnlyError || '下单'}
+                    ? t('读取下单额度…')
+                    : t(form.reduceOnlyError || '下单')}
         </Button>
         <dl
-          aria-label="订单摘要"
+          aria-label={t('订单摘要')}
           className="space-y-2 border-t border-edge pt-3 text-xs"
         >
           {[
-            ['订单价值', form.notional],
-            ['预计初始保证金', form.margin],
+            [t('订单价值'), form.notional],
+            [t('预计初始保证金'), form.margin],
           ].map(([label, value]) => (
-            <div key={label} className="flex justify-between gap-2">
-              <dt className="text-muted">{label}</dt>
+            <div key={t(label)} className="flex justify-between gap-2">
+              <dt className="text-muted">{t(label)}</dt>
               <dd className="text-right tabular-nums">
                 {value} {quote}
               </dd>
@@ -271,18 +279,20 @@ export function OrderForm({
           )}
           {f.kind.endsWith('-market') && (
             <div className="flex justify-between gap-2">
-              <dt className="text-muted">最大滑点</dt>
+              <dt className="text-muted">{t('最大滑点')}</dt>
               <dd>10%</dd>
             </div>
           )}
           <div className="flex justify-between gap-2">
-            <dt className="text-muted">预计手续费</dt>
+            <dt className="text-muted">{t('预计手续费')}</dt>
             <dd className="text-right tabular-nums">
               {form.fee} {quote}
             </dd>
           </div>
         </dl>
-        {form.feeError && <p className="text-xs text-muted">费率暂不可用。</p>}
+        {form.feeError && (
+          <p className="text-xs text-muted">{t('费率暂不可用。')}</p>
+        )}
       </form>
     </section>
   )

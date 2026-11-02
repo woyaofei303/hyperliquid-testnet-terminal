@@ -1,4 +1,5 @@
 'use client'
+import { t, useLocale } from '@/i18n'
 
 export function ErrorFallback({
   name,
@@ -9,6 +10,8 @@ export function ErrorFallback({
   onRetry: () => void
   className?: string
 }) {
+  useLocale()
+
   return (
     <section
       role="alert"
@@ -20,16 +23,22 @@ export function ErrorFallback({
       >
         !
       </span>
-      <h2 className="text-sm font-medium">{name}暂时无法显示</h2>
+      <h2 className="text-sm font-medium">
+        {name}
+        {t('暂时无法显示')}
+      </h2>
       <p className="max-w-sm text-xs leading-5 text-muted">
-        恢复仅重新加载界面。已提交的订单和资金请求请先核对记录，不要重复提交。
+        {t(
+          '恢复仅重新加载界面。已提交的订单和资金请求请先核对记录，不要重复提交。',
+        )}
       </p>
       <button
         type="button"
         onClick={onRetry}
         className="shrink-0 rounded-md bg-brand px-4 py-2 text-xs font-medium text-panel hover:bg-brand/80"
       >
-        恢复{name}
+        {t('恢复')}
+        {name}
       </button>
     </section>
   )

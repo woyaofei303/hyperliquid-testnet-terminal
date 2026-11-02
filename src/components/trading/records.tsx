@@ -1,23 +1,25 @@
 'use client'
-import { Button, Input, Tab, Tabs } from '@fameex/ui'
+
+import { Button, Tab, Tabs } from '@fameex/ui'
 import Image from 'next/image'
 import { useState } from 'react'
 import type { TerminalModel } from '@/hooks/use-terminal'
+import { t, useLocale } from '@/i18n'
 import { display } from '@/lib/display'
-import { isCash, marketLabel } from '@/lib/market-catalog'
+import { isCash, marketLabel, pricePrecision } from '@/lib/market-catalog'
 import { Money } from '@/lib/orders'
+import { PositionClose } from './position-close'
 import { PositionProtection } from './position-protection'
 export function TradingRecords({ model }: { model: TerminalModel }) {
+  useLocale()
+
   const {
     account,
     journal,
     address,
-    closeSizes,
-    setCloseSizes,
     canTrade,
     tradingReady,
     busy,
-    previewClose,
     previewCancel,
     exportEvidence,
   } = model
@@ -27,27 +29,31 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
     return market ? marketLabel(market) : coin
   }
   const [tab, setTab] = useState('positions')
+  const [closing, setClosing] = useState<string | null>(null)
+  const closingPosition = account.snapshot?.state.assetPositions.find(
+    (item) => item.position.coin === closing,
+  )?.position
   const [protection, setProtection] = useState<string | null>(null)
   return (
     <section
       id="trading-records"
       className="flex h-64 min-h-0 min-w-0 flex-col overflow-hidden rounded-sm lg:h-auto bg-panel md:col-span-2 lg:col-start-1 lg:row-start-2"
-      aria-label="交易记录"
+      aria-label={t('交易记录')}
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-0 border-b border-edge px-4">
         <Tabs
           disableAnimation={false}
-          aria-label="交易记录类型"
+          aria-label={t('交易记录类型')}
           selectedKey={tab}
           onSelectionChange={(key) => setTab(String(key))}
           classNames={{ tabList: 'gap-5', tab: 'h-9' }}
         >
-          <Tab key="positions" title={cash ? '余额' : '仓位'} />
-          <Tab key="orders" title="当前委托" />
-          <Tab key="fills" title="成交记录" />
+          <Tab key="positions" title={cash ? t('余额') : t('仓位')} />
+          <Tab key="orders" title={t('当前委托')} />
+          <Tab key="fills" title={t('成交记录')} />
           <Tab key="twaps" title="TWAP" />
-          <Tab key="chase" title="追价策略" />
-          <Tab key="journal" title="操作记录" />
+          <Tab key="chase" title={t('追价策略')} />
+          <Tab key="journal" title={t('操作记录')} />
         </Tabs>
         <div className="flex min-h-9 items-center gap-4">
           <Button
@@ -56,7 +62,7 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
             onClick={account.refresh}
             className="text-xs text-muted hover:text-ink"
           >
-            刷新
+            {t('刷新')}
           </Button>
           <Button
             variant="light"
@@ -64,7 +70,7 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
             onClick={exportEvidence}
             className="text-xs text-accent hover:text-ink"
           >
-            导出验证记录 ↗
+            {t('导出验证记录 ↗')}
           </Button>
         </div>
       </div>
@@ -73,9 +79,9 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
           <table className="w-full text-left text-xs">
             <thead className="text-muted">
               <tr>
-                {['资产', '持有数量', '冻结数量'].map((text) => (
+                {[t('资产'), t('持有数量'), t('冻结数量')].map((text) => (
                   <th className="px-4 py-3 font-normal" key={text}>
-                    {text}
+                    {t(text)}
                   </th>
                 ))}
               </tr>
@@ -101,88 +107,141 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
           </table>
         )}
         {tab === 'positions' && !cash && (
-          <table className="w-full whitespace-nowrap text-left text-xs">
-            <thead className="text-muted">
+          <table
+            aria-label={t('仓位')}
+            className="w-full min-w-[1040px] whitespace-nowrap text-right text-xs tabular-nums"
+          >
+            <thead className="sticky top-0 z-10 bg-panel text-muted">
               <tr>
                 {[
-                  '合约 / 杠杆',
+                  '市场',
                   '仓位数量',
+                  '仓位价值',
                   '开仓均价',
-                  '未实现盈亏',
+                  '标记价格',
+                  '盈亏 / 收益率',
                   '预估清算价',
                   '保证金',
-                  '减仓数量 / 操作',
-                ].map((label) => (
-                  <th key={label} className="px-4 py-3 font-normal">
-                    {label}
+                  '资金费',
+                  '平仓',
+                  '止盈 / 止损',
+                ].map((label, index) => (
+                  <th
+                    key={t(label)}
+                    className={`px-3 py-3 font-normal ${index === 0 ? 'text-left' : ''}`}
+                  >
+                    {t(label)}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {account.snapshot?.state.assetPositions
-                .filter((p) => new Money(p.position.szi).abs().gt(0))
-                .map(({ position: p }) => (
-                  <tr key={p.coin} className="border-t border-edge">
-                    <td className="px-4 py-4 font-medium">
-                      {p.coin}{' '}
-                      <span className="text-muted">
-                        {p.leverage.type === 'cross' ? '全仓' : '逐仓'}{' '}
-                        {p.leverage.value}x
-                      </span>
-                    </td>
-                    <td
-                      className={`px-4 font-mono ${new Money(p.szi).gte(0) ? 'text-mint' : 'text-loss'}`}
+                .filter((item) => new Money(item.position.szi).abs().gt(0))
+                .map(({ position: p }) => {
+                  const positionMarket = model.markets.find(
+                    (item) => item.name === p.coin,
+                  )
+                  const decimals = positionMarket
+                    ? pricePrecision(positionMarket)
+                    : 6
+                  const long = new Money(p.szi).gt(0)
+                  const pnlPositive = new Money(p.unrealizedPnl).gte(0)
+                  const mark = new Money(p.positionValue)
+                    .div(new Money(p.szi).abs())
+                    .toFixed()
+                  return (
+                    <tr
+                      key={p.coin}
+                      className="h-14 border-t border-edge hover:bg-surface/40"
                     >
-                      {p.szi}
-                    </td>
-                    <td className="px-4 font-mono">{p.entryPx}</td>
-                    <td
-                      className={`px-4 font-mono ${new Money(p.unrealizedPnl).gte(0) ? 'text-mint' : 'text-loss'}`}
-                    >
-                      {display(p.unrealizedPnl)}
-                    </td>
-                    <td className="px-4 font-mono">
-                      {display(p.liquidationPx)}
-                    </td>
-                    <td className="px-4 font-mono">{display(p.marginUsed)}</td>
-                    <td className="flex gap-2 px-4 py-3">
-                      <Input
-                        aria-label={`${p.coin} 减仓数量`}
-                        className="w-28"
-                        value={
-                          closeSizes[p.coin] ?? new Money(p.szi).abs().toFixed()
-                        }
-                        onChange={(value) =>
-                          setCloseSizes((previous) => ({
-                            ...previous,
-                            [p.coin]: value,
-                          }))
-                        }
-                        inputMode="decimal"
-                      />
-                      <Button
-                        variant="bordered"
-                        type="button"
-                        isDisabled={!canTrade || busy}
-                        onClick={() => previewClose(p)}
-                        color="default"
-                        size="sm"
-                        className="shrink-0"
+                      <td className="px-3 text-left">
+                        <button
+                          type="button"
+                          onClick={() => model.selectMarket(p.coin)}
+                          className="font-medium hover:text-accent"
+                        >
+                          {p.coin}{' '}
+                          <span className="text-accent">
+                            {p.leverage.value}x
+                          </span>
+                        </button>
+                        <div
+                          className={`mt-1 text-[10px] ${long ? 'text-mint' : 'text-loss'}`}
+                        >
+                          {t(long ? '多头' : '空头')}
+                        </div>
+                      </td>
+                      <td
+                        className={`px-3 font-mono ${long ? 'text-mint' : 'text-loss'}`}
                       >
-                        减仓 / 平仓
-                      </Button>
-                      <Button
-                        variant="bordered"
-                        size="sm"
-                        isDisabled={!canTrade || busy}
-                        onPress={() => setProtection(p.coin)}
+                        {new Money(p.szi).abs().toFixed()}
+                      </td>
+                      <td className="px-3 font-mono">
+                        {display(p.positionValue)}
+                      </td>
+                      <td className="px-3 font-mono">
+                        {display(
+                          p.entryPx,
+                          Math.max(
+                            decimals,
+                            new Money(p.entryPx).decimalPlaces(),
+                          ),
+                        )}
+                      </td>
+                      <td className="px-3 font-mono">
+                        {display(mark, decimals)}
+                      </td>
+                      <td
+                        className={`px-3 font-mono ${pnlPositive ? 'text-mint' : 'text-loss'}`}
                       >
-                        止盈 / 止损
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                        {pnlPositive ? '+' : ''}
+                        {display(p.unrealizedPnl)}
+                        <div className="mt-1 text-[10px]">
+                          ({new Money(p.returnOnEquity).times(100).toFixed(2)}%)
+                        </div>
+                      </td>
+                      <td className="px-3 font-mono">
+                        {display(p.liquidationPx, decimals)}
+                      </td>
+                      <td className="px-3 font-mono">
+                        {display(p.marginUsed)}
+                        <div className="mt-1 text-[10px] text-muted">
+                          {t(p.leverage.type === 'cross' ? '全仓' : '逐仓')}
+                        </div>
+                      </td>
+                      <td
+                        title={t('正数为已支付，负数为已收取；自开仓以来累计')}
+                        className={`px-3 font-mono ${new Money(p.cumFunding.sinceOpen).gt(0) ? 'text-loss' : 'text-mint'}`}
+                      >
+                        {display(p.cumFunding.sinceOpen, 6)}
+                      </td>
+                      <td className="px-3">
+                        <Button
+                          variant="light"
+                          size="sm"
+                          color="default"
+                          isDisabled={!canTrade || busy}
+                          onPress={() => setClosing(p.coin)}
+                          className="h-7 min-w-0 px-0 text-accent"
+                        >
+                          {t('市价')} / {t('限价')}
+                        </Button>
+                      </td>
+                      <td className="px-3">
+                        <Button
+                          variant="light"
+                          size="sm"
+                          isDisabled={!canTrade || busy}
+                          onPress={() => setProtection(p.coin)}
+                          className="h-7 min-w-0 px-0 text-accent"
+                        >
+                          {t('止盈 / 止损')}
+                        </Button>
+                      </td>
+                    </tr>
+                  )
+                })}
             </tbody>
           </table>
         )}
@@ -191,16 +250,16 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
             <thead className="text-muted">
               <tr>
                 {[
-                  '合约',
-                  '方向',
-                  '委托价格',
-                  '剩余 / 原始数量',
-                  '类型',
-                  '订单 ID',
-                  '操作',
+                  t('合约'),
+                  t('方向'),
+                  t('委托价格'),
+                  t('剩余 / 原始数量'),
+                  t('类型'),
+                  t('订单 ID'),
+                  t('操作'),
                 ].map((label) => (
-                  <th key={label} className="px-4 py-3 font-normal">
-                    {label}
+                  <th key={t(label)} className="px-4 py-3 font-normal">
+                    {t(label)}
                   </th>
                 ))}
               </tr>
@@ -212,13 +271,13 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                   <td
                     className={`px-4 ${order.side === 'B' ? 'text-mint' : 'text-loss'}`}
                   >
-                    {order.side === 'B' ? '买入' : '卖出'}
+                    {order.side === 'B' ? t('买入') : t('卖出')}
                   </td>
                   <td className="px-4 font-mono">
                     {order.limitPx}
                     {order.isTrigger && (
                       <span className="block text-muted">
-                        触发 {order.triggerPx}
+                        {t('触发')} {order.triggerPx}
                       </span>
                     )}
                   </td>
@@ -228,7 +287,7 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                   <td className="px-4">
                     {order.orderType}
                     {order.reduceOnly && (
-                      <span className="block text-muted">只减仓</span>
+                      <span className="block text-muted">{t('只减仓')}</span>
                     )}
                   </td>
                   <td className="px-4 font-mono text-muted">{order.oid}</td>
@@ -241,7 +300,7 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                       color="default"
                       size="sm"
                     >
-                      撤单
+                      {t('撤单')}
                     </Button>
                   </td>
                 </tr>
@@ -254,16 +313,16 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
             <thead className="text-muted">
               <tr>
                 {[
-                  '时间',
-                  '合约',
-                  '方向',
-                  '成交价格',
-                  '成交数量',
-                  '手续费',
-                  '订单 ID',
+                  t('时间'),
+                  t('合约'),
+                  t('方向'),
+                  t('成交价格'),
+                  t('成交数量'),
+                  t('手续费'),
+                  t('订单 ID'),
                 ].map((label) => (
-                  <th key={label} className="px-4 py-3 font-normal">
-                    {label}
+                  <th key={t(label)} className="px-4 py-3 font-normal">
+                    {t(label)}
                   </th>
                 ))}
               </tr>
@@ -292,15 +351,15 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
             <thead className="text-muted">
               <tr>
                 {[
-                  '市场 / 方向',
-                  '已执行 / 总量',
-                  '均价',
-                  '时长 / 随机',
-                  '状态',
-                  '操作',
+                  t('市场 / 方向'),
+                  t('已执行 / 总量'),
+                  t('均价'),
+                  t('时长 / 随机'),
+                  t('状态'),
+                  t('操作'),
                 ].map((label) => (
-                  <th className="px-4 py-3 font-normal" key={label}>
-                    {label}
+                  <th className="px-4 py-3 font-normal" key={t(label)}>
+                    {t(label)}
                   </th>
                 ))}
               </tr>
@@ -313,7 +372,7 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                 >
                   <td className="px-4 py-3">
                     {labelFor(item.state.coin)} ·{' '}
-                    {item.state.side === 'B' ? '买入' : '卖出'}
+                    {item.state.side === 'B' ? t('买入') : t('卖出')}
                   </td>
                   <td className="px-4 font-mono">
                     {item.state.executedSz} / {item.state.sz}
@@ -328,18 +387,18 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                       : '—'}
                   </td>
                   <td className="px-4">
-                    {item.state.minutes} 分钟 /{' '}
-                    {item.state.randomize ? '是' : '否'}
+                    {item.state.minutes} {t('分钟 /')}{' '}
+                    {item.state.randomize ? t('是') : t('否')}
                   </td>
                   <td className="px-4">
                     {
                       {
-                        activated: '执行中',
-                        waitingForTrigger: '等待触发',
-                        finished: '已完成',
-                        terminated: '已取消',
-                        stopped: '达到停止价',
-                        error: '失败',
+                        activated: t('执行中'),
+                        waitingForTrigger: t('等待触发'),
+                        finished: t('已完成'),
+                        terminated: t('已取消'),
+                        stopped: t('达到停止价'),
+                        error: t('失败'),
                       }[item.status.status]
                     }
                     {'description' in item.status &&
@@ -361,7 +420,7 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                             )
                           }
                         >
-                          停止 TWAP
+                          {t('停止 TWAP')}
                         </Button>
                       )}
                   </td>
@@ -373,7 +432,9 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
         {tab === 'chase' && (
           <div className="p-4 text-xs">
             <p className="mb-3 text-muted">
-              追价仅在当前页面运行。停止改价后，已挂订单仍可能成交，请在当前委托撤销。
+              {t(
+                '追价仅在当前页面运行。停止改价后，已挂订单仍可能成交，请在当前委托撤销。',
+              )}
             </p>
             <ul className="divide-y divide-edge">
               {model.chase.rows.map((row) => (
@@ -383,10 +444,10 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                 >
                   <span>
                     {marketLabel(row.ticket.market)} ·{' '}
-                    {row.ticket.order.b ? '买' : '卖'} · #{row.oid}
+                    {row.ticket.order.b ? t('买') : t('卖')} · #{row.oid}
                   </span>
                   <span>
-                    报价 {row.price} · 剩余 {row.remaining}
+                    {t('报价')} {row.price} {t('· 剩余')} {row.remaining}
                   </span>
                   <span>{row.status}</span>
                   {row.active && (
@@ -395,7 +456,7 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                       variant="bordered"
                       onPress={() => model.chase.stop(row.id)}
                     >
-                      停止改价
+                      {t('停止改价')}
                     </Button>
                   )}
                 </li>
@@ -449,12 +510,20 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
             />
             <p>
               {address
-                ? '暂无记录'
-                : '连接钱包或输入公开地址，查看账户交易数据'}
+                ? t('暂无记录')
+                : t('连接钱包或输入公开地址，查看账户交易数据')}
             </p>
           </div>
         )}
       </div>
+      {closingPosition && (
+        <PositionClose
+          key={closingPosition.coin}
+          position={closingPosition}
+          model={model}
+          onClose={() => setClosing(null)}
+        />
+      )}
       {protection && (
         <PositionProtection
           coin={protection}

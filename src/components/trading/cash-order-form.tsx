@@ -1,6 +1,7 @@
 import { Button, Input, Tab, Tabs } from '@fameex/ui'
 import { useCashOrderForm } from '@/hooks/use-cash-order-form'
 import type { TerminalModel } from '@/hooks/use-terminal'
+import { t, useLocale } from '@/i18n'
 import { display } from '@/lib/display'
 import type { MarketContext } from '@/lib/hyperliquid'
 import { baseName, quoteName } from '@/lib/market-catalog'
@@ -17,21 +18,23 @@ export function CashOrderForm({
   model: TerminalModel
   market: MarketContext
 }) {
+  useLocale()
+
   const form = useCashOrderForm(model, market)
   const { fields: f, change } = form
   const onboarding = model.onboarding
   const outcome = market.kind === 'outcome'
-  const base = outcome ? '份' : baseName(market),
+  const base = outcome ? t('份') : baseName(market),
     quote = quoteName(market)
   const pair = model.markets.find((m) => m.name === market.paired)
   return (
     <section
-      aria-label="下单面板"
+      aria-label={t('下单面板')}
       className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto rounded-sm bg-panel p-3 [&>*]:shrink-0"
     >
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-sm font-medium">
-          {outcome ? '预测交易' : '现货交易'}
+          {outcome ? t('预测交易') : t('现货交易')}
         </h2>
         <div className="flex w-24">
           <AccountTypeSetting
@@ -62,7 +65,7 @@ export function CashOrderForm({
             )}
           </div>
           <details className="text-xs text-muted">
-            <summary className="cursor-pointer">结算规则</summary>
+            <summary className="cursor-pointer">{t('结算规则')}</summary>
             <p className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words leading-5">
               {market.description}
             </p>
@@ -76,7 +79,7 @@ export function CashOrderForm({
       />
       <Tabs
         disableAnimation={false}
-        aria-label="交易方向"
+        aria-label={t('交易方向')}
         variant="solid"
         selectedKey={f.side}
         onSelectionChange={(key) =>
@@ -90,11 +93,11 @@ export function CashOrderForm({
           tabContent: `px-0 py-0 text-body-regular text-3 group-data-[selected=true]:font-semibold ${f.side === 'sell' ? 'group-data-[selected=true]:text-white' : 'group-data-[selected=true]:text-6'}`,
         }}
       >
-        <Tab key="buy" title="买入" />
-        <Tab key="sell" title="卖出" />
+        <Tab key="buy" title={t('买入')} />
+        <Tab key="sell" title={t('卖出')} />
       </Tabs>
       <div className="flex justify-between text-xs text-muted">
-        <span>可用</span>
+        <span>{t('可用')}</span>
         <span className="text-ink">
           {form.balances
             ? display(
@@ -107,10 +110,10 @@ export function CashOrderForm({
       </div>
       {['limit', 'scale', 'chase'].includes(f.kind) && (
         <Input
-          label={`${f.kind === 'scale' ? '最低价格' : f.kind === 'chase' ? (f.side === 'buy' ? '最高买入价' : '最低卖出价') : '价格'}（${quote}）`}
+          label={`${t(f.kind === 'scale' ? '最低价格' : f.kind === 'chase' ? (f.side === 'buy' ? '最高买入价' : '最低卖出价') : '价格')}${t('（')}${quote}${t('）')}`}
           value={f.price}
           onChange={(v) => change('price', v)}
-          placeholder={outcome ? '0.00001 – 0.99999' : '输入价格'}
+          placeholder={outcome ? '0.00001 – 0.99999' : t('输入价格')}
           endContent={quote}
         />
       )}
@@ -127,7 +130,7 @@ export function CashOrderForm({
         onPercent={form.setPercent}
       />
       <p className="flex justify-between text-xs text-muted">
-        <span>最大可下</span>
+        <span>{t('最大可下')}</span>
         <span>
           {form.max} {base}
         </span>
@@ -135,19 +138,21 @@ export function CashOrderForm({
       <OrderOptions form={form} quote={quote} />
       {f.kind === 'twap' && f.side === 'buy' && !f.twapLimit && (
         <p className="text-xs leading-5 text-muted">
-          预算按当前价与触发价较高者加 3%
-          估算；后续价格上涨或余额变化时可能无法全部成交。可设置最高成交价。
+          {t(
+            '预算按当前价与触发价较高者加 3% 估算；后续价格上涨或余额变化时可能无法全部成交。可设置最高成交价。',
+          )}
         </p>
       )}
       {outcome && (
         <p className="text-xs leading-5 text-muted">
-          每份结算价值范围为 0–1 {quote}
-          ，按该事件规则结算。卖出仅使用已持有份额。
+          {t('每份结算价值范围为 0–1')}
+          {quote}
+          {t('，按该事件规则结算。卖出仅使用已持有份额。')}
         </p>
       )}
       {form.error && (
         <p role="alert" className="text-xs text-loss">
-          {form.error}
+          {t(form.error)}
         </p>
       )}
       <Button
@@ -170,17 +175,17 @@ export function CashOrderForm({
       >
         {onboarding ??
           (form.previewing
-            ? '核对可用余额…'
+            ? t('核对可用余额…')
             : model.canTrade
-              ? '下单'
-              : '等待账户数据 / 核对未确认订单')}
+              ? t('下单')
+              : t('等待账户数据 / 核对未确认订单'))}
       </Button>
       <dl
-        aria-label="订单摘要"
+        aria-label={t('订单摘要')}
         className="space-y-2 border-t border-edge pt-3 text-xs"
       >
         <div className="flex justify-between gap-2">
-          <dt className="text-muted">订单金额</dt>
+          <dt className="text-muted">{t('订单金额')}</dt>
           <dd>
             {form.notional} {quote}
           </dd>
@@ -192,7 +197,7 @@ export function CashOrderForm({
           />
         )}
         <div className="flex justify-between gap-2">
-          <dt className="text-muted">预计手续费上限</dt>
+          <dt className="text-muted">{t('预计手续费上限')}</dt>
           <dd>
             {form.estimatedFee} {quote}
           </dd>

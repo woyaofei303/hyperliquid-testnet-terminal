@@ -4,7 +4,9 @@ import { Button, Spinner } from '@fameex/ui'
 import { getToastQueue, ToastProvider } from '@heroui/react'
 import { useIsPresent } from 'framer-motion'
 import { type ComponentPropsWithRef, useEffect } from 'react'
+import { t, useLocale } from '@/i18n'
 import type { FeedbackTone } from '@/lib/feedback'
+import { isWalletInjectionConflict } from '@/lib/wallet-discovery'
 
 export type { FeedbackTone } from '@/lib/feedback'
 
@@ -49,10 +51,10 @@ export function notify(tone: FeedbackTone, text: string, channel = 'terminal') {
     if (oldest) queue.close(oldest.key)
   }
   const key = queue.add({
-    title: labels[tone],
+    title: t(labels[tone]),
     description: (
       <output className="block" data-feedback={tone}>
-        {text}
+        {t(text)}
       </output>
     ),
     color: colors[tone],
@@ -85,7 +87,7 @@ export function notify(tone: FeedbackTone, text: string, channel = 'terminal') {
         size="sm"
         variant="light"
         color="default"
-        aria-label="关闭提示"
+        aria-label={t('关闭提示')}
         onPress={() => dismissNotification(channel)}
         className="text-muted hover:text-ink"
       >
@@ -103,6 +105,8 @@ function NotificationSurface({
   className,
   ...props
 }: ComponentPropsWithRef<'div'>) {
+  useLocale()
+
   const present = useIsPresent()
   // 组件库禁用动画后仍保留退出节点一帧，立即隐藏，避免挤动下一条提示。
   return (
@@ -120,38 +124,57 @@ const toastProps = {
 } as const
 
 export function Notifications() {
+  useLocale()
+
   useEffect(() => {
     const offline = () =>
       notify(
         'warning',
-        '网络已断开，请等待行情和余额恢复后操作。已提交请求需核对结果。',
+        t('网络已断开，请等待行情和余额恢复后操作。已提交请求需核对结果。'),
         'network',
       )
     const online = () =>
-      notify('info', '网络连接已恢复，请等待行情与余额更新后操作。', 'network')
+      notify(
+        'info',
+        t('网络连接已恢复，请等待行情与余额更新后操作。'),
+        'network',
+      )
     const unexpected = () =>
       notify(
         'error',
-        '页面发生未预期异常。请先核对当前委托和资金记录，再刷新页面；不要直接重复提交。',
+        t(
+          '页面发生未预期异常。请先核对当前委托和资金记录，再刷新页面；不要直接重复提交。',
+        ),
         'runtime',
       )
     const onError = (event: ErrorEvent) => {
-      if (event.error) unexpected()
+      if (
+        event.error &&
+        !isWalletInjectionConflict({
+          message: event.message,
+          filename: event.filename,
+          stack: event.error?.stack,
+        })
+      )
+        unexpected()
+    }
+    const onRejection = (event: PromiseRejectionEvent) => {
+      if (!isWalletInjectionConflict(event.reason ?? {})) unexpected()
     }
     window.addEventListener('offline', offline)
     window.addEventListener('online', online)
     window.addEventListener('error', onError)
-    window.addEventListener('unhandledrejection', unexpected)
+    window.addEventListener('unhandledrejection', onRejection)
     if (!navigator.onLine) offline()
     return () => {
       window.removeEventListener('offline', offline)
       window.removeEventListener('online', online)
       window.removeEventListener('error', onError)
-      window.removeEventListener('unhandledrejection', unexpected)
+      window.removeEventListener('unhandledrejection', onRejection)
     }
   }, [])
   const regionProps = {
-    'aria-label': '全局通知',
+    'aria-label': t('全局通知'),
     className: 'z-[1300] top-16!',
   }
   return (

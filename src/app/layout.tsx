@@ -3,8 +3,8 @@ import './globals.css'
 import { Providers } from '@/components/providers'
 
 export const metadata: Metadata = {
-  title: 'Hyperliquid Testnet · Julian',
-  description: 'Hyperliquid 测试网永续交易终端：实时行情、订单与仓位管理。',
+  metadataBase: new URL('https://hyperliquid.sunshinedairy.net'),
+  alternates: { canonical: '/' },
 }
 
 export default function Layout({

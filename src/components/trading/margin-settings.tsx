@@ -1,7 +1,9 @@
 'use client'
+
 import { Button, ChartIcon, Input } from '@fameex/ui'
 import { type ReactNode, useEffect, useRef } from 'react'
 import type { useMarginSettings } from '@/hooks/use-margin-settings'
+import { t, useLocale } from '@/i18n'
 import type { MarketContext } from '@/lib/hyperliquid'
 
 export function MarginSettings(props: {
@@ -11,6 +13,8 @@ export function MarginSettings(props: {
   busy: boolean
   accountType: ReactNode
 }) {
+  useLocale()
+
   const { settings } = props
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
@@ -27,15 +31,15 @@ export function MarginSettings(props: {
       <div className="mb-4 flex gap-2 text-xs">
         <button
           type="button"
-          aria-label="调整保证金模式"
+          aria-label={t('调整保证金模式')}
           onClick={() => settings.open('margin')}
           className="flex h-6 flex-1 items-center justify-center rounded-lg bg-cc-2 px-2 hover:bg-hover-n"
         >
           {current
             ? current.leverage.type === 'cross'
-              ? '全仓'
-              : '逐仓'
-            : '保证金模式'}{' '}
+              ? t('全仓')
+              : t('逐仓')
+            : t('保证金模式')}{' '}
           <ChartIcon
             name="arrow-drop-down"
             className="ml-2 size-3 text-muted"
@@ -43,11 +47,11 @@ export function MarginSettings(props: {
         </button>
         <button
           type="button"
-          aria-label="调整杠杆"
+          aria-label={t('调整杠杆')}
           onClick={() => settings.open('leverage')}
           className="flex h-6 flex-1 items-center justify-center rounded-lg bg-cc-2 px-2 hover:bg-hover-n"
         >
-          {current ? `${current.leverage.value}x` : '杠杆'}{' '}
+          {current ? `${current.leverage.value}x` : t('杠杆')}{' '}
           <ChartIcon
             name="arrow-drop-down"
             className="ml-2 size-3 text-muted"
@@ -63,7 +67,7 @@ export function MarginSettings(props: {
       >
         <div className="mb-6 flex items-center justify-between">
           <h2 id="margin-editor-title" className="text-lg font-semibold">
-            {editor === 'margin' ? '保证金模式' : '调整杠杆'}{' '}
+            {editor === 'margin' ? t('保证金模式') : t('调整杠杆')}{' '}
             <span className="text-sm font-normal text-muted">
               {market.name} / USDC
             </span>
@@ -71,7 +75,7 @@ export function MarginSettings(props: {
           <button
             type="button"
             onClick={settings.close}
-            aria-label="关闭设置"
+            aria-label={t('关闭设置')}
             className="size-7 rounded text-xl text-muted hover:bg-surface"
           >
             ×
@@ -79,7 +83,7 @@ export function MarginSettings(props: {
         </div>
         {editor === 'margin' ? (
           <>
-            <fieldset className="flex gap-3" aria-label="保证金模式">
+            <fieldset className="flex gap-3" aria-label={t('保证金模式')}>
               {[true, false].map((value) => (
                 <label
                   key={String(value)}
@@ -94,25 +98,29 @@ export function MarginSettings(props: {
                     onChange={() => settings.setCross(value)}
                     className="size-4 accent-brand"
                   />
-                  {value ? '全仓' : '逐仓'}
+                  {value ? t('全仓') : t('逐仓')}
                 </label>
               ))}
             </fieldset>
             <p className="mt-4 text-xs leading-6 text-muted">
               {cross
-                ? '全仓持仓共享全仓账户保证金，其他全仓持仓的盈亏会影响可用保证金。'
-                : '逐仓持仓使用分配给该仓位的保证金。此处只调整模式，不执行追加或移除保证金。'}
+                ? t(
+                    '全仓持仓共享全仓账户保证金，其他全仓持仓的盈亏会影响可用保证金。',
+                  )
+                : t(
+                    '逐仓持仓使用分配给该仓位的保证金。此处只调整模式，不执行追加或移除保证金。',
+                  )}
             </p>
             {isolatedOnly && (
               <p className="mt-2 text-xs text-muted">
-                该 Hyperliquid 市场仅支持逐仓。
+                {t('该 Hyperliquid 市场仅支持逐仓。')}
               </p>
             )}
           </>
         ) : (
           <>
             <Input
-              aria-label="杠杆倍数"
+              aria-label={t('杠杆倍数')}
               type="number"
               min={1}
               max={market.maxLeverage}
@@ -136,9 +144,11 @@ export function MarginSettings(props: {
               ))}
             </div>
             <p className="mt-4 text-xs leading-6 text-muted">
-              当前市场上限 {market.maxLeverage}
-              x。提高杠杆会减少开仓所需保证金；最终可用杠杆和订单接受结果以
-              Hyperliquid 校验为准。
+              {t('当前市场上限')}
+              {market.maxLeverage}
+              {t(
+                'x。提高杠杆会减少开仓所需保证金；最终可用杠杆和订单接受结果以 Hyperliquid 校验为准。',
+              )}
             </p>
           </>
         )}
@@ -149,19 +159,19 @@ export function MarginSettings(props: {
         )}
         {!enabled && (
           <p className="mt-3 text-xs text-muted">
-            启用交易后可提交调整，无需逐笔钱包确认。
+            {t('启用交易后可提交调整，无需逐笔钱包确认。')}
           </p>
         )}
         <div className="mt-6 flex gap-3">
           <Button color="default" className="flex-1" onPress={settings.close}>
-            取消
+            {t('取消')}
           </Button>
           <Button
             className="flex-1"
             isDisabled={!enabled || busy || !current}
             onPress={settings.apply}
           >
-            {editor === 'margin' ? '确认保证金模式' : '应用杠杆设置'}
+            {editor === 'margin' ? t('确认保证金模式') : t('应用杠杆设置')}
           </Button>
         </div>
       </dialog>

@@ -1,8 +1,10 @@
 'use client'
+
 import { Button, Checkbox, Input, Modal, Select } from '@fameex/ui'
 import { useCallback, useState } from 'react'
 import { formatUnits } from 'viem'
 import type { TerminalModel } from '@/hooks/use-terminal'
+import { t, useLocale } from '@/i18n'
 import { display } from '@/lib/display'
 import { DEPOSIT_CHAIN, fundingAmount, transferAmount } from '@/lib/funding'
 import { DEPOSIT_REQUIRED_MESSAGE } from '@/lib/hyperliquid'
@@ -11,6 +13,8 @@ import { rememberOrderConfirmation } from '@/lib/trading-connection'
 import { FundingRoute, WithdrawalForm } from './withdrawal-form'
 
 export function Web3Dialog({ model }: { model: TerminalModel }) {
+  useLocale()
+
   const providers = model.providers
   const [amount, setAmount] = useState('')
   const [copied, setCopied] = useState(false)
@@ -41,7 +45,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
   try {
     if (amount) units = fundingAmount(amount)
   } catch (e) {
-    amountError = e instanceof Error ? e.message : '金额无效'
+    amountError = e instanceof Error ? e.message : t('金额无效')
   }
   const sufficient =
     f.balances && f.balances.usdc >= units && f.balances.gas > 0n
@@ -53,29 +57,31 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
     try {
       transferAmount(amount, transferAvailable)
     } catch (e) {
-      transferError = e instanceof Error ? e.message : '金额无效'
+      transferError = e instanceof Error ? e.message : t('金额无效')
     }
   }
   const title = !wallet
-    ? '连接钱包'
+    ? t('连接钱包')
     : web3Panel === 'deposit'
-      ? '存款'
+      ? t('存款')
       : web3Panel === 'transfer'
-        ? '划转 USDC'
+        ? t('划转 USDC')
         : web3Panel === 'withdraw'
-          ? '提款'
-          : '账户'
+          ? t('提款')
+          : t('账户')
   return (
     <Modal
-      title={title}
+      title={t(title)}
       onClose={close}
       busy={busy || model.connecting}
-      closeLabel="关闭钱包面板"
+      closeLabel={t('关闭钱包面板')}
     >
       {!wallet ? (
         <>
           <p className="text-sm leading-6 text-muted">
-            选择钱包后，在钱包扩展中允许本站连接。已允许连接的钱包可能直接返回账户。
+            {t(
+              '选择钱包后，在钱包扩展中允许本站连接。已允许连接的钱包可能直接返回账户。',
+            )}
           </p>
           {providers.map((item) => (
             <Button
@@ -92,36 +98,46 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 )
               }
             >
-              <span>{item.name}</span>
+              <span>{t(item.name)}</span>
               <span className="text-xs text-muted">
                 {model.connectingWallet === item.name
-                  ? '等待钱包确认…'
-                  : '连接 →'}
+                  ? t('等待钱包确认…')
+                  : t('连接 →')}
               </span>
             </Button>
           ))}
           {providers.length === 0 && (
             <output className="block rounded-[8px] bg-panel p-3 text-sm leading-6">
-              未检测到浏览器钱包。请在已安装 MetaMask、Rabby
-              等扩展的浏览器打开本页。
+              {t(
+                '未检测到浏览器钱包。请在已安装 MetaMask、Rabby 等扩展的浏览器打开本页。',
+              )}
             </output>
           )}
           {model.connecting && (
             <output className="block rounded-[8px] border border-edge bg-panel p-4 text-sm leading-6">
               <span className="block font-medium text-ink">
-                请在{model.connectingWallet}中确认连接
+                {t('请在')}
+                {model.connectingWallet}
+                {t('中确认连接')}
               </span>
               <span className="mt-1 block text-xs text-muted">
-                若未弹出窗口，请打开浏览器工具栏中的钱包扩展。取消连接请在钱包中操作。
+                {t(
+                  '若未弹出窗口，请打开浏览器工具栏中的钱包扩展。取消连接请在钱包中操作。',
+                )}
               </span>
             </output>
           )}
           <div className="space-y-2 text-xs leading-5 text-muted">
-            <p>连接后可读取公开地址、余额与交易记录，并向钱包发起签名请求。</p>
-            <p>连接不会提交订单或转移资金。</p>
             <p>
-              当前浏览器没有有效交易连接时，需单独确认一次无 Gas
-              签名；存款、划转和提款仍由你在钱包中确认。
+              {t(
+                '连接后可读取公开地址、余额与交易记录，并向钱包发起签名请求。',
+              )}
+            </p>
+            <p>{t('连接不会提交订单或转移资金。')}</p>
+            <p>
+              {t(
+                '当前浏览器没有有效交易连接时，需单独确认一次无 Gas 签名；存款、划转和提款仍由你在钱包中确认。',
+              )}
             </p>
           </div>
           {model.connectionError && (
@@ -136,7 +152,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
             <>
               <div className="rounded-[8px] bg-panel p-3 text-xs leading-5">
                 <p className="mb-1 text-muted">
-                  {wallet.name ?? '浏览器钱包'} · 当前地址
+                  {wallet.name ?? '浏览器钱包'} {t('· 当前地址')}
                 </p>
                 <p className="break-all font-mono">{wallet.address}</p>
                 <div className="mt-3 flex items-center justify-between">
@@ -152,7 +168,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                       }
                     }}
                   >
-                    {copied ? '已复制' : '复制地址'}
+                    {copied ? t('已复制') : t('复制地址')}
                   </Button>
                   <a
                     className="text-accent"
@@ -160,31 +176,31 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    链上记录 ↗
+                    {t('链上记录 ↗')}
                   </a>
                 </div>
               </div>
               <dl className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <dt className="text-muted">合约可提余额</dt>
+                  <dt className="text-muted">{t('合约可提余额')}</dt>
                   <dd>{display(f.core?.perp)} USDC</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted">现货可用余额</dt>
+                  <dt className="text-muted">{t('现货可用余额')}</dt>
                   <dd>{display(f.core?.spot)} USDC</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted">交易连接</dt>
+                  <dt className="text-muted">{t('交易连接')}</dt>
                   <dd>
                     {model.account.error || model.connectionError
-                      ? '核验失败，请重试'
+                      ? t('核验失败，请重试')
                       : model.checkingAccount
-                        ? '正在读取余额与核验连接'
+                        ? t('正在读取余额与核验连接')
                         : authorized
-                          ? '已启用'
+                          ? t('已启用')
                           : wallet.expiresAt
-                            ? '已过期'
-                            : '尚未启用'}
+                            ? t('已过期')
+                            : t('尚未启用')}
                   </dd>
                 </div>
               </dl>
@@ -197,10 +213,10 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 }}
               >
                 {model.checkingAccount
-                  ? '正在核验账户…'
+                  ? t('正在核验账户…')
                   : authorized
-                    ? '交易会话已启用'
-                    : '启用测试网交易'}
+                    ? t('交易会话已启用')
+                    : t('启用测试网交易')}
               </Button>
               {!authorized && (
                 <Button
@@ -214,7 +230,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                     )
                   }
                 >
-                  重新连接并核验
+                  {t('重新连接并核验')}
                 </Button>
               )}
               <Button
@@ -226,7 +242,9 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                   setConfirmationsReset(true)
                 }}
               >
-                {confirmationsReset ? '已恢复订单确认' : '恢复下单和平仓确认'}
+                {confirmationsReset
+                  ? t('已恢复订单确认')
+                  : t('恢复下单和平仓确认')}
               </Button>
               <div className="grid grid-cols-3 gap-2">
                 {(['deposit', 'transfer', 'withdraw'] as const).map(
@@ -236,7 +254,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                       variant="bordered"
                       onPress={() => setWeb3Panel(panel)}
                     >
-                      {['存款', '划转', '提款'][i]}
+                      {[t('存款'), t('划转'), t('提款')][i]}
                     </Button>
                   ),
                 )}
@@ -247,19 +265,19 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 isDisabled={busy}
                 onPress={model.disconnect}
               >
-                断开钱包
+                {t('断开钱包')}
               </Button>
               <p className="text-xs leading-5 text-muted">
-                断开仅清除本地会话。交易所授权可在{' '}
+                {t('断开仅清除本地会话。交易所授权可在')}{' '}
                 <a
                   href="https://app.hyperliquid-testnet.xyz/API"
                   target="_blank"
                   rel="noreferrer"
                   className="text-accent"
                 >
-                  API 钱包页 ↗
+                  {t('API 钱包页 ↗')}
                 </a>{' '}
-                撤销。
+                {t('撤销。')}
               </p>
             </>
           )}
@@ -267,13 +285,14 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
             <div ref={attachPopover} className="flex flex-col gap-4">
               <p className="text-sm leading-6 text-muted">
                 {web3Panel === 'deposit'
-                  ? '从 Arbitrum Sepolia 存入 USDC，到账后即可启用交易。'
-                  : '将 USDC 提现到 Arbitrum Sepolia 的当前钱包地址。'}
+                  ? t('从 Arbitrum Sepolia 存入 USDC，到账后即可启用交易。')
+                  : t('将 USDC 提现到 Arbitrum Sepolia 的当前钱包地址。')}
               </p>
               {web3Panel === 'deposit' && (
                 <p className="-mt-2 text-xs leading-5 text-muted">
-                  跨链手续费上限 0.2 USDC，另付源链 Gas；新账户可能扣除 1 USDC
-                  激活费。
+                  {t(
+                    '跨链手续费上限 0.2 USDC，另付源链 Gas；新账户可能扣除 1 USDC 激活费。',
+                  )}
                 </p>
               )}
               <Select
@@ -284,8 +303,8 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                   label: 'text-xs font-normal text-muted',
                   innerWrapper: 'w-full',
                 }}
-                label="资产"
-                aria-label="资产"
+                label={t('资产')}
+                aria-label={t('资产')}
                 labelPlacement="outside"
                 selectedKeys={['USDC']}
                 items={[{ key: 'USDC', label: 'USDC' }]}
@@ -307,12 +326,14 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                   label: 'text-xs font-normal text-muted',
                   innerWrapper: 'w-full',
                 }}
-                label={web3Panel === 'deposit' ? '充值网络' : '提款网络'}
-                aria-label={web3Panel === 'deposit' ? '充值网络' : '提款网络'}
+                label={web3Panel === 'deposit' ? t('充值网络') : t('提款网络')}
+                aria-label={
+                  web3Panel === 'deposit' ? t('充值网络') : t('提款网络')
+                }
                 labelPlacement="outside"
                 selectedKeys={['arbitrum']}
                 items={[
-                  { key: 'arbitrum', label: 'Arbitrum Sepolia · 测试网' },
+                  { key: 'arbitrum', label: t('Arbitrum Sepolia · 测试网') },
                 ]}
                 isDisabled={busy || f.pending}
                 popoverProps={{
@@ -336,11 +357,11 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                   </output>
                 )}
               <Input
-                label="存款金额（USDC）"
+                label={t('存款金额（USDC）')}
                 value={amount}
                 onChange={setAmount}
                 inputMode="decimal"
-                placeholder="至少 5 USDC"
+                placeholder={t('至少 5 USDC')}
                 variant="bordered"
                 size="md"
                 inputWrapperClassName="bg-panel"
@@ -351,7 +372,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 errorMessage={
                   amountError ||
                   (f.balances && units > f.balances.usdc
-                    ? '金额超过源链可用余额'
+                    ? t('金额超过源链可用余额')
                     : '')
                 }
                 endContent={
@@ -363,7 +384,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                       f.balances && setAmount(formatUnits(f.balances.usdc, 6))
                     }
                   >
-                    最大值：
+                    {t('最大值：')}
                     <span>
                       {f.balances ? formatUnits(f.balances.usdc, 6) : '—'}
                     </span>
@@ -372,15 +393,16 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
               />
               {f.balances?.gas === 0n && (
                 <output className="text-xs leading-5 text-loss">
-                  源链 ETH 余额为 0，暂时无法支付 USDC 授权和存款 Gas。请先领取
-                  Arbitrum Sepolia 测试 ETH，再刷新余额。
+                  {t(
+                    '源链 ETH 余额为 0，暂时无法支付 USDC 授权和存款 Gas。请先领取 Arbitrum Sepolia 测试 ETH，再刷新余额。',
+                  )}
                   <a
                     className="ml-1 text-accent"
                     href="https://docs.arbitrum.io/chain-info"
                     target="_blank"
                     rel="noreferrer"
                   >
-                    测试 ETH 水龙头列表 ↗
+                    {t('测试 ETH 水龙头列表 ↗')}
                   </a>
                 </output>
               )}
@@ -390,7 +412,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                   isDisabled={busy || f.pending}
                   onPress={f.switchChain}
                 >
-                  切换至 Arbitrum Sepolia
+                  {t('切换至 Arbitrum Sepolia')}
                 </Button>
               ) : (
                 <Button
@@ -401,43 +423,47 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                   {busy
                     ? f.record?.kind === 'approve'
                       ? f.record.status === 'submitted'
-                        ? '等待 USDC 授权确认…'
-                        : '请在钱包授权 USDC…'
-                      : '请在钱包确认存款…'
+                        ? t('等待 USDC 授权确认…')
+                        : t('请在钱包授权 USDC…')
+                      : t('请在钱包确认存款…')
                     : f.pending
-                      ? '资金请求待确认'
+                      ? t('资金请求待确认')
                       : f.balances?.gas === 0n
-                        ? '需要 Arbitrum Sepolia ETH'
-                        : '存款'}
+                        ? t('需要 Arbitrum Sepolia ETH')
+                        : t('存款')}
                 </Button>
               )}
               <p className="text-xs leading-5 text-muted">
                 {allowance
-                  ? 'USDC 已授权。确认存款后等待跨链到账。'
-                  : '点击存款后，请依次在钱包确认 USDC 授权与存款。已有足够授权时只需确认存款。'}
+                  ? t('USDC 已授权。确认存款后等待跨链到账。')
+                  : t(
+                      '点击存款后，请依次在钱包确认 USDC 授权与存款。已有足够授权时只需确认存款。',
+                    )}
               </p>
               <details className="text-xs leading-5 text-muted">
-                <summary className="cursor-pointer">没有测试资金？</summary>
+                <summary className="cursor-pointer">
+                  {t('没有测试资金？')}
+                </summary>
                 <p className="mt-2">
-                  领取{' '}
+                  {t('领取')}{' '}
                   <a
                     href="https://faucet.circle.com/"
                     target="_blank"
                     rel="noreferrer"
                     className="text-accent"
                   >
-                    Circle 测试 USDC ↗
+                    {t('Circle 测试 USDC ↗')}
                   </a>{' '}
-                  和 Arbitrum Sepolia ETH。
+                  {t('和 Arbitrum Sepolia ETH。')}
                   <a
                     href="https://app.hyperliquid-testnet.xyz/drip"
                     target="_blank"
                     rel="noreferrer"
                     className="text-accent"
                   >
-                    Hyperliquid 水龙头 ↗
+                    {t('Hyperliquid 水龙头 ↗')}
                   </a>{' '}
-                  要求同一地址已有主网存款历史。
+                  {t('要求同一地址已有主网存款历史。')}
                 </p>
               </details>
             </>
@@ -445,18 +471,20 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
           {web3Panel === 'transfer' && (
             <>
               <p className="text-sm leading-6 text-muted">
-                在您的合约和现货余额之间划转 USDC。
+                {t('在您的合约和现货余额之间划转 USDC。')}
               </p>
               {f.core &&
               ['unifiedAccount', 'portfolioMargin'].includes(f.core.mode) ? (
                 <p className="rounded-[8px] bg-panel p-3 text-sm leading-6">
-                  当前为统一账户或组合保证金模式，资金共享。请在官方测试网页管理资金。
+                  {t(
+                    '当前为统一账户或组合保证金模式，资金共享。请在官方测试网页管理资金。',
+                  )}
                 </p>
               ) : (
                 <>
                   <FundingRoute
-                    from={transferToPerp ? '现货账户' : '合约账户'}
-                    to={transferToPerp ? '合约账户' : '现货账户'}
+                    from={transferToPerp ? t('现货账户') : t('合约账户')}
+                    to={transferToPerp ? t('合约账户') : t('现货账户')}
                     onSwap={() => {
                       setTransferToPerp(!transferToPerp)
                       setAmount('')
@@ -464,11 +492,11 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                     disabled={busy || f.pending}
                   />
                   <Input
-                    label="划转金额（USDC）"
+                    label={t('划转金额（USDC）')}
                     value={amount}
                     onChange={setAmount}
                     inputMode="decimal"
-                    placeholder="输入划转金额"
+                    placeholder={t('输入划转金额')}
                     isDisabled={busy || f.pending}
                     isInvalid={!!transferError}
                     errorMessage={transferError}
@@ -485,7 +513,8 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                           )
                         }
                       >
-                        最大值：{display(transferAvailable, 6)}
+                        {t('最大值：')}
+                        {display(transferAvailable, 6)}
                       </Button>
                     }
                   />
@@ -496,10 +525,10 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                     }
                     onPress={() => model.transferFunds(amount, transferToPerp)}
                   >
-                    {busy ? '等待钱包确认…' : '确认划转'}
+                    {busy ? t('等待钱包确认…') : t('确认划转')}
                   </Button>
                   <p className="text-xs text-muted">
-                    手续费 0 USDC，无需链上 Gas。
+                    {t('手续费 0 USDC，无需链上 Gas。')}
                   </p>
                 </>
               )}
@@ -515,7 +544,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
           />
           {f.error && (
             <p role="alert" className="text-xs leading-5 text-loss">
-              {f.error}
+              {t(f.error)}
             </p>
           )}
           <div className="flex items-center justify-between border-t border-edge pt-3 text-xs">
@@ -528,7 +557,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 if (web3Panel === 'withdraw') void f.loadWithdrawalQuote()
               }}
             >
-              {f.loading ? '查询中…' : '刷新余额'}
+              {f.loading ? t('查询中…') : t('刷新余额')}
             </Button>
             <a
               className="text-accent"
@@ -536,7 +565,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
               rel="noreferrer"
               href="https://app.hyperliquid-testnet.xyz/portfolio"
             >
-              资金记录 ↗
+              {t('资金记录 ↗')}
             </a>
           </div>
         </>
@@ -552,6 +581,8 @@ function FundingStatus({
   model: TerminalModel
   onContinue: () => void
 }) {
+  useLocale()
+
   const [acknowledged, setAcknowledged] = useState(false)
   const { funding: f, busy, web3Panel } = model
   const record = f.record
@@ -567,34 +598,36 @@ function FundingStatus({
     <output className="block space-y-2 rounded-[8px] border border-edge p-3 text-xs leading-5">
       <p className="font-medium">
         {record.kind === 'approve'
-          ? 'USDC 授权'
+          ? t('USDC 授权')
           : record.kind === 'transfer'
-            ? 'USDC 划转'
+            ? t('USDC 划转')
             : record.kind === 'withdraw'
-              ? 'USDC 提款'
-              : 'USDC 存款'}{' '}
+              ? t('USDC 提款')
+              : t('USDC 存款')}{' '}
         · {record.amount} USDC
       </p>
       <p>
         {record.status === 'credited'
           ? record.kind === 'withdraw'
-            ? 'Arbitrum Sepolia 到账已核验'
-            : 'Hyperliquid 到账已核验'
+            ? t('Arbitrum Sepolia 到账已核验')
+            : t('Hyperliquid 到账已核验')
           : record.status === 'confirmed'
             ? record.kind === 'deposit'
-              ? '源链已确认 · 等待 Hyperliquid 到账'
+              ? t('源链已确认 · 等待 Hyperliquid 到账')
               : record.kind === 'withdraw'
-                ? '目标链交易已找到 · 等待到账核验'
-                : '操作已确认，请核对最新余额'
+                ? t('目标链交易已找到 · 等待到账核验')
+                : t('操作已确认，请核对最新余额')
             : record.status === 'reverted'
-              ? '操作已取消或失败'
+              ? t('操作已取消或失败')
               : record.status === 'submitted'
                 ? record.kind === 'withdraw'
-                  ? '提款请求已接受 · 等待跨链到账'
-                  : '已提交 · 等待源链确认'
+                  ? t('提款请求已接受 · 等待跨链到账')
+                  : t('已提交 · 等待源链确认')
                 : record.kind === 'approve' && !record.hash
-                  ? '上次授权结果未确认。点击存款将重新读取授权额度，需要时请在钱包再次确认。'
-                  : '结果未知，请核对钱包记录，勿重复提交'}
+                  ? t(
+                      '上次授权结果未确认。点击存款将重新读取授权额度，需要时请在钱包再次确认。',
+                    )
+                  : t('结果未知，请核对钱包记录，勿重复提交')}
       </p>
       {record.hash && (
         <a
@@ -603,27 +636,29 @@ function FundingStatus({
           className="block text-accent"
           href={`https://sepolia.arbiscan.io/tx/${record.hash}`}
         >
-          查看链上交易 ↗
+          {t('查看链上交易 ↗')}
         </a>
       )}
       <Button variant="light" size="sm" isDisabled={busy} onPress={f.check}>
-        核对资金状态
+        {t('核对资金状态')}
       </Button>
       {record.kind === 'deposit' && record.status === 'credited' && (
         <Button className="w-full" onPress={onContinue}>
-          {model.wallet?.exchange ? '返回交易' : '启用交易并继续'}
+          {model.wallet?.exchange ? t('返回交易') : t('启用交易并继续')}
         </Button>
       )}
       {f.pending && (
         <details>
           <summary className="cursor-pointer text-muted">
-            手动核对未确认请求
+            {t('手动核对未确认请求')}
           </summary>
           <p className="my-2 text-muted">
-            先到钱包及官方页面核对。解除保护不代表交易失败，尚在处理的请求仍可能完成。
+            {t(
+              '先到钱包及官方页面核对。解除保护不代表交易失败，尚在处理的请求仍可能完成。',
+            )}
           </p>
           <Checkbox isSelected={acknowledged} onValueChange={setAcknowledged}>
-            已核对，没有待处理的资金请求
+            {t('已核对，没有待处理的资金请求')}
           </Checkbox>
           <Button
             variant="bordered"
@@ -634,7 +669,7 @@ function FundingStatus({
               setAcknowledged(false)
             }}
           >
-            解除本地保护
+            {t('解除本地保护')}
           </Button>
         </details>
       )}

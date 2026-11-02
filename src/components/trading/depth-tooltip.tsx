@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom'
+import { t, useLocale } from '@/i18n'
 import { display } from '@/lib/display'
 import type { orderBookData } from '@/lib/order-book-data'
 import { Money } from '@/lib/orders'
@@ -23,6 +24,8 @@ export function DepthTooltip({
   left: number
   top: number
 }) {
+  useLocale()
+
   const distance = midpoint
     ? `${new Money(row.px)
         .minus(midpoint)
@@ -35,22 +38,28 @@ export function DepthTooltip({
     <div
       id={id}
       role="tooltip"
-      aria-label="档位详情"
+      aria-label={t('档位详情')}
       className="pointer-events-none fixed left-0 top-0 z-50 w-[228px] max-w-[calc(100vw-16px)] rounded bg-surface p-3 text-xs shadow-xl transition-transform duration-150 ease-out motion-reduce:transition-none"
       style={{ transform: `translate3d(${left}px, ${top}px, 0)` }}
     >
       <dl className="grid grid-cols-2 gap-y-2 tabular-nums">
-        <dt>距中间价</dt>
+        <dt>{t('距中间价')}</dt>
         <dd className="text-right font-medium">{distance}</dd>
-        <dt>平均价格</dt>
+        <dt>{t('平均价格')}</dt>
         <dd className="text-right font-medium">
           {display(row.average, priceDecimals)}
         </dd>
-        <dt>合计（{coin}）</dt>
+        <dt>
+          {t('合计（')}
+          {coin}）
+        </dt>
         <dd className="text-right font-medium">
           {display(row.total, precision)}
         </dd>
-        <dt>合计（{quote}）</dt>
+        <dt>
+          {t('合计（')}
+          {quote}）
+        </dt>
         <dd className="text-right font-medium">{display(row.totalQuote, 2)}</dd>
       </dl>
     </div>,

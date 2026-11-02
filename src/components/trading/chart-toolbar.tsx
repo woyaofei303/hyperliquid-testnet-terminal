@@ -1,18 +1,20 @@
 'use client'
+
 import { ChartIcon, Checkbox } from '@fameex/ui'
 import { classNames } from '@fameex/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@heroui/react'
 import { useState } from 'react'
 import type { useChartControls } from '@/hooks/use-chart-controls'
+import { t, useLocale } from '@/i18n'
 import { type ChartInterval, chartIntervals } from '@/lib/chart-periods'
 export type ChartEngine = 'kline' | 'tradingview'
 export const periodLabel = (value: ChartInterval) =>
   value
-    .replace(/m$/, '分')
-    .replace(/h$/, '时')
-    .replace(/d$/, '日')
-    .replace(/w$/, '周')
-    .replace(/M$/, '月')
+    .replace(/m$/, t('分'))
+    .replace(/h$/, t('时'))
+    .replace(/d$/, t('日'))
+    .replace(/w$/, t('周'))
+    .replace(/M$/, t('月'))
 
 const toolClass =
   'flex size-7 shrink-0 items-center justify-center rounded text-2 hover:bg-cc-2 hover:text-1 disabled:opacity-40'
@@ -31,12 +33,14 @@ export function ChartToolbar({
   engine: ChartEngine
   onEngineChange: (value: ChartEngine) => void
 }) {
+  useLocale()
+
   const [open, setOpen] = useState(false)
   const [shapeOpen, setShapeOpen] = useState(false)
   const quick = ['time', '1m', '5m', '15m', '30m', '1h', '4h', '1d'] as const
   return (
     <nav
-      aria-label="图表工具栏"
+      aria-label={t('图表工具栏')}
       className="flex min-h-10 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-edge bg-bg-2 px-2 py-1 text-3"
     >
       <div className="flex min-w-0 flex-wrap items-center gap-0.5">
@@ -61,7 +65,7 @@ export function ChartToolbar({
                 : 'text-3',
             )}
           >
-            {value === 'time' ? '分时' : periodLabel(value)}
+            {value === 'time' ? t('分时') : periodLabel(value)}
           </button>
         ))}
         <Popover
@@ -73,7 +77,7 @@ export function ChartToolbar({
           <PopoverTrigger>
             <button
               type="button"
-              aria-label="更多时间周期"
+              aria-label={t('更多时间周期')}
               className={toolClass}
             >
               <ChartIcon
@@ -110,8 +114,8 @@ export function ChartToolbar({
           <PopoverTrigger>
             <button
               type="button"
-              aria-label="图表类型"
-              title="图表类型"
+              aria-label={t('图表类型')}
+              title={t('图表类型')}
               className={toolClass}
               disabled={!controls.ready}
             >
@@ -121,13 +125,16 @@ export function ChartToolbar({
             </button>
           </PopoverTrigger>
           <PopoverContent className={popupClass}>
-            <fieldset className="grid min-w-28 gap-1" aria-label="图表类型选项">
+            <fieldset
+              className="grid min-w-28 gap-1"
+              aria-label={t('图表类型选项')}
+            >
               {(
                 [
-                  ['candle_solid', '实心蜡烛'],
-                  ['candle_stroke', '空心蜡烛'],
+                  ['candle_solid', t('实心蜡烛')],
+                  ['candle_stroke', t('空心蜡烛')],
                   ['ohlc', 'OHLC'],
-                  ['area', '面积图'],
+                  ['area', t('面积图')],
                 ] as const
               ).map(([value, title]) => (
                 <button
@@ -140,7 +147,7 @@ export function ChartToolbar({
                     setShapeOpen(false)
                   }}
                 >
-                  {title}
+                  {t(title)}
                 </button>
               ))}
             </fieldset>
@@ -151,8 +158,8 @@ export function ChartToolbar({
             <PopoverTrigger>
               <button
                 type="button"
-                aria-label="指标"
-                title="指标"
+                aria-label={t('指标')}
+                title={t('指标')}
                 className={toolClass}
                 disabled={!controls.ready}
               >
@@ -165,13 +172,13 @@ export function ChartToolbar({
                   isSelected={controls.ma}
                   onValueChange={controls.setMa}
                 >
-                  均线 MA
+                  {t('均线 MA')}
                 </Checkbox>
                 <Checkbox
                   isSelected={controls.volume}
                   onValueChange={controls.setVolume}
                 >
-                  成交量 VOL
+                  {t('成交量 VOL')}
                 </Checkbox>
               </div>
             </PopoverContent>
@@ -179,8 +186,8 @@ export function ChartToolbar({
         ) : (
           <button
             type="button"
-            aria-label="指标"
-            title="指标"
+            aria-label={t('指标')}
+            title={t('指标')}
             className={toolClass}
             disabled={!controls.ready}
             onClick={controls.openIndicators}
@@ -190,8 +197,8 @@ export function ChartToolbar({
         )}
         <button
           type="button"
-          aria-label="重置图表"
-          title="重置图表"
+          aria-label={t('重置图表')}
+          title={t('重置图表')}
           className={toolClass}
           disabled={!controls.ready}
           onClick={controls.reset}
@@ -202,7 +209,7 @@ export function ChartToolbar({
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <div
           className="flex h-6 items-center rounded-m bg-cc-3 px-px"
-          aria-label="图表引擎"
+          aria-label={t('图表引擎')}
           role="toolbar"
         >
           {(['kline', 'tradingview'] as const).map((value) => (
@@ -216,14 +223,14 @@ export function ChartToolbar({
                 engine === value ? 'rounded-m bg-2 text-1' : 'text-3',
               )}
             >
-              {value === 'kline' ? '基础版' : 'TradingView'}
+              {value === 'kline' ? t('基础版') : 'TradingView'}
             </button>
           ))}
         </div>
         <button
           type="button"
-          aria-label={controls.fullscreen ? '退出全屏' : '全屏图表'}
-          title={controls.fullscreen ? '退出全屏' : '全屏图表'}
+          aria-label={controls.fullscreen ? t('退出全屏') : t('全屏图表')}
+          title={controls.fullscreen ? t('退出全屏') : t('全屏图表')}
           onClick={controls.toggleFullscreen}
           className={toolClass}
         >

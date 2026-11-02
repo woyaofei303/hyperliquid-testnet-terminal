@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react'
 import type { TerminalModel } from '@/hooks/use-terminal'
+import { t, useLocale } from '@/i18n'
 import { display } from '@/lib/display'
 import { isCash, pricePrecision, quoteName } from '@/lib/market-catalog'
 import { fundingCountdown, marketSummary } from '@/lib/market-summary'
 import { MarketSelector } from './market-selector'
 export function MarketHeader({ model }: { model: TerminalModel }) {
+  useLocale()
+
   const { coin, market } = model
   const summary = marketSummary(market?.context)
   const priceDecimals = market ? pricePrecision(market) : 1
   return (
     <section
       id="market-panel"
-      aria-label="市场概览"
+      aria-label={t('市场概览')}
       className="flex h-16 shrink-0 items-center gap-5 overflow-x-auto border-b border-edge px-3"
     >
       <div className="flex shrink-0 items-center gap-2">
@@ -24,7 +27,7 @@ export function MarketHeader({ model }: { model: TerminalModel }) {
         <MarketSelector model={model} />
       </div>
       <Metric
-        label={isCash(market) ? '市场价格' : '标记价格'}
+        label={isCash(market) ? t('市场价格') : t('标记价格')}
         value={
           market?.context.markPx
             ? display(market.context.markPx, priceDecimals)
@@ -32,29 +35,29 @@ export function MarketHeader({ model }: { model: TerminalModel }) {
         }
         description={
           isCash(market)
-            ? '交易所返回的市场参考价格'
-            : '用于未实现盈亏与清算计算的标记价格'
+            ? t('交易所返回的市场参考价格')
+            : t('用于未实现盈亏与清算计算的标记价格')
         }
       />
       {!isCash(market) && (
         <Metric
-          label="预言机价格"
+          label={t('预言机价格')}
           value={display(market?.context.oraclePx, priceDecimals)}
-          description="验证者汇总的外部现货参考价格"
+          description={t('验证者汇总的外部现货参考价格')}
         />
       )}
       <Metric
-        label="24h 涨跌"
+        label={t('24h 涨跌')}
         value={
           summary?.changePercent != null
             ? `${Number(summary.change) >= 0 ? '+' : ''}${display(summary.change, priceDecimals)} / ${Number(summary.changePercent) >= 0 ? '+' : ''}${summary.changePercent ?? '—'}%`
             : '—'
         }
         tone={summary && Number(summary.change) < 0 ? 'text-loss' : 'text-mint'}
-        description="当前标记价格相对 24 小时前价格的变化"
+        description={t('当前标记价格相对 24 小时前价格的变化')}
       />
       <Metric
-        label="24h 成交额"
+        label={t('24h 成交额')}
         value={
           market?.context.dayNtlVlm
             ? `${display(market.context.dayNtlVlm, 0)} ${quoteName(market)}`
@@ -64,7 +67,7 @@ export function MarketHeader({ model }: { model: TerminalModel }) {
       {!isCash(market) && (
         <>
           <Metric
-            label="持仓量"
+            label={t('持仓量')}
             value={
               summary?.interestUsd
                 ? `${display(summary.interestUsd, 0)} ${quoteName(market)}`
@@ -72,12 +75,16 @@ export function MarketHeader({ model }: { model: TerminalModel }) {
             }
             description={
               market
-                ? `${display(market.context.openInterest, market.szDecimals)} ${coin} · 按标记价格折算`
+                ? '' +
+                  display(market.context.openInterest, market.szDecimals) +
+                  ' ' +
+                  coin +
+                  t(' · 按标记价格折算')
                 : undefined
             }
           />
           <Metric
-            label="资金费率 / 倒计时"
+            label={t('资金费率 / 倒计时')}
             value={
               <>
                 <span
@@ -95,7 +102,9 @@ export function MarketHeader({ model }: { model: TerminalModel }) {
                 </span>
               </>
             }
-            description="每小时结算；正费率多方支付空方，负费率空方支付多方"
+            description={t(
+              '每小时结算；正费率多方支付空方，负费率空方支付多方',
+            )}
           />
         </>
       )}
@@ -103,6 +112,8 @@ export function MarketHeader({ model }: { model: TerminalModel }) {
   )
 }
 function FundingClock() {
+  useLocale()
+
   const [time, setTime] = useState<number | null>(null)
   useEffect(() => {
     setTime(Date.now())
@@ -122,12 +133,17 @@ function Metric({
   tone?: string
   description?: string
 }) {
+  useLocale()
+
   return (
-    <dl className="shrink-0 whitespace-nowrap" title={description}>
+    <dl
+      className="shrink-0 whitespace-nowrap"
+      title={description ? t(description) : undefined}
+    >
       <dt
         className={`mb-1 text-[11px] text-muted ${description ? 'cursor-help decoration-muted/40 underline decoration-dotted underline-offset-4' : ''}`}
       >
-        {label}
+        {t(label)}
       </dt>
       <dd className={`text-xs font-medium tabular-nums ${tone}`}>{value}</dd>
     </dl>

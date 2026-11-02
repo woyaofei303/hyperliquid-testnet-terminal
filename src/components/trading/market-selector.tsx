@@ -2,15 +2,18 @@ import { Input, SmartPopover, Tab, Tabs } from '@fameex/ui'
 import { useReducedMotion } from 'framer-motion'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { TerminalModel } from '@/hooks/use-terminal'
+import { t, useLocale } from '@/i18n'
 import { display } from '@/lib/display'
 import { marketLabel, pricePrecision } from '@/lib/market-catalog'
 import { marketSummary } from '@/lib/market-summary'
 
 export function MarketSelector({ model }: { model: TerminalModel }) {
+  useLocale()
+
   const reduceMotion = useReducedMotion()
   return (
     <SmartPopover
-      triggerLabel="交易市场"
+      triggerLabel={t('交易市场')}
       placement="bottom-start"
       offset={12}
       disableAnimation={Boolean(reduceMotion)}
@@ -70,6 +73,8 @@ function MarketList({
   model: TerminalModel
   close: () => void
 }) {
+  useLocale()
+
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('all')
   const [sort, setSort] = useState<'volume' | 'change' | 'price'>('volume')
@@ -136,7 +141,7 @@ function MarketList({
   const start = Math.max(0, Math.floor(offset / 40) - 3)
   return (
     <section
-      aria-label="市场选择器"
+      aria-label={t('市场选择器')}
       className="flex min-h-0 max-h-[min(580px,80dvh)] flex-col"
     >
       <div className="p-3">
@@ -152,8 +157,8 @@ function MarketList({
               event.continuePropagation()
             }
           }}
-          aria-label="搜索市场"
-          placeholder="搜索币种、交易对或预测事件"
+          aria-label={t('搜索市场')}
+          placeholder={t('搜索币种、交易对或预测事件')}
           value={query}
           onChange={(v) => {
             setQuery(v)
@@ -162,7 +167,7 @@ function MarketList({
         />
       </div>
       <Tabs
-        aria-label="市场分类"
+        aria-label={t('市场分类')}
         selectedKey={category}
         onSelectionChange={(key) => {
           setCategory(String(key))
@@ -175,28 +180,29 @@ function MarketList({
         }}
       >
         {[
-          ['all', '所有'],
-          ['favorites', '自选'],
-          ['perp', '合约'],
-          ['spot', '现货'],
-          ['outcome', '预测'],
+          ['all', t('所有')],
+          ['favorites', t('自选')],
+          ['perp', t('合约')],
+          ['spot', t('现货')],
+          ['outcome', t('预测')],
           ['hip3', 'HIP-3'],
           ['hip4', 'HIP-4'],
         ].map(([key, label]) => (
-          <Tab key={key} title={label} />
+          <Tab key={key} title={t(label)} />
         ))}
       </Tabs>
       {model.catalogError && (
         <p role="alert" className="px-3 py-2 text-xs text-loss">
-          扩展市场加载失败：{model.catalogError}
+          {t('扩展市场加载失败：')}
+          {model.catalogError}
         </p>
       )}
       <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2 overflow-y-auto py-3 pl-8 pr-3 text-right text-xs text-muted [scrollbar-gutter:stable]">
-        <span className="-ml-5 text-left">市场</span>
+        <span className="-ml-5 text-left">{t('市场')}</span>
         {[
-          ['price', '最新价格'],
-          ['change', '24h 涨跌'],
-          ['volume', '24h 成交额'],
+          ['price', t('最新价格')],
+          ['change', t('24h 涨跌')],
+          ['volume', t('24h 成交额')],
         ].map(([key, label]) => (
           <button
             key={key}
@@ -208,7 +214,7 @@ function MarketList({
               reset()
             }}
           >
-            {label}
+            {t(label)}
             {sort === key ? (descending ? ' ↓' : ' ↑') : ''}
           </button>
         ))}
@@ -218,7 +224,7 @@ function MarketList({
         className="min-h-0 h-80 overflow-auto [scrollbar-gutter:stable]"
         onScroll={(event) => setOffset(event.currentTarget.scrollTop)}
         role="listbox"
-        aria-label="市场列表"
+        aria-label={t('市场列表')}
       >
         <div style={{ height: start * 40 }} />
         {rows.slice(start, start + 20).map((m) => {
@@ -230,7 +236,7 @@ function MarketList({
             >
               <button
                 type="button"
-                aria-label={`${favorites.includes(m.name) ? '取消收藏' : '收藏'} ${marketLabel(m)}`}
+                aria-label={`${t(favorites.includes(m.name) ? '取消收藏' : '收藏')} ${marketLabel(m)}`}
                 className="mr-2 w-3 shrink-0 text-muted hover:text-accent"
                 onClick={() => {
                   const next = favorites.includes(m.name)
@@ -259,8 +265,8 @@ function MarketList({
                     {m.kind === 'perp'
                       ? `${m.maxLeverage}x${m.dex ? ` · ${m.dex}` : ''}`
                       : m.kind === 'spot'
-                        ? '现货'
-                        : '预测'}
+                        ? t('现货')
+                        : t('预测')}
                   </small>
                 </span>
                 <span className="truncate">
@@ -289,11 +295,14 @@ function MarketList({
         })}
         <div style={{ height: Math.max(0, rows.length - start - 20) * 40 }} />
         {!rows.length && (
-          <p className="p-8 text-center text-sm text-muted">没有匹配的市场</p>
+          <p className="p-8 text-center text-sm text-muted">
+            {t('没有匹配的市场')}
+          </p>
         )}
       </div>
       <p className="border-t border-edge px-3 py-2 text-[11px] text-muted">
-        {rows.length} 个市场 · HIP-3 为独立部署合约，HIP-4 为预测市场 · Esc 关闭
+        {rows.length}{' '}
+        {t('个市场 · HIP-3 为独立部署合约，HIP-4 为预测市场 · Esc 关闭')}
       </p>
     </section>
   )

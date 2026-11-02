@@ -111,7 +111,6 @@ export function useTerminal() {
   const [action, setAction] = useState<ConfirmationAction | null>(null)
   const [pending, setPending] = useState<PendingOrder | null>(null)
   const [journal, setJournal] = useState<JournalEntry[]>([])
-  const [closeSizes, setCloseSizes] = useState<Record<string, string>>({})
   const [resolving, setResolving] = useState(false)
 
   useEffect(() => {
@@ -518,25 +517,42 @@ export function useTerminal() {
     position: NonNullable<
       typeof account.snapshot
     >['state']['assetPositions'][number]['position'],
+    options?: { size: string; kind: 'market' | 'limit'; price: string },
   ) {
     if (!wallet) return
     try {
       const selected = markets.find((m) => m.name === position.coin)
       if (!selected) throw new Error('找不到仓位对应的市场')
-      const size =
-        closeSizes[position.coin] ?? new Money(position.szi).abs().toFixed()
-      if (positiveDecimal(size, '平仓数量').gt(new Money(position.szi).abs()))
+      const current = await info.clearinghouseState({
+        user: wallet.address,
+        dex: selected.dex,
+      })
+      const latest = current.assetPositions.find(
+        (item) => item.position.coin === position.coin,
+      )?.position
+      if (!latest || new Money(latest.szi).eq(0))
+        throw new Error('仓位已关闭，请刷新账户')
+      if (
+        new Money(latest.szi).isPositive() !==
+        new Money(position.szi).isPositive()
+      )
+        throw new Error('仓位方向已变化，请重新确认')
+      const size = options?.size ?? new Money(latest.szi).abs().toFixed()
+      if (positiveDecimal(size, '平仓数量').gt(new Money(latest.szi).abs()))
         throw new Error('平仓数量超过当前仓位')
       const book = await info.l2Book({ coin: position.coin })
       if (!book || Date.now() - book.time > 15000)
         throw new Error('该市场行情过期，暂不能平仓')
       const side = new Money(position.szi).gt(0) ? 'sell' : 'buy'
-      const price = book.levels[side === 'buy' ? 1 : 0][0]?.px
+      const price =
+        options?.kind === 'limit'
+          ? options.price
+          : book.levels[side === 'buy' ? 1 : 0][0]?.px
       if (!price) throw new Error('当前盘口没有对手方报价')
       const order = prepareOrder({
         market: selected,
         side,
-        kind: 'market',
+        kind: options?.kind ?? 'market',
         price,
         size,
         reduceOnly: true,
@@ -544,14 +560,16 @@ export function useTerminal() {
       })
       requestOrder({
         kind: 'order',
-        orderKind: 'market',
+        orderKind: options?.kind ?? 'market',
         account: wallet.address,
         coin: position.coin,
         at: Date.now(),
         order,
       })
+      return true
     } catch (e) {
       setMessage(errorText(e), 'error')
+      return false
     }
   }
 
@@ -804,8 +822,6 @@ export function useTerminal() {
     action,
     setAction,
     journal,
-    closeSizes,
-    setCloseSizes,
     resolving,
     unresolved,
     canTrade,

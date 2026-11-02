@@ -1,5 +1,6 @@
 export const performanceModules = {
   book: '订单簿数据',
+  account: '仓位 / 账户数据',
   candles: 'K 线数据',
   trades: '最新成交数据',
   context: '标记价 / 市场数据',

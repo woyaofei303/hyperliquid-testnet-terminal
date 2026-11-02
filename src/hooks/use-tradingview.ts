@@ -1,7 +1,9 @@
 'use client'
+
 import { getVolPaneTargetHeight } from '@fameex/kline'
 import { getColorByCssVar } from '@fameex/utils'
 import { useEffect, useRef, useState } from 'react'
+import { useLocale } from '@/i18n'
 import type { createChartFeed } from '@/lib/chart-feed'
 import { type ChartInterval, chartResolutions } from '@/lib/chart-periods'
 import type {
@@ -22,6 +24,7 @@ export function useTradingView({
   visible: boolean
   onReady: (widget: IChartingLibraryWidget) => void
 }) {
+  const locale = useLocale()
   const container = useRef<HTMLDivElement>(null)
   const widgetRef = useRef<IChartingLibraryWidget | null>(null)
   const desired = useRef({ coin, interval })
@@ -74,7 +77,7 @@ export function useTradingView({
           datafeed: source.tradingView,
           symbol: coin,
           interval: chartResolutions[interval] as ResolutionString,
-          locale: 'zh',
+          locale: locale === 'en-US' ? 'en' : 'zh',
           timezone: 'Etc/UTC',
           theme: 'dark',
           autosize: true,
@@ -143,7 +146,7 @@ export function useTradingView({
       widgetRef.current?.remove()
       widgetRef.current = null
     }
-  }, [source, onReady])
+  }, [source, onReady, locale])
   useEffect(() => {
     desired.current = { coin, interval }
     sync.current()

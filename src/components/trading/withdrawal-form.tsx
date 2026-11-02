@@ -1,7 +1,9 @@
 'use client'
+
 import { Button, Input } from '@fameex/ui'
 import { useEffect, useState } from 'react'
 import type { TerminalModel } from '@/hooks/use-terminal'
+import { t, useLocale } from '@/i18n'
 import { display } from '@/lib/display'
 import { WITHDRAWAL_FEE, withdrawalAmount } from '@/lib/funding'
 import { Money } from '@/lib/orders'
@@ -18,24 +20,26 @@ export function FundingRoute({
   onSwap?: () => void
   disabled?: boolean
 }) {
+  useLocale()
+
   return (
     <div className="flex items-center gap-3 rounded-[8px] bg-panel p-3">
       <fieldset
-        aria-label="划转方向"
+        aria-label={t('划转方向')}
         className="min-w-0 flex-1 space-y-2 text-sm"
       >
         <p>
-          <span className="mr-4 text-xs text-muted">从</span>
+          <span className="mr-4 text-xs text-muted">{t('从')}</span>
           {from}
         </p>
         <p>
-          <span className="mr-4 text-xs text-muted">到</span>
+          <span className="mr-4 text-xs text-muted">{t('到')}</span>
           {to}
         </p>
       </fieldset>
       {onSwap && (
         <Button
-          aria-label="交换划转方向"
+          aria-label={t('交换划转方向')}
           variant="light"
           className="h-9 min-w-9 p-2 text-accent"
           isDisabled={disabled}
@@ -60,6 +64,8 @@ export function FundingRoute({
 }
 
 export function WithdrawalForm({ model }: { model: TerminalModel }) {
+  useLocale()
+
   const { wallet, funding: f, busy } = model
   const [amount, setAmount] = useState('')
   const { loadWithdrawalQuote, cancelWithdrawal } = f
@@ -79,22 +85,22 @@ export function WithdrawalForm({ model }: { model: TerminalModel }) {
       const value = withdrawalAmount(amount, quote.available)
       received = new Money(value).minus(WITHDRAWAL_FEE).toFixed()
     } catch (e) {
-      validation = e instanceof Error ? e.message : '金额无效'
+      validation = e instanceof Error ? e.message : t('金额无效')
     }
   }
   return (
     <div className="space-y-4">
       <p className="break-all text-xs leading-5 text-muted">
-        收款地址 · 当前连接钱包
+        {t('收款地址 · 当前连接钱包')}
         <br />
         <span className="font-mono text-ink">{wallet.address}</span>
       </p>
       <Input
-        label="提款金额（USDC）"
+        label={t('提款金额（USDC）')}
         value={amount}
         onChange={setAmount}
         inputMode="decimal"
-        placeholder="至少 0.4 USDC"
+        placeholder={t('至少 0.4 USDC')}
         isDisabled={busy || f.pending}
         endContent={
           <Button
@@ -106,12 +112,12 @@ export function WithdrawalForm({ model }: { model: TerminalModel }) {
               if (quote) setAmount(quote.available)
             }}
           >
-            最大值
+            {t('最大值')}
           </Button>
         }
       />
       <p className="flex justify-between text-xs">
-        <span className="text-muted">最大可提（已预留 Gas）</span>
+        <span className="text-muted">{t('最大可提（已预留 Gas）')}</span>
         <span>{display(quote?.available, 6)} USDC</span>
       </p>
       {validation && (
@@ -121,28 +127,29 @@ export function WithdrawalForm({ model }: { model: TerminalModel }) {
       )}
       <dl className="space-y-2 border-t border-edge pt-3 text-xs">
         <div className="flex justify-between">
-          <dt className="text-muted">跨链手续费</dt>
+          <dt className="text-muted">{t('跨链手续费')}</dt>
           <dd>{WITHDRAWAL_FEE} USDC</dd>
         </div>
         <div className="flex justify-between gap-4">
-          <dt className="text-muted">预计 HyperEVM Gas</dt>
+          <dt className="text-muted">{t('预计 HyperEVM Gas')}</dt>
           <dd className="text-right">
             {display(quote?.gasHype, 8)} HYPE
             <br />
             <span className="text-muted">
-              约 {display(quote?.gasUsdc, 6)} USDC ·{' '}
-              {quote?.gasInHype ? '从现货 HYPE 扣除' : '从 USDC 预留'}
+              {t('约')}
+              {display(quote?.gasUsdc, 6)} USDC ·{' '}
+              {quote?.gasInHype ? t('从现货 HYPE 扣除') : t('从 USDC 预留')}
             </span>
           </dd>
         </div>
         {quote && new Money(quote.activationFee).gt(0) && (
           <div className="flex justify-between">
-            <dt className="text-muted">账户激活费</dt>
+            <dt className="text-muted">{t('账户激活费')}</dt>
             <dd>{quote.activationFee} USDC</dd>
           </div>
         )}
         <div className="flex justify-between pt-1">
-          <dt className="text-muted">预计到账</dt>
+          <dt className="text-muted">{t('预计到账')}</dt>
           <dd className="font-medium text-ink">{received} USDC</dd>
         </div>
       </dl>
@@ -152,7 +159,7 @@ export function WithdrawalForm({ model }: { model: TerminalModel }) {
           size="sm"
           onPress={() => void loadWithdrawalQuote()}
         >
-          重新查询提款费用
+          {t('重新查询提款费用')}
         </Button>
       )}
       <Button
@@ -168,19 +175,19 @@ export function WithdrawalForm({ model }: { model: TerminalModel }) {
         onPress={() => void f.withdraw(amount)}
       >
         {f.pending
-          ? '资金请求待确认'
+          ? t('资金请求待确认')
           : busy
-            ? '等待钱包确认…'
+            ? t('等待钱包确认…')
             : f.quoteLoading
-              ? '正在查询费用…'
-              : '提现至 Arbitrum Sepolia'}
+              ? t('正在查询费用…')
+              : t('提现至 Arbitrum Sepolia')}
       </Button>
       <p className="text-xs leading-5 text-muted">
         {shared ? (
-          '使用统一账户的共享余额，已扣除维护保证金限制。'
+          t('使用统一账户的共享余额，已扣除维护保证金限制。')
         ) : (
           <>
-            提款使用合约可提余额。如 USDC 在现货账户，请先
+            {t('提款使用合约可提余额。如 USDC 在现货账户，请先')}
             <Button
               variant="light"
               size="sm"
@@ -191,12 +198,12 @@ export function WithdrawalForm({ model }: { model: TerminalModel }) {
                 model.setWeb3Panel('transfer')
               }}
             >
-              现货转入合约
+              {t('现货转入合约')}
             </Button>
             。
           </>
         )}
-        通常约 5 分钟到账，实际以链上结果为准。
+        {t('通常约 5 分钟到账，实际以链上结果为准。')}
       </p>
     </div>
   )
