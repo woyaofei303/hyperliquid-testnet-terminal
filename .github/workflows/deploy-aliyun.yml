@@ -1,0 +1,152 @@
+name: CI & Production
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 检查并发布 main，或回滚到上一成功版本
+        type: choice
+        required: true
+        default: deploy
+        options: [deploy, rollback]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.ref == 'refs/heads/main' && 'aliyun-production' || format('hyperliquid-ci-{0}', github.ref) }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: CI
+    if: inputs.operation != 'rollback'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HUSKY: '0'
+    outputs:
+      release_id: ${{ steps.build.outputs.release_id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check deployment rollback
+        run: python3 -m unittest discover -s deploy -p 'test_*.py'
+      - name: Check source
+        run: npm run lint
+      - name: Check business rules
+        run: npm test
+      - name: Build static site
+        run: npm run build:static
+      - name: Check types
+        run: npm run typecheck
+      - name: Install test browser
+        run: npx playwright install --with-deps chrome
+      - name: Check exported interactions
+        env:
+          STATIC_EXPORT: '1'
+        run: npm run test:e2e -- --workers=2
+      - name: Build server assets
+        id: build
+        run: |
+          release="$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          printf '%s\n' "$release" > out/version.txt
+          printf 'release_id=%s\n' "$release" >> "$GITHUB_OUTPUT"
+      - name: Save failed browser traces
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: failed-browser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: output-tdd/playwright/hyperliquid/test-results
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Save the CI build
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.operation == 'deploy'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-${{ github.sha }}
+          path: out/
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: true
+
+  deploy:
+    name: ${{ inputs.operation == 'rollback' && 'Rollback' || 'Deploy' }}
+    needs: verify
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' &&
+      ((inputs.operation == 'rollback' && needs.verify.result == 'skipped') ||
+       (inputs.operation != 'rollback' && needs.verify.result == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: aliyun-production
+      url: https://hyperliquid.sunshinedairy.net
+    env:
+      OPERATION: ${{ inputs.operation || 'deploy' }}
+      RELEASE_ID: ${{ needs.verify.outputs.release_id }}
+      DEPLOY_HOST: ${{ vars.ALIYUN_HOST }}
+      DEPLOY_USER: ${{ vars.ALIYUN_USER }}
+      DEPLOY_PORT: ${{ vars.ALIYUN_PORT || '22' }}
+    steps:
+      - name: Check deployment configuration
+        env:
+          PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || { echo 'Configure ALIYUN_HOST'; exit 1; }
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo 'Configure ALIYUN_USER'; exit 1; }
+          [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]] || { echo 'Invalid ALIYUN_PORT'; exit 1; }
+          [[ -n "$PRIVATE_KEY" && -n "$KNOWN_HOSTS" ]] || { echo 'Configure SSH key and verified known_hosts'; exit 1; }
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Download the CI build
+        if: inputs.operation != 'rollback'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-${{ github.sha }}
+          path: out/
+
+      - name: Publish or roll back the release
+        env:
+          PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/hyperliquid-ssh.XXXXXX")"
+          trap 'rm -rf "$ssh_dir"' EXIT
+          chmod 700 "$ssh_dir"
+          printf '%s\n' "$PRIVATE_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          unset PRIVATE_KEY KNOWN_HOSTS
+          ssh_options=(-i "$ssh_dir/key" -p "$DEPLOY_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" -o ConnectTimeout=15)
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          if [[ "$OPERATION" == rollback ]]; then
+            release="$(ssh "${ssh_options[@]}" "$target" 'cat /srv/hyperliquid/previous/version.txt')"
+            [[ "$release" =~ ^[0-9a-f]{40}-[0-9]+-[0-9]+$ ]] || { echo 'No valid previous release'; exit 1; }
+            ssh "${ssh_options[@]}" "$target" 'python3 - --rollback' < deploy/release.py
+          else
+            release="$RELEASE_ID"
+            [[ "$release" =~ ^[0-9a-f]{40}-[0-9]+-[0-9]+$ ]] || { echo 'Invalid CI release'; exit 1; }
+            [[ "$(cat out/version.txt)" == "$release" && "$release" == "$GITHUB_SHA-"* ]] || { echo 'CI artifact does not match this commit'; exit 1; }
+            ssh "${ssh_options[@]}" "$target" "mkdir -p /srv/hyperliquid/releases/$release"
+            printf -v transport '%q ' ssh "${ssh_options[@]}"
+            rsync -rzc --perms --chmod=D755,F644 -e "$transport" \
+              out/ "$target:/srv/hyperliquid/releases/$release/"
+            ssh "${ssh_options[@]}" "$target" "python3 - '$release'" < deploy/release.py
+          fi
+          actual="$(curl --fail --silent --show-error --retry 3 --max-time 30 https://hyperliquid.sunshinedairy.net/version.txt)"
+          [[ "$actual" == "$release" ]] || { echo 'Public HTTPS version check failed'; exit 1; }
+          printf 'Operation: %s\n\nActive release: `%s`\n\nhttps://hyperliquid.sunshinedairy.net\n' "$OPERATION" "$release" >> "$GITHUB_STEP_SUMMARY"

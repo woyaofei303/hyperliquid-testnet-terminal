@@ -1,0 +1,215 @@
+/* FameEX apps/web dark tokens; packages/config/tailwind-preset.js aliases. */
+:root {
+  --fx-bg-0: 17 13 26;
+  --fx-bg-1: 11 12 14;
+  --fx-bg-2: 23 24 29;
+  --fx-bg-3: 34 35 43;
+  --fx-bg-4: 11 12 14;
+  --fx-bg-5: 90 94 114;
+  --fx-bg-6: 11 12 14;
+  --fx-bg-7: 11 12 14;
+  --fx-bg-g: 6 55 39;
+  --fx-bg-r: 71 21 21;
+  --fx-bg-y: 74 55 18;
+  --fx-bg-b: 45 20 98;
+  --fx-bg-6-opacity: 0.55;
+  --fx-bg-7-opacity: 0.75;
+  --fx-text-0: 255 255 255;
+  --fx-text-1: 255 255 255;
+  --fx-text-2: 194 197 214;
+  --fx-text-3: 141 145 165;
+  --fx-text-4: 90 94 114;
+  --fx-text-5: 68 71 86;
+  --fx-text-6: 255 255 255;
+  --fx-text-7: 141 91 246;
+  --fx-text-8: 45 47 57;
+  --fx-text-10: 255 255 255;
+  --fx-text-11: 30 32 38;
+  --fx-fill-1: 56 59 71;
+  --fx-fill-2: 68 71 86;
+  --fx-cc-1: 68 71 86;
+  --fx-cc-2: 56 59 71;
+  --fx-cc-3: 30 32 38;
+  --fx-divider-1: 255 255 255;
+  --fx-divider-1-opacity: 0.08;
+  --fx-divider-2: 255 255 255;
+  --fx-divider-2-opacity: 0.12;
+  --fx-divider-3: 255 255 255;
+  --fx-divider-3-opacity: 0.2;
+  --fx-overlay-0-opacity: 0.75;
+  --fx-overlay-1: 11 12 14;
+  --fx-overlay-1-opacity: 0.55;
+  --fx-overlay-2: 11 12 14;
+  --fx-overlay-2-opacity: 0.35;
+  --fx-overlay-3: 11 12 14;
+  --fx-overlay-3-opacity: 0.08;
+  --fx-brand-1: 113 50 244;
+  --fx-brand-2: 213 253 0;
+  --fx-sem-g: 20 184 129;
+  --fx-sem-y: 245 184 61;
+  --fx-sem-r: 235 71 71;
+  --fx-hover-b: 141 91 246;
+  --fx-press-b: 90 40 195;
+  --fx-hover-b2: 56 32 106;
+  --fx-press-b2: 36 16 78;
+  --fx-hover-n: 72 75 86;
+  --fx-press-n: 54 57 69;
+  --fx-hover-g: 67 198 154;
+  --fx-press-g: 16 147 103;
+  --fx-hover-r: 239 108 108;
+  --fx-press-r: 188 57 57;
+  --fx-hover-y: 247 198 100;
+  --fx-press-y: 196 147 49;
+  --fx-primary: 136 77 255;
+  --fx-primary-bg: 136 77 255;
+  --fx-primary-bg-opacity: 0.2;
+  --fx-green: 20 184 129;
+  --fx-green-bg: 20 184 129;
+  --fx-green-bg-opacity: 0.1;
+  --fx-yellow: 245 184 61;
+  --fx-yellow-bg: 245 184 61;
+  --fx-yellow-bg-opacity: 0.1;
+  --fx-red: 235 71 71;
+  --fx-red-bg: 235 71 71;
+  --fx-red-bg-opacity: 0.1;
+  --fx-shadow: 11 12 14;
+  --fx-shadow-fill-opacity: 0.35;
+  --fx-shadow-stroke-opacity: 0.35;
+  --fx-shadow-fill-depth-opacity: 0.55;
+  --fx-shadow-stroke-z400-opacity: 0.75;
+  --fx-shadow-stroke-z500-opacity: 0.75;
+  --fx-shadow-popup-fill-opacity: 0.4;
+  --fx-shadow-popup-stroke-opacity: 0.5;
+  --fx-hover-primary: 160 113 255;
+  --fx-hover-secondary: 136 77 255;
+  --fx-hover-secondary-opacity: 0.35;
+  --fx-hover-ordinary: 72 75 86;
+  --fx-hover-positive: 67 198 154;
+  --fx-hover-negative: 247 117 117;
+}
+@theme inline {
+  --color-bg-0: rgb(var(--fx-bg-0));
+  --color-bg-1: rgb(var(--fx-bg-1));
+  --color-bg-2: rgb(var(--fx-bg-2));
+  --color-bg-3: rgb(var(--fx-bg-3));
+  --color-bg-4: rgb(var(--fx-bg-4));
+  --color-bg-5: rgb(var(--fx-bg-5));
+  --color-bg-6: rgb(var(--fx-bg-6));
+  --color-bg-7: rgb(var(--fx-bg-7));
+  --color-bg-g: rgb(var(--fx-bg-g));
+  --color-bg-r: rgb(var(--fx-bg-r));
+  --color-bg-y: rgb(var(--fx-bg-y));
+  --color-bg-b: rgb(var(--fx-bg-b));
+  --color-text-0: rgb(var(--fx-text-0));
+  --color-text-1: rgb(var(--fx-text-1));
+  --color-text-2: rgb(var(--fx-text-2));
+  --color-text-3: rgb(var(--fx-text-3));
+  --color-text-4: rgb(var(--fx-text-4));
+  --color-text-5: rgb(var(--fx-text-5));
+  --color-text-6: rgb(var(--fx-text-6));
+  --color-text-7: rgb(var(--fx-text-7));
+  --color-text-8: rgb(var(--fx-text-8));
+  --color-text-10: rgb(var(--fx-text-10));
+  --color-text-11: rgb(var(--fx-text-11));
+  --color-fill-1: rgb(var(--fx-fill-1));
+  --color-fill-2: rgb(var(--fx-fill-2));
+  --color-cc-1: rgb(var(--fx-cc-1));
+  --color-cc-2: rgb(var(--fx-cc-2));
+  --color-cc-3: rgb(var(--fx-cc-3));
+  --color-divider-1: rgb(var(--fx-divider-1));
+  --color-divider-2: rgb(var(--fx-divider-2));
+  --color-divider-3: rgb(var(--fx-divider-3));
+  --color-overlay-1: rgb(var(--fx-overlay-1));
+  --color-overlay-2: rgb(var(--fx-overlay-2));
+  --color-overlay-3: rgb(var(--fx-overlay-3));
+  --color-brand-1: rgb(var(--fx-brand-1));
+  --color-brand-2: rgb(var(--fx-brand-2));
+  --color-sem-g: rgb(var(--fx-sem-g));
+  --color-sem-y: rgb(var(--fx-sem-y));
+  --color-sem-r: rgb(var(--fx-sem-r));
+  --color-hover-b: rgb(var(--fx-hover-b));
+  --color-press-b: rgb(var(--fx-press-b));
+  --color-hover-b2: rgb(var(--fx-hover-b2));
+  --color-press-b2: rgb(var(--fx-press-b2));
+  --color-hover-n: rgb(var(--fx-hover-n));
+  --color-press-n: rgb(var(--fx-press-n));
+  --color-hover-g: rgb(var(--fx-hover-g));
+  --color-press-g: rgb(var(--fx-press-g));
+  --color-hover-r: rgb(var(--fx-hover-r));
+  --color-press-r: rgb(var(--fx-press-r));
+  --color-hover-y: rgb(var(--fx-hover-y));
+  --color-press-y: rgb(var(--fx-press-y));
+  --color-primary: rgb(var(--fx-primary));
+  --color-primary-bg: rgb(var(--fx-primary-bg));
+  --color-green: rgb(var(--fx-green));
+  --color-green-bg: rgb(var(--fx-green-bg));
+  --color-yellow: rgb(var(--fx-yellow));
+  --color-yellow-bg: rgb(var(--fx-yellow-bg));
+  --color-red: rgb(var(--fx-red));
+  --color-red-bg: rgb(var(--fx-red-bg));
+  --color-shadow: rgb(var(--fx-shadow));
+  --color-hover-primary: rgb(var(--fx-hover-primary));
+  --color-hover-secondary: rgb(var(--fx-hover-secondary));
+  --color-hover-ordinary: rgb(var(--fx-hover-ordinary));
+  --color-hover-positive: rgb(var(--fx-hover-positive));
+  --color-hover-negative: rgb(var(--fx-hover-negative));
+  --radius-m: 6px;
+  --radius-small: 4px;
+  --text-subtitle: 16px;
+  --text-body-regular: 14px;
+  --text-body-s: 12px;
+  --text-body-xs: 11px;
+  --text-body-xxs: 10px;
+  --color-hover-brand-1: rgb(var(--fx-hover-b));
+}
+@utility text-1 {
+  color: rgb(var(--fx-text-1));
+}
+@utility text-2 {
+  color: rgb(var(--fx-text-2));
+}
+@utility text-3 {
+  color: rgb(var(--fx-text-3));
+}
+@utility text-4 {
+  color: rgb(var(--fx-text-4));
+}
+@utility text-5 {
+  color: rgb(var(--fx-text-5));
+}
+@utility text-6 {
+  color: rgb(var(--fx-text-6));
+}
+@utility text-7 {
+  color: rgb(var(--fx-text-7));
+}
+@utility text-8 {
+  color: rgb(var(--fx-text-8));
+}
+@utility text-10 {
+  color: rgb(var(--fx-text-10));
+}
+@utility bg-1 {
+  background-color: rgb(var(--fx-bg-1));
+}
+@utility bg-2 {
+  background-color: rgb(var(--fx-bg-2));
+}
+@utility bg-3 {
+  background-color: rgb(var(--fx-bg-3));
+}
+@utility bg-4 {
+  background-color: rgb(var(--fx-bg-4));
+}
+@utility bg-5 {
+  background-color: rgb(var(--fx-bg-5));
+}
+@utility bg-6 {
+  background-color: rgb(var(--fx-bg-6));
+}
+@utility bg-7 {
+  background-color: rgb(var(--fx-bg-7));
+}
+@utility bg-b {
+  background-color: rgb(var(--fx-bg-b));
+}

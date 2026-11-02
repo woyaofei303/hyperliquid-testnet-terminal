@@ -1,0 +1,5 @@
+# 经检查并备份后，追加到现有 Caddyfile；不要覆盖原有 live 站点。
+hyperliquid.sunshinedairy.net {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8089
+}

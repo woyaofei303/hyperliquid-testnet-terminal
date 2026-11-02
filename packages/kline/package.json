@@ -1,0 +1,13 @@
+{
+  "name": "@fameex/kline",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./index.ts",
+  "dependencies": {
+    "@fameex/utils": "0.0.0",
+    "klinecharts": "10.1.0",
+    "ahooks": "3.9.6",
+    "zustand": "4.5.7"
+  }
+}

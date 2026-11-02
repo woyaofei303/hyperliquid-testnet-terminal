@@ -1,0 +1,10 @@
+node_modules/
+.next/
+out/
+__pycache__/
+next-env.d.ts
+*.tsbuildinfo
+.env*
+!.env.example
+.DS_Store
+!package-lock.json

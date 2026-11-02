@@ -1,0 +1,62 @@
+{
+  "name": "hyperliquid-testnet-terminal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port 3210",
+    "build": "next build --webpack",
+    "build:static": "STATIC_EXPORT=1 next build --webpack",
+    "start": "next start --hostname 127.0.0.1 --port 3210",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/lib/*.test.ts",
+    "test:e2e": "playwright test --grep-invert @live",
+    "test:live": "LIVE_CHECK=1 playwright test --grep @live --workers=1",
+    "verify:read": "node scripts/verify-read.ts",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@fameex/kline": "0.0.0",
+    "@fameex/ui": "0.0.0",
+    "@fameex/utils": "0.0.0",
+    "@heroui/react": "2.8.5",
+    "@heroui/theme": "2.4.23",
+    "@nktkas/hyperliquid": "0.33.3",
+    "decimal.js": "10.6.0",
+    "framer-motion": "12.7.4",
+    "klinecharts": "10.1.0",
+    "next": "16.4.3",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "viem": "2.57.14"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.8",
+    "@playwright/test": "1.58.2",
+    "@tailwindcss/postcss": "4.1.18",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "husky": "9.1.7",
+    "lint-staged": "16.2.7",
+    "tailwindcss": "4.1.18",
+    "typescript": "5.9.3"
+  },
+  "lint-staged": {
+    "*.{js,mjs,ts,tsx,json,css}": "biome check --write --no-errors-on-unmatched"
+  },
+  "workspaces": [
+    "packages/ui",
+    "packages/utils",
+    "packages/kline"
+  ],
+  "overrides": {
+    "motion-dom": "12.7.4",
+    "motion-utils": "12.7.2"
+  }
+}

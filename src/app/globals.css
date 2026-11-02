@@ -1,0 +1,76 @@
+@import "tailwindcss";
+@import "./fameex-theme.css";
+@plugin "../heroui.ts";
+@source "../../packages/ui";
+@source "../../packages/kline";
+@source "../../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
+@custom-variant dark (&:is(.dark *));
+
+/* Hyperliquid 交易页配色，沿用 FameEX 组件的语义 token 和交互状态。 */
+:root {
+  --fx-bg-1: 27 38 43;
+  --fx-bg-2: 15 26 31;
+  --fx-bg-3: 35 47 53;
+  --fx-bg-b: 24 63 60;
+  --fx-cc-1: 49 65 72;
+  --fx-cc-2: 35 47 53;
+  --fx-cc-3: 25 38 44;
+  --fx-text-1: 225 236 236;
+  --fx-text-2: 180 194 195;
+  --fx-text-3: 145 162 164;
+  --fx-text-4: 88 110 115;
+  --fx-text-6: 15 26 31;
+  --fx-text-7: 80 210 193;
+  --fx-brand-1: 80 210 193;
+  --fx-primary: 80 210 193;
+  --fx-sem-g: 0 185 150;
+  --fx-sem-r: 242 86 104;
+  --fx-volume-up: 33 193 166;
+  --fx-volume-down: 227 100 118;
+  --fx-hover-b: 111 222 207;
+  --fx-hover-brand-1: 111 222 207;
+  --fx-hover-b2: 33 77 72;
+  --fx-hover-n: 46 62 69;
+}
+
+@theme {
+  --color-canvas: #1b262b;
+  --color-ink: #e1ecec;
+  --color-muted: #91a2a4;
+  --color-panel: #0f1a1f;
+  --color-surface: #232f35;
+  --color-edge: #28373d;
+  --color-brand: #50d2c1;
+  --color-accent: #50d2c1;
+  --color-mint: #00b996;
+  --color-loss: #f25668;
+}
+
+@layer base {
+  body {
+    @apply m-0 bg-canvas text-ink antialiased;
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Microsoft YaHei", sans-serif;
+    font-variant-numeric: tabular-nums;
+    color-scheme: dark;
+  }
+  button,
+  a {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-panel;
+  }
+  button {
+    @apply cursor-pointer transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none;
+  }
+  input,
+  select {
+    @apply min-w-0;
+  }
+  ::selection {
+    @apply bg-brand/40 text-white;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #444756 transparent;
+  }
+}

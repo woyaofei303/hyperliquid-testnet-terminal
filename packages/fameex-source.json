@@ -1,0 +1,2506 @@
+{
+  "source": "/Users/julian/fameex-web",
+  "files": [
+    {
+      "path": "packages/ui/components/select/FlatSelect.tsx",
+      "sourceSha256": "ec30230f45bd66b1fa2b02381e5d92b84a9bb76cda13ee79f6f0bf3a6f495a29",
+      "adaptation": "保留 FameEX 下拉样式，使用现有 SVG 图标和语义按钮，支持可访问名称与减少动画偏好。"
+    },
+    {
+      "path": "packages/utils/classNames.ts",
+      "sourceSha256": "6af3d375b19fc882adf44202356c3c158b2cff52ae0a82b9602dbba3946f9610"
+    },
+    {
+      "path": "packages/utils/cssVar.ts",
+      "sourceSha256": "ec4f0a4fa93b37302ecb3fac5a0ff67f076ab65c3aca976e81e2efd4821edd7c"
+    },
+    {
+      "path": "packages/ui/components/button/index.tsx",
+      "sourceSha256": "c197d5de4d08d4582d6ff8017df0cdf4d13fe9fa1f09febe962a5d7ae4f38d18"
+    },
+    {
+      "path": "packages/ui/components/input/Input.tsx",
+      "sourceSha256": "db1e44ede15a43679f6bdb9c4468a7e2b66c7b201c92c939b936c45c6ffc9856"
+    },
+    {
+      "path": "packages/ui/components/input/style.ts",
+      "sourceSha256": "acdc7b9bb4044cf2670c6deb8349578b26966188536736a7ff296bad27d11a4b"
+    },
+    {
+      "path": "packages/ui/components/select/Select.tsx",
+      "sourceSha256": "c716c52457c3df60aa2c46999264e54995b6eb9859feb727a4d4be4b22e20ea1"
+    },
+    {
+      "path": "packages/ui/components/select/style.ts",
+      "sourceSha256": "78c0d8439c74423291418c64b2b1abce610bfc35bcd3d3a1dba60b264c5b7a09"
+    },
+    {
+      "path": "packages/ui/components/checkbox/index.ts",
+      "sourceSha256": "9a84622fcf81eef03302bb855a94447bfc69c61bfaf00173a7a33f00bef52f55"
+    },
+    {
+      "path": "packages/ui/components/spinner/Spinner.tsx",
+      "sourceSha256": "122dc05008fc91ab1e3161dc541545ae63d014fb53d797360ca435c9a45650c7"
+    },
+    {
+      "path": "packages/ui/components/spinner/index.ts",
+      "sourceSha256": "ce75a0b6a21548e3c0c57278c11150a552e3200ac71c65db0c7c8a78a357763a"
+    },
+    {
+      "path": "packages/kline/src/chart/BaseKlineChart.tsx",
+      "sourceSha256": "1739b4e30e60c697ff50f7831beca3f87f8e033aa01199d09fbc1d14c28af843"
+    },
+    {
+      "path": "packages/kline/src/chart/useBaseKlineChart.ts",
+      "sourceSha256": "d63d16834c88de415c91325e0b1b9401b03e6b8823fa5364635fb9609461cd17"
+    },
+    {
+      "path": "packages/kline/src/chart/constants.ts",
+      "sourceSha256": "b6be1eea725dc59d1aa28d69f1db7f2c6d2402414cf63d8d4b1ba0287ed69c05"
+    },
+    {
+      "path": "packages/kline/src/chart/dateFormatter.ts",
+      "sourceSha256": "5d1ad2766d0052dd1a3cd480efa250e2363a82f49b5fa7572c1844235dabb9b9"
+    },
+    {
+      "path": "packages/kline/src/chart/presentation.ts",
+      "sourceSha256": "54f9381c465932f8b95f39fa91ba5ab6a2297bc5a6cfdd5a9f70831a2d636981"
+    },
+    {
+      "path": "packages/kline/src/chart/volPane.ts",
+      "sourceSha256": "94dc8aa2e0561dbaab1c560759ecafd604da1f28ec96cc24a51d91ca32d5d1b0"
+    },
+    {
+      "path": "packages/kline/src/chart/useChartLoading.ts",
+      "sourceSha256": "f93b19b55200b3c2c60613f22ffea5fb0b492247c85c96c2dfd43234bdda0979"
+    },
+    {
+      "path": "packages/kline/src/chart/useKlineChartStore.ts",
+      "sourceSha256": "add5bfc25f07cd3e167b2613c24f29b4a67a8dbb90d5d34b31d2dc0975132577"
+    },
+    {
+      "path": "packages/kline/src/shared/engine.ts",
+      "sourceSha256": "b57cf98d864acfc2755472d39616c311dabdfe811c771bc749326b9d786be607"
+    },
+    {
+      "path": "packages/kline/src/shared/useKlineChartOverlay.ts",
+      "sourceSha256": "9c6162b521896d4850547b740922153b83ff17dcf517e5aa99f13a975933d9bb"
+    },
+    {
+      "path": "packages/kline/src/crosshair/constants.ts",
+      "sourceSha256": "14144836306ae771b3afe355463a1b6aad3b7e1467983b261221f116dca0edc6"
+    },
+    {
+      "path": "public/lib/charting_library/charting_library.d.ts",
+      "sourceSha256": "121a1feb5caf9d4fed4391c765b1987b4aea2ad2edc50fe8bc6e58e7046531d0"
+    },
+    {
+      "path": "public/lib/charting_library/charting_library.esm.js",
+      "sourceSha256": "6410e2a04efd2a2c3be916a979652c8a31df21ec438bbc8aa628bc0efea35c09"
+    },
+    {
+      "path": "public/lib/charting_library/charting_library.cjs.js",
+      "sourceSha256": "a8cf4659cbd16f8d88b37badb1d0481efd687a908d3c7df2c9100099e3d28cfe"
+    },
+    {
+      "path": "public/lib/charting_library/charting_library.standalone.js",
+      "sourceSha256": "6fb887ce0dcd7873da95d9b11e8ac00b77e8f12e2e90a914fe3449c4dada9139"
+    },
+    {
+      "path": "public/lib/charting_library/datafeed-api.d.ts",
+      "sourceSha256": "bda7a94ae70e70de0505313597f0f0cd9ec513a0a60d124eca24b1bf7ca8fcff"
+    },
+    {
+      "path": "public/lib/charting_library/package.json",
+      "sourceSha256": "480b567b8aca8e04a655bfcd38fcee4f5309961f5b7b5eb26046222bbd1e7e76"
+    },
+    {
+      "path": "public/lib/charting_library/charting_library.js",
+      "sourceSha256": "81bf4cb9ab1fb366dc946bf28513cc80e48bf395a153adf1145cde6cdd47990a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4062.9229fac3ef3db26fd5bc.js",
+      "sourceSha256": "261fbb6892453c124cc0165c0059c40b9017207dff9286cf5824317245b14e6e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3939.4d0187960a564ff5a557.rtl.css",
+      "sourceSha256": "61b94d1707c5d6ad3f8ba57cc29574d51330f0bbe398189ecd43a4b8ad73a6fe"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pt.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "e79775ad8498e882ccd9c06bb0d40b10aa5592c2347b122775ca5fab56648500"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh.2547.28b713bedf796244795d.js",
+      "sourceSha256": "fff5496a707d68c5188a55382476f34967d8de08a1d049336f36d40442ec6d28"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/8056.1f54f717d8e522c55c89.rtl.css",
+      "sourceSha256": "4381a0bb9f65e5770c682dc2c70fe239d1be3a9fbd304a25b305b56f4efad0e5"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7663.6fabc58c7ddf7c2b076f.js",
+      "sourceSha256": "f1c55d053c4520a2c78f4ac90d138d57589a7eaaadd9c60d3bce0922b7a0abe4"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/full-tooltips-popup.3a92633d0497afb5344c.js",
+      "sourceSha256": "56311cce3adab84545e1b2c71b7b1f8e06cfcce201f6ff5c40ba7f410ed6fdfb"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ms_MY.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "3388b82cb0aac2947159c931badfdb8394edfe2423cc4865ea769030218ddde8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/share-chart-to-social-utils.d7331dbca4a2aa0909e7.js",
+      "sourceSha256": "e45b1e982424ec3804ef1229873547f3c2ef5efa0183ea5a380cf2c6047bb0e3"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/nl_NL.2547.28b713bedf796244795d.js",
+      "sourceSha256": "d02c5e7d4ead32ae3012e3492c90192a64e4006f789fa01441588a8f63201f96"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/898.f909d7c1efc95f635922.rtl.css",
+      "sourceSha256": "be3bdf0567e47cc55e4705f10aa580fde88e99a9ef89b2aa8fab479a1d1cec31"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/lt-pane-views.077de067da0763f84cb2.js",
+      "sourceSha256": "9321bb0c860ee883708f1b4b622836e124456802b1f1feb96a61c6811ebf4248"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4215.d24836a292b1969ab4bb.rtl.css",
+      "sourceSha256": "5084a231bec34e139ac4f09ce22fdcb0a4fbbe75e840d7aa603a4ffbafd02195"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ro.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "4dd296e4843cf75559b7a507c33d4f6f5aa828a40f1dc97b77497142ddf37097"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/sv.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "2fc11831d7855658f77ef700094d7cc0b58d49ab4cd4053c3e82d1dcc3b4b3ac"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/hu_HU.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "813b87be203eaf817123ba1f829aced42437d28b8602ab48d6de38bc6cd4c5c1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/hu_HU.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "b299cb6a6a2a02d82cc6bc9fa3746ade801414181b2561ac158a791dcd32f1df"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4788.3cff897925f7a8dbc837.rtl.css",
+      "sourceSha256": "a5f49a879d86d89591d777cb959f764ec34bb57ce170ee809c492819f545d1af"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/tr.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "454d1d5deb8941f72b3dd34da3283bca4de52eefce9bf62e0194f24f31f87f11"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/he_IL.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "f55d2c1e213baac98b31a064d7d18a49cf12f80c7209d31effff307b5eeb3a15"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3502.c49903f7222870ff8aca.css",
+      "sourceSha256": "339c9dd9db4fe476a3edd73631d7322327ac872155c5c6c617a988b8a2f65204"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ro.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "5bf92bf66b943ae7d3e334b4c4def7a5bc1faf82e838b09d5c8480f3baa949bb"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/large-slider-handle.18e9ee5923db4eac2c43.svg",
+      "sourceSha256": "79141334e2f0e15b6f3c4dba057ef20cb65106185e7e75bb98ce34df1e8f21a5"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/sv.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "cf7b61bd9070974fd821869394194532034a050c070463d63e99bcc44dcd4590"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ja.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "dc4116cbd05af39ce74a6bfcc893a9474fcba948afe37fc270330a9ecbc53f8d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6221.bc53670dfb8f982908a2.rtl.css",
+      "sourceSha256": "fadab2b0a511780c2de3847ac20dbb632676fff86b50b578b1daae98559ea528"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ja.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "1225ec81d91ef14ab6120de9c006f7c3e2aea47e22fb68f8e28ab1945d5e618b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ko.2547.28b713bedf796244795d.js",
+      "sourceSha256": "82606422848be503ca70014ebe50ae32f21e3add3858764aa293d56f4d752dce"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ca_ES.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "c9f9619f10f12e86943f9fe4edeb5c68603f05c869984d47d8896e9a01a4ec59"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fr.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "ef56f28d6624f154a98017370bb98b6d825259aaf5315c9d47887e800a2ce92b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/mock-light.d201313017eb2c1b989f.svg",
+      "sourceSha256": "d453146abcf742d77aa698cba0e9a878cc2983674481797fe6a1b504f7161314"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ca_ES.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "0fb648f18c6f0233ba6e5fcd4b6330153a2b883b9344e5ca57639c5d3e18ad19"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pt.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "4b0627585c0abb6133645a931d2bfc624e15ae2f14d7607fb414d809cdf9fc37"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/de.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "8e32af9101bb7587f60c0d1995d14a8cedec2ca3045579d794c69be8b3335df5"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fr.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "a4e7c06f90ae4d0bc7268de133c81d1ea08cb1882ae513f817457fed7d1b8353"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pt.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "b90b4e5f4a76ab7247ebe8191e86eb64755e4ab1a246358b21db1b8c74156526"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/en.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "70db5ae4788a3d4176f00f0176f7e53462ea4ddcb021c5ae76919a10d4539158"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/chart-screenshot-hint.795900ef9e075c847a64.js",
+      "sourceSha256": "764510a6e8e18e6575ef496c68a3fca9a3d54ccbe62651ebe7aa4837f35083ba"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2544.225f38946afc6ad55a35.js",
+      "sourceSha256": "041aa2e809e0bdae8744871bbda99f66a3d758d3445a46af6609f4c8fd6d971a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/de.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "6e4c1b1055c610a8bd73ac3877fa2177e0c90384ade39c2a7c81e97cfd56e763"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/cs.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "be94dbb29f3756cb6c1d8dd3380b6e5e620332561c5a77d72328f3f9c25df4ab"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pl.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "9d42e79d2be70fd31ffddc6c6a44d4d7eceeef2e732cb3dcc6d6ff7a3f095f78"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/general-property-page.e4f9354142134a911ace.js",
+      "sourceSha256": "ce6fad34d00390d0984e32ee415d9086de044e571341283db0f6cee56eac5c32"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fr.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "c0642c9356f32a4320553bcca3e2637842e83862714d896abbcbf3ab286f780d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5649.b60ed09c5ea8c55827d4.css",
+      "sourceSha256": "e64c1a4f7f4d616c33476e47dc7d71be67689c3e70a186b0ea3fd34caead2ccc"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/tr.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "a2bb20d1a22ee707c4232b931d329f602d3cf8bad341a1a7e8716dc78e4a0b08"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/id_ID.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "9e5c214db84597ad1cad28b6e440d8964dbc3edef21158e70ac121b382935c37"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/th.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "f2ea2b192a8a9336d5395046134d319e809c7f0fc7fc717ec0dc6e9b39b43d25"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ko.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "4815c9abae17093b515d32f2e7b3ec77a8f9d219f9ef31b79e8d8865c8ed2713"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/en.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "0e7f0fea5a028de9a63fc67dd525daf5dec8a8e1924ccab6a40fb9514fb60954"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/th.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "938941dab6bad4d01ace533bbd6bacc43f3ac1518267b92bcbf7ad701fda11f8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6494.4c212043f24336e170d5.rtl.css",
+      "sourceSha256": "009121d5e9b55b5e3fa20f5f9739061d563d9cb1e732079614e0fa17562feca2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/es.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "d364ff32d3ca0f773cdee349bd89fcd698e78c7d5ae823dac91b1b812551e94d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/es.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "605bc49b3caa98ba5f34feb4aa139bc0780f3ba149408678aada26f5bf5426c3"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pt.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "1c1a1f31ac95cc0a4a7399f1907a67afd4a065bc26acadfa586fec95af039f00"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6747.c7d403ae692f88568278.css",
+      "sourceSha256": "e3454ccd1bccb9915917db05d6fd6fc84c7c421d2411bb7ae2e19bc06f2a7f9a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fa.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "7b7f60757d40c3bfed9ce7e30f1f3b5072d9d95df2f92db41c3ec6dcaca9980b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/vi.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "e3d71d0872e31c532fbb0a3fbd03da0ac70ebdfb0fff7c57d00db3bc98a4352d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/it.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "9614d676041f72dd412bbffb8ccc469fd8c0ba448a9551ca5bdcf1b9323d9e42"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/he_IL.2547.28b713bedf796244795d.js",
+      "sourceSha256": "4b8ec66d036bdd96b97b438820fcb12fa9cfa7142ed6e59e3ef4564bdaa32381"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3842.8cf6b523fd5a5b6fb022.css",
+      "sourceSha256": "173c70d9afe4e02c3e3264c5ca948bd7c663c12e1ca0473b413cb4b869d60a0a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/it.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "ff21c139c48c504dbb5522de642ef4748ae3e32088725db0eae46c1f417fbadd"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/id_ID.2547.28b713bedf796244795d.js",
+      "sourceSha256": "327a4f39e3c390c801f3a0b76a3bfea2340e625f9fb552f60efefd9c90d643e6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/vi.2547.28b713bedf796244795d.js",
+      "sourceSha256": "be058eb3c49307aef8837c82905b666ef0056662abdf1f9678f7193ceac8a394"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/cs.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "dd05194655fdac061b14564e20749b977114b0213dc7cf3835c6beeeeed04d41"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6214.65b7dbf8be6cca5ac143.css",
+      "sourceSha256": "4abddcfa8eb78ba4950636059f9d84eb8ce7c784712649e9a4a2eb6ae7b66d66"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fa.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "625b98fc801aaee53735851ebc74ce2f2c467ca8881172e621801a6a72d17e84"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/nl_NL.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "d8f0f7cee0bcbb06516693de7c7758deeeb1fa5cf8dd241845899dcba0ecaaf3"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/en.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "6f2a8e6511f9206cae824a61d6cda902a66fdc6bda8cba2546204b66d8477481"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6925.a3a09d7303a96edb77cb.css",
+      "sourceSha256": "1b17aa2c9b2a6046494880a5aeaaa1789e04f3c06083a97f25906db40a2bb36e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5163.950dd1d584f76da1ed3b.css",
+      "sourceSha256": "58428808814a0ec5ce67f36eff125c096ca29a015d8e3915f2fefef6a27d045b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6408.e58aaf98d9306e8d9b77.js",
+      "sourceSha256": "4bd72df9633c1ba041f8592052b3149dd386bc705061c4c99c24d3ace91c420e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ja.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "e62e5204f75f5af18820ef090b874cb669771dd5e51bc627c840fa9bde953a80"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ro.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "92ca9ba327e5f9eb689e1ed562748150681097473ceabc4364e4ea00c77ac43c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7555.8c1e3939e7666b0f8c69.css",
+      "sourceSha256": "a6af6ccb12e8dd2e97991f21c69f6ba7782a1a9ddd396687bcef1febecec1dbe"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "bfdd25206b15fe49eae1d23444e06b56caf89823dae19a822c398d7fc1c09fe1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/1762.7ff6b353c441db2276da.rtl.css",
+      "sourceSha256": "df812655846a2ac498b24c838247fcffee237b8bdecd084b788fa0ca2dae3849"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3939.4d0187960a564ff5a557.css",
+      "sourceSha256": "59f1d8849c7a0d03fdeee8237bd66ae17fec7872abf2bd9c4dded1b66938717b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4015.1d0e3a62a59d173c81f3.css",
+      "sourceSha256": "7e660c591591cab7424fdadd9682c9a5e4f264329fc0872db669d8d71085aab6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/tr.2547.28b713bedf796244795d.js",
+      "sourceSha256": "e884a5cf1229fa74dd3ba792836dc78dc597e9296d614fccb05baa7958794f9e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/header-toolbar.df1a95078c18a5da785c.js",
+      "sourceSha256": "ec8b462c079c7d7ce84824580d564c6af838810ec9794c5ef23c11c9ca186b0d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/th.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "5032d2677384bd44c36a4fde26832dbba381bccc4c35579cec0ccc2a037033c9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ko.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "d20e40aa9455533ce16bee84d892a6fb5f6afe34da73c921785123b0d46baa7b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ar.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "e8f92b5faf134c210a4d32358fd3cc0d89879e29e923c78a59d1088d53bcedf1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/sv.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "71cf1d31883bfed6bd7d4a6dbf2f6d31bb52cd323892e73c42cb51468c517bbb"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/de.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "3c336c8345dafb7c03b6801f773b837c0988e606ae342ec72fceae89e7063661"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/library.ed30e653462ab0610aff.js",
+      "sourceSha256": "a814e8730ebc943b12d157de29cd0d5fb9a9a76a8d0fded7ee62a8e208fcd56c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ca_ES.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "41da4103ec14c406a87de1e1ca0d1495c0f9dd0765ae53d43b8710c18d0de8f8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ro.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "f1400d229b2f5547a3785fce11fa2cf4a970ceabc49649a8f9c7712c227844cb"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4015.1d0e3a62a59d173c81f3.rtl.css",
+      "sourceSha256": "7e660c591591cab7424fdadd9682c9a5e4f264329fc0872db669d8d71085aab6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh_TW.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "11429769834329dc7df780e240298e4169bf4f9353e0e03b05c44cbf107a87f8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fa.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "bf1e2a12dc51f300087482c3862e4181830e812451d96b224097bb005dd339bb"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "840a31972d6b2b5cc10afc3f5bb02ebc2ce88411f425b78c80f13f129d3ce789"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ro.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "23115268b1a074f34d05e78062c5fd4dad93c08c9b0ac1186a1deff5c55bfd12"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/el.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "70bf2707aeb36b0503590c9dad2e8b8c963973c6586887fc7d875fc2d6884162"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/sv.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "14041681b2d48921cf59cad4695ba549ef6530ce99bdd536e44826c2cd96c47c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/el.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "99d24b18cdb76ab09878b705f40d25396d6116321f85797d8833e1eaaa5716a3"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2260.b98824e4829a1aa9b444.rtl.css",
+      "sourceSha256": "85dd3f79da7b194fa8e5b1d2ae158c20ad6ee53d75f16ed8d94e81224dc339df"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh_TW.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "80311d5e82504ef9b3911b9fac0afdeb11136423845b5974e59876ad5828bdd6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/sv.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "2191d088a4afcb6ad86d073e5296989b6da00c6fa91228ef3c31f127c2896451"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9465.fd61e82b3c912f2e9fad.css",
+      "sourceSha256": "7c8d0b406f0f734102728b8508588d7fe80544a2f7a688f56ec34a072795a012"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh_TW.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "f00182a151ea1eee91516db6d9be9dc14dffe5ddc666fea3e53d6916999e192a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pt.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "5f03a2e664106d8cd3262919a74a88ad3896f1cc416deafafaaed8c77daee147"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3780.a289557f2e0bcabcc4ca.rtl.css",
+      "sourceSha256": "0e19ac8f314af87db29439b770c4ab1174cdee58643ff53d785e37c466da8951"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/en.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "b9f0d92e36809c2e86ce7e61575fb5d8dfaa10e2860431bf848c6417a3d2d8a5"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4403.bf44a542113a4440984b.js",
+      "sourceSha256": "6e590b3ea8c2938c371b7aa2df5b82633b7164ff2aa71b17c305db6c63b6de8f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fa.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "e352367daea369549e956ee190fec3a69dc9b20409ae47605d4edb3fbc7cbe9c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/get-error-card.83ba0cba4c0538851e0a.js",
+      "sourceSha256": "39b216c0e9c303893ad760ca2e01429b2d8e228a9e5b7b429f86178be6ab434a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/en.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "8025fd53dd4b90c9b44c124dda04347610e3ffba065d12b82d10230467f2e1b2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/restricted-toolset.78732f5a01aa118efb81.js",
+      "sourceSha256": "c52ca79a71a7d2a08d18f6dbf7d2ec400ac07bb86ecac798cffdb3653d511dc5"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/8287.2b6f71ec5c0064590ffd.css",
+      "sourceSha256": "13c0f35e1f3e819f27d0c7804816c8f033c289019c398e43036441434e7036ca"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ar.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "3f90511e54fcbe12bfd5f234e18c0d3ca91deaaaf2ba13ced9edbf11059e60d3"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3896.96db838d3467bcf68051.rtl.css",
+      "sourceSha256": "48bbf5907979c4582457ecce33c245b7024c2908690dc7696ccf0e13883d9526"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5649.b60ed09c5ea8c55827d4.rtl.css",
+      "sourceSha256": "e99c730bbb1409920c970e4cfca69cb9d35c53ce1315a0d7bbdcb8690f2d16b2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pt.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "8f7e8add1cac9ce2cfcca8e2df5219bfdfd46242e7827a22d3b6ea8c90d46142"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/id_ID.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "177468682a34f282de0e2d37d8f578af877edaed134481f132e3d59c83c79756"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/de.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "fd77323385a0ead986509f99cce6fb544c4879be563dfab092751d33375d161d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ar.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "635973e3cc8764dcf341ca2af5c4baec1c423351c5f9801b8fcb6387844287fd"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/he_IL.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "df431c20146f8e197c515235f79008721b93b0035542d27e1328225e678db437"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/it.2547.28b713bedf796244795d.js",
+      "sourceSha256": "14ae64724fb005da7f49427b402c872d6ba8110401b0867c70cec6a72236b2ef"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/chart-event-hint.9fb712c61440c609af69.js",
+      "sourceSha256": "b37a4dbb841a48aee54eaa966d9e15eadf7bd2b1d13ef70b071736cd6f101475"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/hu_HU.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "5a82b90ab5e91d1caf8d39435a300a98f47d47d4e0866518a545499409e0d153"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/svg-renderer.f065beaf6b5b37da27d9.js",
+      "sourceSha256": "39770b8c64e0940fd352f178085fae11feb2e8fd21ab9dbaa7c305609774085d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/icons.4d39018d0766cf7006bc.png",
+      "sourceSha256": "384471af813af946e6238afb854552e5eb7b5b4596e2a7c3844c67efb93f23f3"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7111.b16b4eb739a7e8577559.css",
+      "sourceSha256": "2ade0d35d8be1060a3f4534a558367b9532212a546432b4f51100836419f9da6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5164.a45b25a7ca6a0c16f810.js",
+      "sourceSha256": "2d5219056eb2a54d6cd192de84af15d6ad48c6131d2f0bc64394ac4e7595342f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/de.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "87dc5d7b737640751c826d643bdd235ef340bffe96ac7dcbf8a5f23431532082"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/vi.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "7bec375433d84e035b5b343262ee3b83c047b65a0d5726125e69762ed1cc7316"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ro.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "48e350f5c719a475835516dd290f2ff909156149885bad4c8af08cf6e91ddb28"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/drawing-toolbar.37a00c1b0c7a68cc1d44.js",
+      "sourceSha256": "f4069f8455749dcdc9be98f743a11708320d42a6970e6d1c2668e85313401a73"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fa.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "3fd34d30b747dd3061d48ee786d5e7d3d9c15d43fd0f619fa59997ebe3dc803f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/en.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "a8ab20e9ec0925e36357b9433dff2cfd63a55a2f8bff807afbd7958ad20d1f5b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2676.2d3cabbd39a3b0d6e9ea.rtl.css",
+      "sourceSha256": "f79e8eee55832e66c101130ade84bd772b0be450fe232c7eedd22387d1e16446"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/nl_NL.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "f7722b21b801cdf6dcd31f59fb5245386684b03e9edcd05b53b7c903444f25bf"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fa.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "271643131757ef528dd635fd7c30dc7e07c92d92211c08f1ff8cf84e42da1d03"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/symbol-search-dialog.e5850d7e02343ee54c52.js",
+      "sourceSha256": "edae34e7fe7b6f2f83f2f8856e91607718879c6843e19e4119f5749835397892"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/1553.c076714f5e24887f0b94.js",
+      "sourceSha256": "3023d78544a068f8ef510b0c445243781e2651002dddbd506626d09c5ad637e4"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/de.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "486de40de56083a8aa57163698ce9d546cec2748195b6291d7cff49ad4e56d60"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/mock-dark.16b5f3a431f502b03ae3.svg",
+      "sourceSha256": "25945a010d4f3fef717df4cb2b35b83a77c72c313f22ee723a3eeb2bee6bd8e7"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pl.2547.28b713bedf796244795d.js",
+      "sourceSha256": "a1e078c12d9360eea70a4bbd89760afba97dbdff6c6350b00c11ad465de35276"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/cs.2547.28b713bedf796244795d.js",
+      "sourceSha256": "a290d8e07735616b532cd1f1bce7963a5330cccac3df9cf68f28bf385cc75d66"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7350.00632eec360f0cf2d9a0.css",
+      "sourceSha256": "5ff1a07587728049d92b57f341cb692c9fd4f2623c57c09d43da4ffd2dc014b2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/sv.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "45524057947d967b6e0a2973debaf5e5022f06f4d040556b9f5fde5a0560ab86"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/id_ID.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "788865814a6d3c1fca7c56a6491beabc43a8a63ab0aab3eddf84d0a967b80e65"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9327.97be240031495a68333f.css",
+      "sourceSha256": "8798f83b5031f70722371993bd6f17179d9a8cc340fca3a75589e10f0d573aec"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/he_IL.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "e7872319a47524b73aae903151351acc0e239a14bcd71411cf24e4dde27f2b4a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/id_ID.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "873966b6c649376fc521b20fe7cf75c413019db03ca66eaa32ff36d3fc7af397"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/he_IL.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "53d60f32ed3422ae1f323965dba811ea56d5608ccfdb4b34a9b3cf1d78a56f43"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ar.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "84c24cd589c3fe820b854f88a7666054e36d157488274a32af8c07e575104a5e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5940.aedc1bdbd324e6042b17.rtl.css",
+      "sourceSha256": "ed6d1dd4a75577c2fb4e89df4fdd194f5dad45e061c63f68a57d2c732d5e1e48"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/vi.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "64cfcc3839907b9ab9d78f910a0b88bc4398960c5b13ea5d87682aa36d37cfd9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2109.4d5de3fbde1cd7dc5e9f.rtl.css",
+      "sourceSha256": "6ccc2b945a77712fd5d070cbaa85e7453e03ceeba840e2aad41bb714c4f00431"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/vi.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "2bde052b3b823e2d19862f06a15e5a121a7db496127766d1b6c6decc428bf9ce"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ru.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "fe3d044176bafa0c4c12e8aae0b7ea022aaa79678b45dd30d3c4dfef73735c57"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pt.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "36ca1755d6a934a4a447999d9f4199380e6a552226fa3029f5706dafa18fdd0d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/es.2547.28b713bedf796244795d.js",
+      "sourceSha256": "3fe4c28601f9764dc34fa79107d360ee0a9046256a90017a6fec84abfd677340"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ms_MY.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "571d598778ec7c9d33974af8a9da415fc44b5c26c175c42003a35aa3b99edd76"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ichart-storage.1144e5a1b4f8503ee572.js",
+      "sourceSha256": "aadbe3d9fd22705fa7fd9b352574de18138d800aa8038d8ff8fa9630f1a8ba2c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9789.cb5ad20bc727d3820b6c.css",
+      "sourceSha256": "c8405433bcf1c9ad435ba7bdc36eccc58641942e180d48747e8620f070b7ecfe"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7550.087936b2aa6ea51cd6bf.js",
+      "sourceSha256": "955c03532440673dbd90d4d35db25599b8d841d25c5f906c9dea79b2ffc19770"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ru.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "af59fc1ada2462520b8dda50cfd5403d06fbf7ab240f6832fc9ebb885fa8fa91"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/en.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "2229a1cd836368b5c072b6fe74da8e8b9c978b801ed88e444b0778f5305e16d7"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/new-confirm-inputs-dialog.5ce0d1c060e0d28cde15.js",
+      "sourceSha256": "97184e808bada2a2a0f9a8a09f45903dee8e9ba1dcbbe27844abcb668ff426d3"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6150.bda60280b05cea478076.css",
+      "sourceSha256": "e2d9af68d11e17603cffbbd8dd72cb49ca44d0b19dffafe6ac7f0be03258e512"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fa.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "65ed76410615f7e03e444ecfd3f88fcf3fe2ae56dcf4815e168667858ff2e9af"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/th.2547.28b713bedf796244795d.js",
+      "sourceSha256": "eeef08c456a1db0fc51e7c1444c6d805844435469d9857150ec6a7b73f94b57d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fr.2547.28b713bedf796244795d.js",
+      "sourceSha256": "29d8d9f48b4350ee7080de80d678539fc079a31734013990e00c7f82c58a9db4"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5866.f164dd2a584ab0f493cf.css",
+      "sourceSha256": "dff1c48bf17052d43b067d037a019c00cf873eec901488512f69faf5aaffd7b2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ca_ES.2547.28b713bedf796244795d.js",
+      "sourceSha256": "c80b1f6186e8660b7ab7deaa6a0c33029409ca5fc5c61a3f81c01d52833030b5"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6918.c8f3265e9286a784038b.js",
+      "sourceSha256": "bb8b502cb6c9afda7f3010fa4bdaed8d8f4fe7c4b478c934562a5cdfbd4bac2e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6.362fa6a7ab1f3e3b06c4.rtl.css",
+      "sourceSha256": "6c66d13ad1e3e2b6d43093dcc6c781fd16bc4bf1e8141c41b3f2a802985d0f45"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ru.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "d016178dccb366cb6411782a79e39428308b806a1b50999428f8eeacef813d2e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9789.cb5ad20bc727d3820b6c.rtl.css",
+      "sourceSha256": "8348fb39ed065c282e160d4c68826619cf895fac1ddae6da22774467a3367965"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/lt-icons-atlas.5d7c9d668ac98bd5bce1.js",
+      "sourceSha256": "6db8a3676a8d37b172442b2b9ce3e17616b9649f3f6763822459d8482d4e1095"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/general-chart-properties-dialog.cddce4ed266fd9e0629e.js",
+      "sourceSha256": "faa15d2effc19b4c01ed4c74400a3f14459758ce3c863b4f1588bc8441ed6cd5"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3717.856421c70a4dff35762a.rtl.css",
+      "sourceSha256": "ed945d53ec584e75033de49308575c518fae744b51a0ac7620039e7ce729b2ca"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ro.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "dbc84fafc4dd1147efca6b996148b90714480fbf11970a507f8e196257a2f454"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2260.b98824e4829a1aa9b444.css",
+      "sourceSha256": "fe68b07e7bbed06eacb328e556271f292adb6ea69d5c204ee6c2caec3f387974"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/hu_HU.2547.28b713bedf796244795d.js",
+      "sourceSha256": "5ca68088860d6285d82435251a7419e37b5ab88f18c2a94f0df71ff519cc3cf1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2846.fbbd62afe04b4f9387f2.js",
+      "sourceSha256": "2cbc0b7daf6673efc372e12132560167274ec24335ee46839598c19738870b2f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ko.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "4b2cf5851600d8405de73fad5487f489c5baae1327684fd98f43cd79d3d1c22d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ja.2547.28b713bedf796244795d.js",
+      "sourceSha256": "4bde4d6cf142a59068070c04f18306576279f6ffc86cb7c38580af37bfc098a2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/1033.5197f9f8b8500206d06c.css",
+      "sourceSha256": "5d4e2c3378368f3b2a07486ac550dd10bc12a6812aaeec0146eefe93465ecf80"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/lollipop-tooltip-renderer.19bbb3fc39665da2e3e6.js",
+      "sourceSha256": "06f839e87e8e29e51292be9f9982f53450df3f98ba719af1490f68e56f744d9b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/524.ef662c4bc3e57dd91171.css",
+      "sourceSha256": "c3caa0fcc7cf03bf8c4ed5e72f0654786d5bc5201b3373fc51361f671c12357f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ko.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "a2d448bbd23e90a107a93ccd7d7cf0a21762a4ba36b8408fdf2e0a656f2e7df3"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/8904.a302177fe7e3ccd50cb0.rtl.css",
+      "sourceSha256": "2898380f02c4410de141de93b51e29aa81a36eb954a0bed9a07da2d6a13f8383"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4781.cf1365a3bf51d9989978.rtl.css",
+      "sourceSha256": "40e2a9f0003b6f14919d3c854ffe747ffb67cd437c1b9c636bddab8982401427"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/nl_NL.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "38790126e17a69ca251d4da4555d98320443ee38a4762cde687b22bec6092791"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3980.b2ff45a2d8bb6a131d7c.rtl.css",
+      "sourceSha256": "b1523f493ff008d37e1fe009e359b19a890ec2df16327a77202a244cd72de283"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6221.bc53670dfb8f982908a2.css",
+      "sourceSha256": "b02ea0d2e635dd6e30782d427900d28925ef76e155184b6dd805af226800236e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/nl_NL.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "6a67d25371d2f700845de3fd54b6e02aa2e2267b904f0b3a285505492184ead9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ms_MY.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "d937429473f8cc2e09dbc190d42ebeac5bef00550ed20985a14175f9865642db"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7149.12adbb19fdefe9b66b18.css",
+      "sourceSha256": "7fb8e23f68b66878e962b603ef435807e2439143f93746cb89ff7fae278b6a07"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/prediction-success-white.2fb9966b4c0f3529a2ea.png",
+      "sourceSha256": "6a31043e48daea83ddc8ddcb6b3400e98e112cb3feefa0c6d64b2a936d232dc4"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ms_MY.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "3da7e46d1ca122cd930cd82c6d55e0d749cc6fbd67c56d8b5aa8a68199d2fe48"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ru.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "bfd3a9137e5efffd789357ff068bc32e73b302cd54a33e9ead63152dd4bf35c1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/el.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "a383d8248799b8e437102da30f133d85f51a2523abbc2895544e40cd5ac5bad1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/el.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "b231688c77c3ea2fb7f4a7217471bf4f418726f7bf1f967e2427bf5ee0d26b33"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2109.4d5de3fbde1cd7dc5e9f.css",
+      "sourceSha256": "ca3670cd9d2780b328d5d2f4ae1ddfa5b988534bfde176cf857f08b95abf63e6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3066.58a325f25b087530293d.rtl.css",
+      "sourceSha256": "4c8a521f49e13908263294b1d3c8c9f9b3889a20dca514a5c444aecb6525742e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6639.885b5577e3fb71ee2bea.rtl.css",
+      "sourceSha256": "856f4663973867f854d4df66a79bbe412209c050f7e4612acfc02609ce740373"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh_TW.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "a236c71e29f3a5fe333ede2c6a33a696c363d73e2cf11885e201bd15011c1fa0"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/study-inputs-pane-views.6caf467f12b1d6ee408a.js",
+      "sourceSha256": "1833750716bd6fa3ea2e4eaa4079ee33703b2b4510692322ed97cc1202074ed8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6106.f01163745d787b60c86c.rtl.css",
+      "sourceSha256": "c684bf0bc471af89fadcf1641039b1568af4abe349e733fe07bbae8678678c2b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2731.ec19f123cabf8efd03a4.css",
+      "sourceSha256": "38d5eb9ffd0480c2ca8f389bcfb20df3c81f677a05baf05c225e95c837671860"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6150.bda60280b05cea478076.rtl.css",
+      "sourceSha256": "f8ece33a04eeb26cf4855cc280e186ec62a0d0b7ad8c91f360d81d19a09630c4"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "fe50cdfd789ca9c9b5bbfedb60052cc0a40d25fb4df83bb69f5fa304b3ab42dc"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ms_MY.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "bd283ece811d3c630e6b18e06aae78a4befa6244da06ea8e2b8223f325b0fb0e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4781.cf1365a3bf51d9989978.css",
+      "sourceSha256": "f4841b8903f322310d3f1f325872b8ecaf3ca28f0e440c40930a8e89aa0e38b6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9842.ceaeabba258d065497c8.rtl.css",
+      "sourceSha256": "1aed9c45c07b77bc781543f044a5cc52c4e566bfa63e573664b8ceed2b81cb73"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "deb6e04905e3866ec30de76d8d611e56e40a6a693c0523075f1575cec8aad45c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/line-tools-synchronizer.0bc2d3617dda7143f094.js",
+      "sourceSha256": "f37387c9ac974f70a29d08879a4a78dd02149420b47e54dcab897d482e98cc2a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pl.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "edc8bc9360b00bb70a11678792489128c866d0e684211305771867847e6ec864"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/cs.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "f682ca3a2672fe7e34bcb596bba2d35fd5aa084409ab567b3270421e9a73f9d1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ru.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "d56627f36fcec86c296c8c0349057d47434f4c6cf8eefc8b2820073414ef8710"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/cs.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "ff4c8b1eb05972ce5ddaab862a2cfc5823f7adac1c1ecff4d526fe185028541e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/8167.3edae41386acc976c9f8.js",
+      "sourceSha256": "e01b03a57098c84c2e23135dad5669f66c2fe910a9bf253c34268afc62c8df8e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pl.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "7f190251486d33132b7e79e564cac67ce55f8e1cc658ad54bae2a6e56b9b8d58"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/sv.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "5ea849f819ba6aba83f969f31ed2ab05c480a3ed6460ef27297a2f6d5d808b14"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2587.1f1100dc01693edfe269.css",
+      "sourceSha256": "54e1437e4977bdd1bacba12653da668482c3d171f39773da68c9ce7e13651e57"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/th.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "349db9f1827fa19590283e4e48ab1c88cb8bd296b74683908e2e5f85771b425a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5142.2c34c8656148cc5203b7.js",
+      "sourceSha256": "6d10ee5328b87656b7591182c89eacacfceaaa4134ea6f85a6bf0d2bf04a5105"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6752.207eb3cc75b3ed2c6754.rtl.css",
+      "sourceSha256": "c3d9951b4bb01d6adcf5ce5c38310ac60cf54093b83e543ad154dd93f3493d44"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3914.d2b6c577f350629b6837.rtl.css",
+      "sourceSha256": "33f6e0ec72f9720887bcc4edfcd750b8bf58af579583e31a500d76ae17b69e25"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6106.f01163745d787b60c86c.css",
+      "sourceSha256": "c684bf0bc471af89fadcf1641039b1568af4abe349e733fe07bbae8678678c2b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6036.3b493a9f0ab052e6447c.rtl.css",
+      "sourceSha256": "d0dfda27601edc8582e2ccee9d573857b163de78b452ab64a8379b132c67c636"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ru.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "9cba682b4ca7aac1e61861f508989a92f11be1485fd14ff68416e2899ad496b3"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5983.3c0ae13972f5d3433a77.js",
+      "sourceSha256": "a6280403bdbe4fe7a22d992e5a8ba6621300f45456b866eb15a8d32477a4e763"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/de.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "66ff4c2298acb49adad85db0d94d4ab07cdbbbf86d72a84f569092a0cc061601"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fr.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "7c9db5fed4ae6c69783c9e1b339bfd553db196685bfa8412423b0d03db5c129c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ca_ES.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "515b2c4958344b9a2e8fa7b0be663e776d40a2f2d5d06a5cbaceff7d8b1fa4af"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/user-defined-bars-marks-tooltip.71213c4f755723965a80.js",
+      "sourceSha256": "c55fb4a7e9d1758c59cde7d2daed1c482529e9ae509afbd34fcc1158d4382ae8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/opacity-pattern.4d8fbb552dde3db26f4a.svg",
+      "sourceSha256": "6ae762927aba7ef77e5b07026b949d63b0c8e2be878c8333ddab30fbd75ab321"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pl.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "cb6ee7c6ad1b6f2b090746b50eb8f47b37d966c1e06d75ffd6e9f934614879ca"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/floating-toolbars.96ac7a46b7738535bc92.js",
+      "sourceSha256": "cb66df347d6eb261214355d556cc5b1b799bdf07634d17d5470c55a0a8b05817"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/currency-label-menu.8bac01cc43d3f2cbf903.js",
+      "sourceSha256": "32bfc232980814d87b06dac7dee061fc925330b79d22b5fac3ecf60f44b751e5"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ar.2547.28b713bedf796244795d.js",
+      "sourceSha256": "073f87a23dfd0abf18ca920888c5de6a4fda44912a0552b467b664c8caa89d23"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/it.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "2ca8d605810e0aab018c885aba0a4c7d9b6fb06d8d35981c8091a48dd5ebc4d6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/eraser.c80610a04a92d2465b03.cur",
+      "sourceSha256": "c272c594ecce924206db7acdd2ac90f28865eea7b2633d3fe2ea137ab95d2099"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9916.60c48148a54dba9504a0.css",
+      "sourceSha256": "8c96f0014c07251bfc62c8d1544e5c0f8c8384e95013e5e03a8f3ca581d29f9b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/it.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "7029d6a28f70f1d5be9bfe3b1a3a8a92cbfb770584d0507c4d4afce9f0b10009"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/524.ef662c4bc3e57dd91171.rtl.css",
+      "sourceSha256": "d4f282786c76e43ab027f317deee1eb356d27366a7accea03faed0237e968cdb"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/es.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "e94cb61af2d88acf78e74e43d48b07980eee47d285834c239d904eada1963648"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/performance.769cf9dda2ede7d12b74.svg",
+      "sourceSha256": "e5b2668aabd769031d93bc00eeabe095f1c4344a104487a9e832a45fa66cc272"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/EuclidCircular.be8f862db48c2976009f.woff2",
+      "sourceSha256": "1aee44e827f8b55b70fdd14acd7f5b95751605423701df48f4a30d50a8ddb9ef"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6884.bb7d30a7bbbe5af36556.css",
+      "sourceSha256": "a2f8de9630a1edc2d2e759519f0607fee1eaadb3fe7736b8c5ad8f59800a3e1f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/chart-storage-library-http.f1f53155460ee314f062.js",
+      "sourceSha256": "3b819c49d4eda372b0cc4b45e5bae3fdc334978139aef595b6c7a112cbf81518"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7555.8c1e3939e7666b0f8c69.rtl.css",
+      "sourceSha256": "52564499adfbf2f0416a589e69bffaefa66a60f3ddbd76838360eccc63c82902"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3980.b2ff45a2d8bb6a131d7c.css",
+      "sourceSha256": "41ac36d65b6a3a8e5e4176eb169b714a6f49b04e4431974bd815f57a50dd904f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2676.2d3cabbd39a3b0d6e9ea.css",
+      "sourceSha256": "d7d5e8eef67a479bfdf641cb1c2f87493405342ba7346328faa6fb855b6de80e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5163.950dd1d584f76da1ed3b.rtl.css",
+      "sourceSha256": "48aa147f8044c4257d5740d6e69c947997e0214df41a26e921b4469991b6d3ed"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/el.2547.28b713bedf796244795d.js",
+      "sourceSha256": "7538f8f1a568ed28359972eae6e03eb2745f195eeca6e1ea4dbcc706a1fa648e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/es.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "99cc64fd88c3d498af6bab9cdb4c5d61f447c62de7b715db1522e6cbab70e988"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3914.d2b6c577f350629b6837.css",
+      "sourceSha256": "45aa99ef11e2ccc829d106e35af33027d130454db2d944c29c02ffaca4478f6c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh_TW.2547.28b713bedf796244795d.js",
+      "sourceSha256": "fd93bb482bbe29db71ee529da5fefe27052f4003950c2b64480a2c6d01c56542"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/manage-drawings-dialog.5f8ccee744105adf029e.js",
+      "sourceSha256": "2bcc1dff9e1a2291e165c749ea570d4e27e1edf1fb25f37d74afcfd63544c63a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ms_MY.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "1e9516050cfe14ff22cf6749c61b23a1dde7bc62e8ce3f0f741113572598ddaa"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7871.fff454908cba03863eb7.css",
+      "sourceSha256": "7870af883922016c9232bfc17fb16621b3adeb6f8867843d5fab15c7fdef75af"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ms_MY.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "62def135fe71ebd5b4779eff3e8e6a88d1f76d6fabbfb6ffe959bd97c19935ef"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6884.bb7d30a7bbbe5af36556.rtl.css",
+      "sourceSha256": "04a4a4674fecc070648a8b05a6821cee9a8f319878a33620eb94b1ba4ff65687"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3717.856421c70a4dff35762a.css",
+      "sourceSha256": "01339d704aff0c93abc808524725ccfe3bd18cc1a52f7fa060206ec36ddfa301"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/new-edit-object-dialog.b3553940c9159e24d8aa.js",
+      "sourceSha256": "57d0dc5756cb40fb7c0d2a6e01590047d1531ce79d327e119eb9b03c43e5fbb2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3502.c49903f7222870ff8aca.rtl.css",
+      "sourceSha256": "034c229d41b79b2d324e92b8c9ab69cf26bfbbe2332305c1726e91192650da71"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/tr.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "e421502d56e24d4d64b4ed43c144922012bec87be2559b52f77c3c1b980ba2bd"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/hu_HU.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "3f855f02983743115f2a43ff11f421f8375759911190430cc56354f439f693ad"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/runtime.1f6691a05496db116913.js",
+      "sourceSha256": "37ac57ace645fba49e446e5c3ccf771969f942d11bc481e31c4a63d51e9658a2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/tr.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "2dce8eb47ff11d83545f3a8772a45072e4b1c75345ede370642034128e71fb36"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/8882.9838a8b1e0e6766b6408.js",
+      "sourceSha256": "e747009e034d955391aa9e1488ec25ebb292fd30d9fc04f0b3efd63c6be8becd"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ja.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "890de01cf36edb86afaa7a56031d09d60bc5ee8aa32298b53298770b27b3c34f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/study-pane-views.51d0897ba74454ec3423.js",
+      "sourceSha256": "59bc257d69537b186815b83c48570014d223efda7f9bbaddf320664cb24f0b1f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/1803.4653bb65d2b0d594d6af.css",
+      "sourceSha256": "33dc78256d561b6fb5133aa28c161c6eff909e26ebf158d0b5d9bad28dd2c830"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/lt-property-pages-with-definitions.ae758430950906d90d11.js",
+      "sourceSha256": "f23267f8e95c7d3e699e15d3f546ff8d954ba6ac536b0d2acc209f26707db8d6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ru.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "9e1b13ea0a87686b896f6fccc1e230521255c39e5aac30ad7f6c66208dc00ef5"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4102.4abd8542fa3aa3e7fd5d.rtl.css",
+      "sourceSha256": "edbd066dd6c1c583f671275a0aae3948427eceae674c30e50e9966eb840e82c6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/context-menu-renderer.4170e3d150582097504c.js",
+      "sourceSha256": "8c93270ea3ef69938a825d5b334013c4e6630e0e1a747112a5de4178db3b499d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/8056.1f54f717d8e522c55c89.css",
+      "sourceSha256": "1f5d21fd99703f8cdd8185fa980013edcf140642c5e8d38805f1eab208791a44"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5128.57de9f218989cee8119d.js",
+      "sourceSha256": "4d14c83a1570f69a19b8f78fb7ce342544e57ba4512df7f6b5ee60d21e70cda7"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/cs.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "4dcbce506c3a66d69874e7f85cd1baf29b6ad7f181605af38200b0a72a98dce7"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pl.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "259cad41e835f01dd371c7abe9a9463bba28bf815925d0b07267f9d4b43771f4"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3986.b50fcad4f1b77533bda7.js",
+      "sourceSha256": "55bcc7a829f4bffd88b2b6752b09aa7a33e53e1ea2e4ac063f0f599e720f41fa"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ru.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "ed1249a87805d6ab108aa6b87b7525ebf2d20c4cbf4051d891b1dc72469296d0"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ru.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "71aac08ea042d3a82eac929e78cdd4e78c674a535144877ed65bb3eab4e5c2ae"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9916.60c48148a54dba9504a0.rtl.css",
+      "sourceSha256": "c103bf6f3f56e6a6a436bb4c8f7b5b3be370dad8d04eab85c248dfe7ee22b4fb"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/nl_NL.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "7e5b34bd877501b74703cdb495ecaaeaf663ecdd3fba544ba402db1250fe0d11"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6025.263b457b1a7f9ca139b2.rtl.css",
+      "sourceSha256": "3293720e1875d221a5c2b3defe04ae643892532771ad3b1ba9e585fd7473dd09"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/en.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "503fba6ba941d92782855d58788addde89e5ecae8173acedf5ae5651a24e98d6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/he_IL.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "4cdac9d290af3ad54eccda1951806716f1947a39380f19016c38b9a27a3c501e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ko.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "5fe2498511b4f8d630a4beb65b689a35a97c48a681dc77b9b57433dddb39f133"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7391.9c809fa91ed0c8f75bc0.css",
+      "sourceSha256": "826c45d2e6a2318e24646c7c7969034ffaed9a5dc068724b05897819a65ed9e9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pl.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "436b506e9aa0dfa383c5a3ce7d710abb39265f927979e63484776c2ae1eee7d9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/cs.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "a451ad7b1b882815c5fcb5ebc91ed369ff36429d5a507d65164ddb8731d808bb"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4987.ca5d16a7e990d39bfb0e.css",
+      "sourceSha256": "60d2fd111047e71cff976490bdd3943bf93f98e28ab00690536cd9c78eb0e152"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/id_ID.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "2a196d5af5d1f5053be808a406f82652f401944c64fa490abdbf27bdeee4729c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7807.8577632fdab29ee53ddf.rtl.css",
+      "sourceSha256": "efe71be95be3672f79552c1e97a78c4802144f663cb11a4fb939cc4b57a915a6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/de.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "be50137da662090684b5ccaa31d40c9fe508052f55290ff708764e92e123ae3c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/hu_HU.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "855b6f3c6b1ea219f1b86df0e798627ace035d822de6ba7b7deebdbadc3e5ffb"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/vi.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "a575967f41b463689b8cbcbac7cc24781c199260135c0e9230959b5a030745dc"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9403.db9859ab09623682562c.css",
+      "sourceSha256": "44f91adb12145f8e7db09261e5b9624bbdf33792f61283efe6ec5ff5f1cbe57d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/vi.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "8613b25ff8f9f411ab124f06fd8fb91086ff5da9921543848fc395c1361c7e89"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3842.8cf6b523fd5a5b6fb022.rtl.css",
+      "sourceSha256": "a3a76d33c5cfcef968e31215c3d77cc6ede030122303afdbf579fb460bb56d7a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/id_ID.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "3350a82ad18fce8a2dd15a5b637ddd48cd6e44d5caefe3db41f981f41c135fb6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2731.ec19f123cabf8efd03a4.rtl.css",
+      "sourceSha256": "9fdbd3d1e45cfe4aa815f0720bd158003a79af80ce2eb077ad3dc4e5f03b7cd6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6985.2cd225354e2fd236e8e9.css",
+      "sourceSha256": "1ebf783b63da16fbc52f3571aa0947795497cbb8e9a6e99fffb9f7b1d41f1f0d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/he_IL.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "77f1de30f6754047dcac05ca97435698661c6cd93a4b6606d020df899346ae04"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5145.a2b224fd27ab2941c565.rtl.css",
+      "sourceSha256": "97c9b7c2cb20871ffe2ce3f45a20a5017100a9b0c7cbaa39e1e0a9b5a102f987"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "0d70e1120d04caadf21416431d1698c17d5ea31a4649e1d12e0aa74cbf1fa5c7"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/it.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "76997752082729f73814c11a01c944f57d802136899520b0c61caee17fec3c0c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/nl_NL.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "fd66f26d81dfdfc2ef8c9bb6b217087faa5432ffef8a619d3d7a57cce68c5373"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pt.2547.28b713bedf796244795d.js",
+      "sourceSha256": "81cde8f5deb904da90c223aec0423eebf9fc029a97cc8df93e80832e6c8a35db"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5057.5382614553878fcf337d.js",
+      "sourceSha256": "658c112fcdd2ff1b966ab5d3625a8e928db9a94446bb5ca1c4ab442cdcf862a4"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6752.207eb3cc75b3ed2c6754.css",
+      "sourceSha256": "c3d9951b4bb01d6adcf5ce5c38310ac60cf54093b83e543ad154dd93f3493d44"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/898.f909d7c1efc95f635922.css",
+      "sourceSha256": "13b44d533065161bc0706e3188c22c7187962ef3a6468b5ff350de20cf4db7d8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5166.a12c50ad6225ca6de843.rtl.css",
+      "sourceSha256": "c30955ad7d465d7e7bc1f6c69456525cbd2a5ee9ae8ab59895f65a354ee3e0da"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2639.7b1d42eef7b89e0e96d3.css",
+      "sourceSha256": "2857bf5b66039fb966926af1a81f631e10b1c741b62bc8794056bf4517ec6a4a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fa.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "52d422c3f413f4d23c57df28406a3cd7a14578955427ffaec58b2a12bc38a76b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/750.5d5f4dea4acc51a7ba4b.js",
+      "sourceSha256": "10c80b72bfd849407d2330b08be8294d75a8af1be68a99cb0dfe91fba81ce29e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4370.18ca7d93e5073f0446c0.js",
+      "sourceSha256": "3ad47af9c969614eb0c6d3424aded94eb83908ccf5e173f039d1d4bbff5c5a7f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/prediction-clock-white.c4675d37769f1df4c9ec.png",
+      "sourceSha256": "894eeb249791afadd87aca27ec4adab2c1779258efc852c765e8933d48c71e96"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/he_IL.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "955005f0e58b56a4b387264e5164141b88207ca3a8993ff210f9163c08885889"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/1740.4c61de525e940eee4f3c.js",
+      "sourceSha256": "89bd59d7b62bdb7c52043a09118631d73630f027d4d52c64c8b4cff63ed1c406"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/id_ID.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "f3ef21095988ee91c7e9edcdcd6ca07a0104809146e95f5275286f016459e4cf"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/it.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "d9cb8881085df2a1006bd10cf0e34d4446a41185e0b612ef87d39d863a13671c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/vi.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "09fd1baac2adbaf8b76f3e5fd28e4280eed5dacc8e120433ac276d3084afd292"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/1803.4653bb65d2b0d594d6af.rtl.css",
+      "sourceSha256": "a1fff37979bd2ad55916a1b4272da0b915984a91c980442226023769508b28b0"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6925.a3a09d7303a96edb77cb.rtl.css",
+      "sourceSha256": "e55d94e75524e6682c1d8a927e2a938dfdabcbbe446c3b9ce0f3d700324fe27b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ja.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "5f42109e91b870e8045742261d7048f13b54015be3b7aec36ac9cbe8cc1cf562"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/nl_NL.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "be2a408f6ec49daa37b72f765d030942c4f9adc1c48028fcddb25fc66471912c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6625.0ed88fc3a989c98408cc.rtl.css",
+      "sourceSha256": "19c17ce9c7386537b0b7f7137d2147609aa52be600a9105b9bea38f5975e2d62"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3066.58a325f25b087530293d.css",
+      "sourceSha256": "80037d9bbfb511d969bafce13d2c620fa9e505cefcea9777b635166245b02a43"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/nl_NL.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "fa052c9caf6ef7f5787aaf83036e01f5df466b90ddfbe32a36f001da77c1ad3c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ms_MY.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "c26fa6c67995617eeb115d9bf919979cc9266bf84b2b0a00f322395c1b15eb8e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7111.b16b4eb739a7e8577559.rtl.css",
+      "sourceSha256": "bc7448fac83fc3bf8a0220ec12f73402d2decd029061bb82f1765c6707ab92af"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "1c3b139c26e00116e3c795c630a553515ab984344bd7611689a9f7ab6fc15b83"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ms_MY.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "37318f9418637623d385f9b7b1374cf4b09715d5e68911c9cd0fdfe868d58d99"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ko.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "afa67e1eacf241e30dcffac60c62d04c434e4ba0c3bfc7a4571bce3252ab70c5"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/show-theme-save-dialog.02c87d9b20f743b5cf16.js",
+      "sourceSha256": "844a5b4d8baeea1235d6d1f95039a17fa63dcddde5d4c51bd853ad588b45359c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/vi.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "624af4d3e47fb399190fa08b8163b85d765bf35de64d0bd02a63f3f01daf6310"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ar.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "0dfe37c059e592cd5c3b4f00e4281368fadbf45fe68a0ca285d09b62464ca1be"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/prediction-failure-white.a838a6689f951970e715.png",
+      "sourceSha256": "58f71a0a03d7417843f7a5a1b095253d10f507becc2ed90a56821d05173123f5"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/series-icons-map.f25fb7b89b7e831b726c.js",
+      "sourceSha256": "131367f5fe1a4148205d43a4b1edc2f5a3268fcc461c549f4aace65507bff85a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/id_ID.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "6de16e5745d74cab8c6f8be1aa48365a8fd5ea219332c15ea2c274c7f4b241b1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/th.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "81ab1a7e2e28c3843735c132ff93211a725e2617ae58c8965015eceed16c2a6a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6214.65b7dbf8be6cca5ac143.rtl.css",
+      "sourceSha256": "38c0540c6483257cbd023cb9aadc18e904581086a9ea2520d443a3b638c54856"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/he_IL.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "a4f3e496ce3feb7a78d8709368cbeaf9075e3e310985679187b8e8e8d5b6e85a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/favorite-drawings-api.340e60e2342b0d93ebe7.js",
+      "sourceSha256": "999ea79dc8ad65ede4b707bfe560c0f1ff923419560540a4b70eb8ff269d986a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ko.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "4d9e68cb6950b54dcdb166dd0f1e884e70686493355b00016aed61e4db8b93f0"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "ce2e60658f63b95c58fdd9bda964bb22e5eaef849d2c53504c8f90ebc346b22f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "57f7f176bf93d0381b23df59ac309828395a73b04b7d5387f4fbfb22c1abb5d0"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/nl_NL.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "f23011c5a6d3d18234f5cd20e3d78568e37329c76ded605ba6122dec4f00c9c8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5993.4705829d0834140ee3f2.css",
+      "sourceSha256": "37bebaf2eb24d937fcea16a9b8afafce2b5128a2395cb43d3d6c468fa2c32dd4"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/962.9f54d549868e21286372.js",
+      "sourceSha256": "941ab49be1c8d1a8404afaae67f6fe9a2662059c561475fb903b1bf13114ff86"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/tr.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "159e60893c4c9c21f6099a6076fb563db22079f6bbe4686c07f4c91b6aba5c53"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ro.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "11c5abc0a437c661b6efe6704ec7e1706617608606058ce7f0c96b2f98ec8662"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "e038fa76ae6970e35ee13c13e07ccb9cd1ba022c74043d9e2947bd70280f0639"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh_TW.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "d6e9ad5ddc649227fe2cc1e2f1bc683193303bfda9e09af1c8367c96bac8c3ee"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ca_ES.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "615c5e68abd96513e42fb22d1b325570e86941f8856a854e2d1086d0437888c1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6747.c7d403ae692f88568278.rtl.css",
+      "sourceSha256": "595c39159064e470da3a0d1d65f8d88e2b26de7643573e0159cf0f486702367b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/tr.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "cfb50f38b87a3d2962504856d21333ac5770ea0576768a5b77ff80259b6b9f57"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/line-tools-icons.ecc8d3a4af49afed6b6d.js",
+      "sourceSha256": "b56c902450d3ace42b7cd42cefb93989602c1f0e3455e3e81cc413e4e2cccb0e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/sv.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "74dec3dee879b86e1b7af8e90d8912a98da5908a9c7fb3f55bdd75673e410a46"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/symbol-info-dialog-impl.6ef1056ef156ddb4caf1.js",
+      "sourceSha256": "95f7a9d69e80f8fe7b036ba4635593f0804fe1059159f6e11fcc0a9cb1ac16e7"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ko.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "b4a3d577497261c0c3f17b40e1334c4db62a7e46421f329f07e911f44ed85ed2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/id_ID.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "2b9920cf1a7529ff7351cf5e5edd6c3d8ef045391d49ed8d79a697096ea9f465"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pt.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "2582244165d4a5e2286581f3856a5ab0f759b6d15280e545e952a0c84f516c8a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/8149.21f2b01074a4d082e268.css",
+      "sourceSha256": "ef16151410fb79f03a056b5a373efbbdbce204c02b155c71db3274b188cbbc9c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/global-search-dialog.91018047180ff0d9e40b.js",
+      "sourceSha256": "ee27d66ad3f1804f419b327ae9d3139867b9e5d801686d89ab6046b57d4d5276"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/he_IL.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "3cbea0bdb09b7980f28be2900e6e81b2c2f63fbcba51957b7d380f0677195d54"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7149.12adbb19fdefe9b66b18.rtl.css",
+      "sourceSha256": "a4ea194ac20fef034854629d2a1bebfeadbdb995ab0243aadf1b0910b277d54d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fa.2547.28b713bedf796244795d.js",
+      "sourceSha256": "92fdf5c01d5554aa37744cc29966a71b3c9b57b51d1d413f2e6d9bad7a825778"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/export-data.f43b3c60275506b2198a.js",
+      "sourceSha256": "f4d22471b4a3fd02e39c6a92353a93685e95bd2605e0757e43af90a4a897fd52"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/vi.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "d4f80c6e0700e50a407b240b36baa596c80ae5ad6a6e355803d60ba1eab354fe"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9138.03b8fbcfabcae851949a.css",
+      "sourceSha256": "9e891a24bdd964d958b4b879b3cf87bbd89b075311c7b465884731d2b7f08f6a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/he_IL.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "051ebbd7a424fda5a8c3ce13559905d964bbe545cd1cc239161da1f2bcd73de0"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ko.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "b1f806189644ecb26e5833bebde77ed8287d01bc21ac9ceb342d6a5cf8b966d0"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2666.fbb750fd312778403036.css",
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4894.99d4c2794da9feef3c70.rtl.css",
+      "sourceSha256": "9124895b5f83211d8c98151e06977c390145dd59dad674991540d920c88a8c04"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/cs.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "82db5f7d0f617ed36d65e9e91b4a43ddb9196566d6c67125a9008647038709e8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pl.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "19fb8d153db4456945b23d1adddb1142b14ac6bbd112cce2cd758a6a691de144"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/it.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "31b69c6c9551e88a76d0c4ee15b47bdccbf02fd10b46e47a0e4272a95a154851"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/id_ID.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "d98d02efcc667bf3af47e63a02467e751d268495ed7d600591555705f5497297"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/tr.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "7420710613115dabab152a55d343348a6cd72a369e8d2c199dd20f11b73569ed"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/id_ID.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "674ea84fcf8522b64b5dc5d651e078213c5568baefc3161e8c972cf4fa2db820"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pl.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "73ab775b8d39ce7099fcd88259d8d7e59b49c9633bd2ebb31942c172899a418b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/cs.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "5be7c3bb0e3937d5babca22efe63c8631ac5951ee3b0a74c957dab470181dabf"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3263.238cd2d620e004adee5a.js",
+      "sourceSha256": "8eb49eb1f975ce6cf4a61017bc18d366194c850c6b55f577474c6b235b755b55"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fr.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "8f90279b97ed78f0cd677deb3614bbbedcf44a110b913df8c164a95cd337cca4"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6494.4c212043f24336e170d5.css",
+      "sourceSha256": "20fa83755d157879b31ba364347b3aae621a1fd3bdd8845f26a7c973df775b68"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/vi.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "1acb79a112dec2f04e07b686fafcaeb6f4ff36762253a713b070aaee000f3e94"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5940.aedc1bdbd324e6042b17.css",
+      "sourceSha256": "44cf65841b52c19f97edd1dc6566fd0fc9c10b77c5ee939a0aa8cfd86ca335d2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/1109.b1ced88f4a839badfff1.css",
+      "sourceSha256": "d3b41005dfd0e3293a15df68f24b81c3c9fe31d0922a52a2d86c64c9d91cab77"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6639.885b5577e3fb71ee2bea.css",
+      "sourceSha256": "856f4663973867f854d4df66a79bbe412209c050f7e4612acfc02609ce740373"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/en.2547.28b713bedf796244795d.js",
+      "sourceSha256": "c60344bd82ef14671f0cdba17d2ed8480bfb9c7282ce3bfafb9a87d8331da7a9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7413.f830ad1ad6ee6f9b1cb3.rtl.css",
+      "sourceSha256": "a5a216d433af508364353daa08f26f623e415b4c4eb5f62721f8b606a1a002e9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/de.2547.28b713bedf796244795d.js",
+      "sourceSha256": "860d713253900cda58306313d78dfe0964c748c5a5fb3fe68e071151a5bee463"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/source-properties-editor.3b96f58f66e0caa61b15.js",
+      "sourceSha256": "b81a1144be3d51441c6fc042be9eca85bcea9a070f1956452f2d3528ab774569"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/cs.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "94e35f300a4ec4631a8e5cbfbebb9c1332e14de2d53e287e469f39c87587b617"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/study-market.6dd3b88a86eba6172f5c.js",
+      "sourceSha256": "3346ff1ec155e8d4297989f62ff5ddf3c7b52eb44ea69fc68cbbc434cbfc499f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/cs.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "b5a1b60c02e75cb214e78b9182a3f37536257057e6048f68f408f89a30048625"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pl.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "be9e17fbd93c2bdfd39587cf82ff55c013c10bfbcb239bb9ba20f561b75d4038"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/it.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "bc4874e1fba5e7eb7109e3c35e03b3bfd30046b8cf3d27a9b123bac4ab04cae1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/956.1e89775cfd644d656c56.rtl.css",
+      "sourceSha256": "a073e3095025417b0461eb0d93e2bc30292dc1525180f06e046d941b4e82a3fe"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/1762.7ff6b353c441db2276da.css",
+      "sourceSha256": "df812655846a2ac498b24c838247fcffee237b8bdecd084b788fa0ca2dae3849"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/it.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "887a1e4c40c0170aa710b9ccb71bf0a0f3c3d6497b6c02a4089b0705b24db600"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/it.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "25355df1a7e2018a35af1a4767213e396d188d59a1dc7134cf7a8a60106b4f49"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/tr.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "6ddd963ccd17de77b719dddb6da65ca0105fe9eb9f7dc32ab665049b2187a4ae"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/take-chart-image-impl.600804a9c180df6a83b1.js",
+      "sourceSha256": "039bbc16b97ec1fa57476ef211a6344a8bd7ab66d7c9d8450682b2901a4cd44a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/vi.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "ac5d096de210d56971856004e99e665be397cca83ecb8a79372520cfa96ed639"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/1109.b1ced88f4a839badfff1.rtl.css",
+      "sourceSha256": "d3b41005dfd0e3293a15df68f24b81c3c9fe31d0922a52a2d86c64c9d91cab77"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/nl_NL.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "73daf18c6020a4dc67b7a74eecc44d880d48faad461525a41e0fb168e36df2bc"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4102.4abd8542fa3aa3e7fd5d.css",
+      "sourceSha256": "4d1a2d76ba6e6e850cef2ddeb7da0c787a64b1a1c074edb12de8f06717970599"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3353.860146c59230ab4bd938.rtl.css",
+      "sourceSha256": "3868164bcfa3da46fc6485d00c9e2593ff42c8e7d8512c9a467f05eb52d30bc1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ko.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "b72d0170265314d0208a6a28cc5c674795cab84172eb316d2c6e75b68b5880bf"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ro.2547.28b713bedf796244795d.js",
+      "sourceSha256": "9164050d84c347e9954f1a46dd0b3d37c5bd44587b6f85a3458efc2965b65ca7"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4987.ca5d16a7e990d39bfb0e.rtl.css",
+      "sourceSha256": "eba44c6156c557e6f4d4c3cc3cd2edd7c4e48341a0d6d40ece23265e8c9ff9b7"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/tr.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "79ca44f734565cc9d58d6962b93a5ac19fa264eca29f1e8f1558b0c32c710c38"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/nl_NL.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "91fae0125f9971d4ead215f264db6294e493c597f6eef78ff7558edaaa5dc85b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7194.e04f69c8933166966874.css",
+      "sourceSha256": "6b4f6c7552d6b595783b9545e2706795bc9c7c38468d43eeceb54c5759729a03"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/cs.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "1898cad2e42529de24f9b3b693d09230d6451f81db85bb6d07fcf3814d100cbb"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pl.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "2647c70915a318f5bd8836839fb3978277f62d82c977d3fbb8967599c0a65732"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/sv.2547.28b713bedf796244795d.js",
+      "sourceSha256": "e63cfa40c8bda349cdcc4f2bea9b487a8742b377ea8e55adf90f05ebd9645c10"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ko.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "5a8f1edbbada3d3a69714a08c52717bdd4fa803c2874e75efc3986650551684b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2639.7b1d42eef7b89e0e96d3.rtl.css",
+      "sourceSha256": "ca1c4043898be5500722528f71052dcab49b051f4dc14f4837d94f7eb01cc91b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7391.9c809fa91ed0c8f75bc0.rtl.css",
+      "sourceSha256": "826c45d2e6a2318e24646c7c7969034ffaed9a5dc068724b05897819a65ed9e9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/simple-dialog.6a6e7744cd3263ce2887.js",
+      "sourceSha256": "20d26956b21c8d545e8c327ef0014ea463af9a3dd8cabd999fd4b09ef092a1c4"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6949.19355e81a60b640ea097.rtl.css",
+      "sourceSha256": "8ab0bcc1e395b610757a474de2fab1150700e77461c0535cedd756bfa6640037"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4894.99d4c2794da9feef3c70.css",
+      "sourceSha256": "2489d751f02926187e3f205fc5110ea5bb6120470816819fac0d1f97e45e788f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "854e53fe3014b0d1a909d557cb283000e0d0821524f7d92c0918e5dbc051d286"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/add-compare-dialog.5039a5ac2f3556b18cb1.js",
+      "sourceSha256": "d9b516841c5a5b662a74e63173d572edfdd1943cfc0203bf021b420326441218"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ms_MY.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "cca0212e45fab748cc4c3fb2a2a19d9b4e65f45a821b5fb07d39276d348d2440"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/tr.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "26d44a22c55a7ed994ae7c59b3261be13ed95c7a4527d864887b928b5d5c4803"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6985.2cd225354e2fd236e8e9.rtl.css",
+      "sourceSha256": "c316a2dba4c8c86b97f174745841a5120891e21ef95fe9d0413e43038644452d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/chart-bottom-toolbar.4d02fadc540256bf733e.js",
+      "sourceSha256": "ea5fe20fc076dfe828bbf8c02f5e75b04c012b1cce56604d6b8f1f5b86b0150e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/he_IL.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "8d34a2a352de4b0df38c08109b01479f745486fff3cca2c0faf68218e295b55a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "a5866226513c345d8e8f495a78ea4ccb3f903e8564714547ce80117dd5ba6364"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9138.03b8fbcfabcae851949a.rtl.css",
+      "sourceSha256": "8a314de4417032b685e8ede5f2c34c44a653e1442cd38a52329e5db49bee1c6b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/it.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "ee0a7024f73de1d839bc240dfc7640f72585fafef0202f442eff6b5bc20144cd"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/8904.a302177fe7e3ccd50cb0.css",
+      "sourceSha256": "ad42b6e3b91891c3a62a160c5d2659532894ce1ac7f2b8a7c76d5b9a8e3683a5"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3353.860146c59230ab4bd938.css",
+      "sourceSha256": "f44b6ab6cf9c785c0e5de60cff85d87f598d2ce3a0df93a24998816b7f221a42"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2486.82c7dba4839761a57f28.css",
+      "sourceSha256": "7473728ab181b3a89507670197595809426eae9779d6116ec5727cf88eb17826"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/tr.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "c37648be9ec5470552905e3bbacfce6a802a3c78350355e56b25b56a3cbed7f9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/study-property-pages-with-definitions.1d3c58ff151a9c7c19a3.js",
+      "sourceSha256": "0d4241c095469894ffd4b1ddbf722299e699419fffcf7045297e462cc8c5f764"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/th.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "62cb0e9d9f30dd6a2931f1dee1148f7866482cb3ed329f790154632cd2b64889"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/hu_HU.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "2325e96d507ba505d04bebef72d8fc79626da8cd45806b5329832fe866069fad"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/es.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "9a9fecaf4c192bfcc820f95b1ccf59275d6eff43bf716f344cff6c86d2dba2f2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2191.bb0aa12f5e562fd483f3.css",
+      "sourceSha256": "7b6792edc106c0f3583f00e145e3111f54e361a491d82c65ba6abb7e73b0be6a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ja.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "59154fcfb7a593492c1708759f478c6c37f4b710e96dc13dd8789632a835f9a2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/956.1e89775cfd644d656c56.css",
+      "sourceSha256": "9ef5d6907b0c17b6642d21164a0ac071a0d2ae00769ece377f285edfb4aad4f6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3610.11b7ad14e26429fdfa5d.css",
+      "sourceSha256": "1789d5442e5412206a4c8696ae9336f829b8d9ee208cdc459d998a48fc351914"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/chart-storage-external-adapter.9c1267d07e48b8d8f53f.js",
+      "sourceSha256": "52eadd45d7de68316ae37637c4de0407b941ef274149e9b60f7ca116b58161c8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/opacity-slider.4f3ca6b00b45fd71da5f.png",
+      "sourceSha256": "8508d6f54164189a5ebe05efa426390228fa1737a508f1484b47f413a4fd5ac9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ca_ES.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "c0ff112fafec96aa6d1cba2ecea1bf5edb94b0eacdd299385b84d665763c04e4"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fr.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "5b1d8be0f26cfa7a3cdf089fccf67f7506b04cec0a47e91012c4f3c682a5719e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/855.56a5e53c97d91a9f96f7.rtl.css",
+      "sourceSha256": "0686bd7b0503d8794a9b2da222b25c02e1f28ddab02bbd5103f2e7df1bc69d7b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/hu_HU.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "456c07616bf8e3dbcf4e45a119e1e69f1a1bba29cd59254284514ab716fcf000"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2052.e9d07fdfb896fca26166.js",
+      "sourceSha256": "1a8e178c27b64b00c2d5e3916b037c20e008eea6a0a4d8be485d0a165ac42051"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/el.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "dcdf93c4b0bea77cb6688032f44492cfe84e229c8f74bcd242b305e67db8759d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ja.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "12eaf818790b3306de9a8e476487a26c7ca7017c7b2c8a68796faf01c0015762"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/hu_HU.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "79d71d62af519473aec25a7be74834947e6f03f0a55cf689a8893c703cd2d978"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ja.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "c28aa455d5e921ac365fe660a358299c010cca7295683f14c82f2b3f3ca98197"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh_TW.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "4295c424dbe9e97de3119134152daeb4bcb41c6bc17c3a137bf7e90b7cc71b1c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/8149.21f2b01074a4d082e268.rtl.css",
+      "sourceSha256": "ef16151410fb79f03a056b5a373efbbdbce204c02b155c71db3274b188cbbc9c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/el.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "699f65aabe8706ccf16f91190e690445efdd85cdc640c46bcd657e3ee08bdd43"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6036.3b493a9f0ab052e6447c.css",
+      "sourceSha256": "d0dfda27601edc8582e2ccee9d573857b163de78b452ab64a8379b132c67c636"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ru.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "3625d2478c4f595054c508218467dcd426c66f4745ca7c6bbc785929686b9e59"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/es.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "e6e62e0241224790f68edfcb781f1b581b61c42bcfdf501be53e6d8b8cf686f0"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3780.a289557f2e0bcabcc4ca.css",
+      "sourceSha256": "eca3792398a81c76409c8d0c82f94c6068e35d16f7433133ef853b288d07818a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ms_MY.2547.28b713bedf796244795d.js",
+      "sourceSha256": "b5484a9f70ef092b45b27713a5e653ccd70024dbec89357c4fb09656c11c0ba8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh_TW.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "f32ae33abb5fb60bdee1f8d5731883de4c5a2aa9607452ee48b95e10677076be"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4788.3cff897925f7a8dbc837.css",
+      "sourceSha256": "1bbf38acc8ecf7d6cb598da52c2d5e193d6947c205f0ea154797dbfac1896692"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/go-to-date-dialog-impl.851f6bf2bf36fe8fbac4.js",
+      "sourceSha256": "fa94c1d57316075ea7a6b640e3a630d1c1d4182d28525ad3d95f967cb4907add"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ar.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "e3a7109de95089d6343bc1ff48e41fbda35a7b9df6bd2d01f47aa4bb2c491be9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/th.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "6f744973ec97b40c8cfe1f25548c20bed52170c5dc4f6e716a40574744e0cc58"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5866.f164dd2a584ab0f493cf.rtl.css",
+      "sourceSha256": "dff1c48bf17052d43b067d037a019c00cf873eec901488512f69faf5aaffd7b2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/sv.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "bbcfecb83030501290d252a51082bb4b988a56f0e33d804c1d99aff8dd2bda43"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/th.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "23a2a1c3cb746c8b749df7de59be41f3b2d420d711f6b190872ac241ef6ccc78"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pt.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "2128dab72d85be2ebeaafd70fc81444c50060dc620b9b0106ff9263318e76b58"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ca_ES.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "cf4b71b4334df0d41059cc2d126b63f98fb342c11bf13c9ac770616ebcebd976"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pl.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "e1ab6ce830af0d4087c85307cad356c8cc157b9f30c4966a423b458870dc5324"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fr.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "c70090d02a533bcbb2a3686220fb9b7ae35570dd3da060cd7ac1a9dc43a90b6d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6949.19355e81a60b640ea097.css",
+      "sourceSha256": "8ab0bcc1e395b610757a474de2fab1150700e77461c0535cedd756bfa6640037"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pt.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "8c6b38ec90178b245f21f352109153411883b9276436f238ddb783ed35ec5625"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ar.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "a356567d9c907dbaf1ee933c7c5af11f9a317246864287ef244e2f45abada36e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/826.2effba57f47544e58368.rtl.css",
+      "sourceSha256": "f62dbe0b7dbfeb09ef1ba0297aba6018ed3a78184801f096fa2738cd032ffc8d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/es.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "18ea2675ed2aa88d6773f0b448c0016d5288b86d0c5945cef0d0be671d819aaa"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/855.56a5e53c97d91a9f96f7.css",
+      "sourceSha256": "5a99aec9b8f693dabbe9641af3f5821f43e805f2b442c7e7e84c7ed9644d5245"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/de.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "2e5055a79d28ed468f88e31d1f144bed82346be841466a72ce0c7c49fc7e90fa"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7051.ba50ecafb4527628fb40.js",
+      "sourceSha256": "88ef62343ea5c5c30a883217d65a5d07603688ecf01d95ee97e745ae0e16ac1a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6625.0ed88fc3a989c98408cc.css",
+      "sourceSha256": "de3f4d58ac9e5ddc9cbc47e95caa02ec1f45014777e8d16f286caa86acb357d3"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fr.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "7946118cf742086e3e9bb2fdfbb909c1c6ede34a0e936a93cd8585ea122523f1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ca_ES.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "347174368c5037ad7a9d47fe5482f6a3787d429d8deac96a76dececdd9ac7bbe"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5145.a2b224fd27ab2941c565.css",
+      "sourceSha256": "97c9b7c2cb20871ffe2ce3f45a20a5017100a9b0c7cbaa39e1e0a9b5a102f987"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/change-interval-dialog.ebdeefbf84f9e033ed5b.js",
+      "sourceSha256": "39fb037dd529e2ce01ed68549173c5a38701c4c6c343a2260b54f7440878d558"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ja.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "972d6a505fc5196f9e9657449694ea53658208a788a5715c69208fd6300f887a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7807.8577632fdab29ee53ddf.css",
+      "sourceSha256": "efe71be95be3672f79552c1e97a78c4802144f663cb11a4fb939cc4b57a915a6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/hu_HU.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "9030b1adc298bd2881e972982af544ecd676437d954f3fc056bbd0a9c0df442c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7194.e04f69c8933166966874.rtl.css",
+      "sourceSha256": "07d3da3a3bf09cf611d5045f2b3c8588db6e7081a16cb5545ba3b62cd850e0c5"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4215.d24836a292b1969ab4bb.css",
+      "sourceSha256": "30781703c7d9410e515f4e1efc196157c43715421b92d0cc206a7943ab9c31f9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/th.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "c94f03f1f2c69e4c2bf53c02087c72377735a55f3a02505d0ce70caf68e83c07"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5993.4705829d0834140ee3f2.rtl.css",
+      "sourceSha256": "dc26509f47086e972cf17928dfd6b356810a6f0530840a5e6498ed2e244022ed"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ru.2547.28b713bedf796244795d.js",
+      "sourceSha256": "48a0533c8fcac5b098d9fb8182dc44df23d42e549da566e0871ad1180b23fa70"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7350.00632eec360f0cf2d9a0.rtl.css",
+      "sourceSha256": "492bf7441d9bb7b14ed04d183680d31a20f231bac3869e7d6989d686eb3e3d60"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ca_ES.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "0076a3547675f2fa019821d2d8e51a533eec3f141edd8bd115cb3f5803200fdf"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fr.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "5f1554d3ddd4275ac1ff550a4d9398424933fe0663dcc48d7dc6663205a4bc6b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/es.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "60a87edda9c8e248e2edbcca23e43a711e4263388fd52c4344e8e1b042f35af9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/study-template-dialog.711ba6ae5b343ace8691.js",
+      "sourceSha256": "b1821011aad57d067de63a76f3a2196e27b1f460f80200103bd62bc90e665600"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9465.fd61e82b3c912f2e9fad.rtl.css",
+      "sourceSha256": "28bbe73a39ad8f107601dcdff3260fd21ebd2b48afd3b0714079d8e0e59e5368"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/es.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "58fed0d47515bcb2d6d380fcb0ae5bd211c98b65f021553737d160526ad22b16"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6025.263b457b1a7f9ca139b2.css",
+      "sourceSha256": "5d7679b0f86c50fcbf6bec9ddea7ff8d04a081140f085ee73e58df9c151b04b4"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/lt-stickers-atlas.52ad6e6d7d7b134ab0ba.js",
+      "sourceSha256": "5b9d09ea5cf921217940de27d1c2f3ff3c089e4959f5920229d657b23c805738"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2486.82c7dba4839761a57f28.rtl.css",
+      "sourceSha256": "a61cba0ca8087b528d26098050c32ce0cab333fa0a5d85e344077f6840f6e1a8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/compare-model.da9eebe3af491996707c.js",
+      "sourceSha256": "945d26d88f726594785ac0d1a6db89eb4362cb9a4db1f8feea34dcbb74b1e706"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4648.7172f75bb866b3438c6f.js",
+      "sourceSha256": "f8039fd22f1653a33c2b72bc3f2c893d48a2336ad720e20b560c1afb4d836710"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/8287.2b6f71ec5c0064590ffd.rtl.css",
+      "sourceSha256": "cb4f83c3c4680eb480d3955060a283e5d81e482f65f5ee90a3db0fee48d8971d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/el.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "f79f72b26245c804dd3187e66b7589dfe228504ab74fbbd6be332f00a283eab2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/load-chart-dialog.9a37c608b4849a6f8a11.js",
+      "sourceSha256": "3d5d1457c3b97ffad9d0565c0002b0c1aeb3a69efa1410328be3bcf4390cab63"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3896.96db838d3467bcf68051.css",
+      "sourceSha256": "11ce3d49d94d8a02baf448c42702b63018650129067490d2088f21cbc387669b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/6.362fa6a7ab1f3e3b06c4.css",
+      "sourceSha256": "80500344b5c340a44d864b52eaf3964077854d857f4d5ac5ed9b660e11fa18c9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh_TW.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "0ef64f3e274801a0a91a6de1d62e425f50c7db531ae5d1df333f012a43e8bcfc"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/dot.3d617b6b01edba83a7f4.cur",
+      "sourceSha256": "9376251232b344ce75c7ee0014091d8cf60213eb4c3d9bd324dd66f7a33112d1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ar.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "a0371f2eaee0994d0bf9d29f1265de754f6b8ad72e70ac4ed7da023aecf08750"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9842.ceaeabba258d065497c8.css",
+      "sourceSha256": "1aed9c45c07b77bc781543f044a5cc52c4e566bfa63e573664b8ceed2b81cb73"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/1033.5197f9f8b8500206d06c.rtl.css",
+      "sourceSha256": "5d4e2c3378368f3b2a07486ac550dd10bc12a6812aaeec0146eefe93465ecf80"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/el.344.a9e566fa1091368f40c7.js",
+      "sourceSha256": "e7fd7b469d47b4510318ab347a00293418eab5cf5a5b7b030ad29c8eab5d524d"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ms_MY.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "dbe1ba418c28a54f71498d91a7b0399edebed3fe2c044631961140623de5c8e8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/linewidth-slider.8e3d0520d28ce8259ccf.png",
+      "sourceSha256": "c69be71d00b7f07896b5dac89e06f7357022df5cf931e40970cd21c60b5e851a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/hu_HU.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "e9e317e353bac5581017a30114b7c165ee4239e99e4711ea9a1fe9bee1fb10ef"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/el.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "e24f7718e1973b3e5b1577acbac349ff4cf2dd259bebe826224d25de0a05066f"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh_TW.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "d1339acc9d78a05f2c7454dbc560bad60d7e8c39026f37460e9fea6dfdfea1dd"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7413.f830ad1ad6ee6f9b1cb3.css",
+      "sourceSha256": "a5a216d433af508364353daa08f26f623e415b4c4eb5f62721f8b606a1a002e9"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh_TW.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "2add39c9165db0d623f67c682850c44eb6c3424d39b0fa5050b394327bef9e8e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/chart-widget-gui.75a373be3b6816e8b55a.js",
+      "sourceSha256": "e0b1c70550bb734ed56df18aba82e8d1f04383e997f0c9ee5c694c0687de5722"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ja.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "7f402b55a73240529a149e50c175cfe8a362ba79d92a2a50fa793695e9af18ee"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/sv.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "852c8fc93755f1f120ce529867d873ca92bd0c27d4255ee25c358b4c635a8f0c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/el.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "dd00c18bcef5af4cff1da8a2ae2a0ab32930cf7bd66c2117b4cdfd03e9375d7a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/sv.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "1345cd80b032800ba9611a533ce3b41c9472f6c5fcff1ad726c9b2bedbb0b754"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/hu_HU.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "8ceb53bfa8438bd782e1958c6cf92c95c73aab4fa3d266b894f92e60df47345e"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/826.2effba57f47544e58368.css",
+      "sourceSha256": "fdba7d4a4055624633509424ec0c7ee087a6399b1183f0fa65c215c3fcd46e20"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/series-pane-views.d3299bca6e9fad2c340a.js",
+      "sourceSha256": "6c70c136e08ef8620523af222796060739a59aa91cbf7d1527f1203acae4cb94"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ro.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "4695115d89bea1ed47a5c941c0d6813d480fe9b0f258c71f7e9bbe0fb87e36fd"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5166.a12c50ad6225ca6de843.css",
+      "sourceSha256": "61306eacd7f82c6ee703971fe9f261e25e5a73f4bae4446b0694da973bdffa96"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ro.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "1031b1430c382cb1e68fe52df972a88261aec13c5fb4e8e7960e68fd733a70b2"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9403.db9859ab09623682562c.rtl.css",
+      "sourceSha256": "8bb202f5b9ef45bc6de1b8827cdfcdcfc13a15af851bf671fb6868bf679e1fa0"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/custom-intervals-add-dialog.1aa54900370f7317d3f0.js",
+      "sourceSha256": "578d1b36fae11639369f9cf90c41066b2dd767ff19bfc7da85ff436068346cda"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ja.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "d90ccdc63123f5a0f5e2b5a6e31db78c05bde14736a646baec8e43b56faac41c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ar.2578.ab3178e0160c259eac53.js",
+      "sourceSha256": "30ba38557154f7345d81e3fad42e8517bd68f4fb7ba4b0288adca44142cc3119"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/de.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "9d2c2a7b1a3e5b2322784e65593224085c92764586168a56c91ce277d4e65151"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/object-tree-dialog.0b6cab4cb55e2cef2c40.js",
+      "sourceSha256": "40bba88784a9af26d750fadb415a9f398ba9c3631b11c370d302151ab3712f5c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ca_ES.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "e2882fc1902af498eb5fece84680e860a31d73c0b60903cafd685a3a6dc2c23b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fr.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "62673bfb8314ae8f0c66afe8c1aaf644fd41161c863c5230023ba5467cd9d4c6"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/de.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "7c02d3dc7239133c5cb3eae14ace34c1f5cc49eb47b94377d06eaffc846b5899"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2443.66f44a8bfe8d49aaeaee.js",
+      "sourceSha256": "ff79e1b3275f0cf779ad0604cc402ba412a3523a812d7c0a2a0f2dc5d68a9f0c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/9327.97be240031495a68333f.rtl.css",
+      "sourceSha256": "0462e345ff3e9eab9cd62415a80da519109ce2b621d92e601cdd6bf973bc065a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/8450.f75ab24e1ecb22d29183.css",
+      "sourceSha256": "251f35d036ed5930ba28b1336b245c15d5d059470aa1782f4697d596368acb72"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ar.3236.e12bb9a536432e97ec0c.js",
+      "sourceSha256": "acb7db60ae5ab02ddce704a68d4074484c12b273c9b7eb644bbe30ec3067a730"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2666.fbb750fd312778403036.rtl.css",
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2191.bb0aa12f5e562fd483f3.rtl.css",
+      "sourceSha256": "b7b8e7b35b5ef325b4d3a1797fc16e2c85de25da0b4c0c5ad2212f6bc3c69420"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/th.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "7b6916a765f2247b4b7334e774e3fef9ef12d9e991cab33bc839c9820f32a831"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fr.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "d974f77e5f6c418d125cf064f25fcd0f0dca63980f2e1608f7a3062b5687fe85"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/en.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "872bd73d1b5ea721278ee77978e1c9eacfd35bdf1eec83566eba07cb649a108c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ca_ES.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "b42999aad840f2b94cd80dc8a34b49128b50014b1983257a86fbc7214f3b4e08"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ru.3175.e0a2c845c5cba23f42fb.js",
+      "sourceSha256": "4a9a552fdba370c4fdd534d6a94e019015ea0282cfeb2564674715d00551f22c"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/th.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "19ef8f4a9a6759164ed77a2a8b6a95238fd20555694252fad048ac44d439235b"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/en.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "4f3e02a720ad8f6c2daf31bca136e436e4438e164f5e7015d19616823a78a3ed"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/2587.1f1100dc01693edfe269.rtl.css",
+      "sourceSha256": "9696b287f28a55a7ec103ea853314f26262ae782a87d34a8a3f3a042a633d249"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/pt.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "4afe9d842d1acdc38cfe0461dd8612effb2f11060fe95549a5bdd958f25e2c86"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/en.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "f2c7887fc68149cb4babae432bb41199607a681be05fe06b554d1ece703dc054"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/8450.f75ab24e1ecb22d29183.rtl.css",
+      "sourceSha256": "dc8df29af384aa4f6149de5c1604151af8db09764770366e6e0a6521f7d29180"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/es.9417.7ff64779d43389a1bb41.js",
+      "sourceSha256": "59dbfc02080d3eca3b2ccb724d457b632c527cc676b048f85b16d28a8bd7abde"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ar.4716.e4ac74dfc9ec5374b00c.js",
+      "sourceSha256": "7ff1fba41abc5ca9ecde7f3b741b22f54ab25fd7db242be82bead949aa3d3b06"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fa.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "85e59e8b5d8b16c1863fe18a54b031d7af7b3b263543ddd0db5967e05b86f4f8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/zh_TW.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "94f54e7fbe7840fdc0ed28503af5709c1046f63a288c7e358078e4bfdad62e59"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/el.5362.311bfba5d2c84b13ec2b.js",
+      "sourceSha256": "3703f23e9d5a289c7fb1f32753bb03eb12057e151869c3b2912024c402c2a177"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/3610.11b7ad14e26429fdfa5d.rtl.css",
+      "sourceSha256": "42e7c0f81ba8285774cdca98ae75eec9814c72e451600dade6d20bc90b0b1861"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/4713.d82fc553d710da1606f0.js",
+      "sourceSha256": "493bdb4164487e9d9bcaa46f7bf52404594c249260e9e60dc5a8d39a861b10d8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/ro.178.dd03c0163a8373c0fc5b.js",
+      "sourceSha256": "b08c69183b7e641b4b7e97a7c17de541fdb277e9eaa3d441193a04e6ffec4ec8"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/es.2285.1268ecef367debd2960b.js",
+      "sourceSha256": "79269414fd82b33762b6f24c88b25eddc0ed2fd85e275b5f8f803d177901bae1"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/hammerjs.6e30e0c48af40bf2f6c0.js",
+      "sourceSha256": "8b3ecdeff0cc1f2a06d1581944921c9e211db6978dd0a4916cf6186d65e968a3"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/5664.87e81959e880fa8ba65d.js",
+      "sourceSha256": "0f3c8aec02383f36075f9463b359015853958cbd0bc835782f91da8a8550eadb"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/7871.fff454908cba03863eb7.rtl.css",
+      "sourceSha256": "ea8b33c8dc19d0a84cf5072cab7e574a4ab4e12f70f8fa173a377a9341dca97a"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fa.6306.b88dcc3f0d7db89ebfc1.js",
+      "sourceSha256": "254b4247ba8307490ba6f469658e49c48a9b34b7c3985ac2a7a582b73ed56005"
+    },
+    {
+      "path": "public/lib/charting_library/bundles/fa.3951.babac9be598102fb0d92.js",
+      "sourceSha256": "0aaeb3c1a620406df3bc43ae270a572f38eb5cc7b779fa763d0316a745f7abca"
+    },
+    {
+      "path": "packages/ui/components/tabs/index.tsx",
+      "sourcePath": "apps/web/src/components/Tabs.tsx",
+      "sourceSha256": "c8c5d7b054a708175b11f02470593f9f2de586b4a167d1f57d202236b4a82f34"
+    },
+    {
+      "path": "public/fameex-chart-icons.svg",
+      "sourcePath": "packages/icon/output/icon.json",
+      "sourceSha256": "ad459fbbb06b9c1ad992e389e0b446d815d4a0b197350c8ac6ee4d5819266a91",
+      "note": "提取 k-line-chart、indicators、refresh、aspect-ratio-open2、aspect-ratio-close2、arrow-drop-down、area 七个原始图标路径"
+    },
+    {
+      "path": "packages/ui/components/slider/index.tsx",
+      "sourceSha256": "3736bcde23229e0d21b581ac52a94e427fbb12f141606c51dd930159501b4d4f"
+    },
+    {
+      "path": "packages/ui/components/slider/style.ts",
+      "sourceSha256": "d80b2a4bc680635a1a633808dbbc0662b4334af786a328117b003ec1a2d59e59"
+    },
+    {
+      "path": "packages/ui/components/popover/SmartPopover.tsx",
+      "sourceSha256": "a4fa9c4ae76db71ba7316cb8c1272cb882f939d6f507da1c39cde38590260cd5",
+      "note": "沿用 FameEX 弹层及状态 hook；点击型不在鼠标离开时关闭，触发器使用原生按钮，卸载清理计时器"
+    },
+    {
+      "path": "packages/ui/components/popover/useSmartPopoverState.ts",
+      "sourceSha256": "4b2a876215fc7eaeafb5e257f6d6555c9a609f61e1ffa391e073470eab6e4890",
+      "note": "沿用 FameEX 弹层及状态 hook；点击型不在鼠标离开时关闭，触发器使用原生按钮，卸载清理计时器"
+    },
+    {
+      "path": "packages/ui/components/modal/index.tsx",
+      "sourcePath": "apps/web/src/components/Modal.tsx",
+      "sourceSha256": "75b0ce9606630646b46777779ea1ace8904b2c6279013e89e2276cf264492982",
+      "note": "复用 HeroUI Modal、480px、16px 圆角与动画；精简未使用选项，适配终端主题和可访问关闭标签"
+    },
+    {
+      "path": "packages/ui/components/modal/index.tsx",
+      "sourcePath": "packages/icon/svg-files/behavioral/Close.svg",
+      "sourceSha256": "62c9451db5f4571d18088d8f5a1da762d5a118e55bfca1abbf9da301820e9b69",
+      "note": "复用原关闭图标路径，颜色跟随 currentColor"
+    },
+    {
+      "path": "src/components/trading/withdrawal-form.tsx",
+      "sourcePath": "packages/icon/svg-files/behavioral/Transfer2.svg",
+      "sourceSha256": "15aeffa4ccba2a3f04070055ab8800b61e4c62ddaeb2171962c493f52adfd762",
+      "note": "复用原交换方向图标路径，颜色跟随 currentColor"
+    }
+  ],
+  "orderTypeSelectorReference": {
+    "sourcePaths": [
+      "apps/web/src/apps/Futures/components/OrderPanel/OrderTypeTab.tsx",
+      "apps/web/src/apps/Futures/components/OrderPanel/TriggerTypeDropdown.tsx"
+    ],
+    "targetPath": "src/components/trading/order-type-selector.tsx",
+    "adaptation": "复用已有 dropdownStyle 和相同 HeroUI Dropdown 原语，专业入口相邻且无悬停背景；按 Hyperliquid 产品能力过滤订单类型。"
+  },
+  "sourceCommit": "d2f862eba4082f1ebe9105e354c5a26ccfb09f8c"
+}

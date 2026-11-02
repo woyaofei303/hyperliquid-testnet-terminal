@@ -1,0 +1,17 @@
+name: hyperliquid
+
+services:
+  web:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8089:80'
+    volumes:
+      - /srv/hyperliquid:/srv/hyperliquid:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    mem_limit: 64m
+    cpus: 0.5
+    logging:
+      options:
+        max-size: '10m'
+        max-file: '3'
