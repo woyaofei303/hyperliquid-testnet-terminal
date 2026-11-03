@@ -1061,6 +1061,7 @@ test('余额读取失败不误判新用户，重试查询后再显示交易状�
   expect(exchange.agentRegistrations()).toBe(0)
   await page.getByRole('button', { name: '完成钱包连接', exact: true }).click()
   await page.getByRole('button', { name: '重新连接并核验' }).click()
+  exchange.pushMarket('BTC', 70000)
   await expect(
     page.getByRole('button', { name: '下单', exact: true }),
   ).toBeEnabled()
@@ -3728,6 +3729,7 @@ test('Web3 多钱包发现与断开：主动弹出连接列表，重新选择前
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: 'Rabby 连接 →' }).click()
+  exchange.pushMarket('BTC', 70000)
   await expect(
     page.getByRole('button', { name: '下单', exact: true }),
   ).toBeEnabled()
@@ -3760,6 +3762,7 @@ test('Web3 多钱包发现与断开：主动弹出连接列表，重新选择前
     page.getByRole('dialog', { name: '连接', exact: true }),
   ).toBeVisible()
   await page.getByRole('button', { name: 'Rabby 连接 →' }).click()
+  exchange.pushMarket('BTC', 70000)
   await expect(
     page.getByRole('button', { name: '下单', exact: true }),
   ).toBeEnabled()
@@ -4027,6 +4030,8 @@ async function fillWithdrawal(page: Page) {
 test('Web3 提款：主钱包确认、固定测试网 CCTP 路由、目标链真实到账才成功', async ({
   page,
 }) => {
+  // 跨链索引与到账核验各等一次 10 秒轮询，另留页面操作时间。
+  test.setTimeout(60000)
   await mockExchange(page)
   await mockFunding(page)
   const funds = await mockWithdrawal(page)
