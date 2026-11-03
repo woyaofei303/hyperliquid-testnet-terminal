@@ -913,9 +913,10 @@ test('连接后先读取余额，未完成查询时不签名，查询后在连�
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
   await expect(
-    page
-      .locator('header')
-      .getByRole('button', { name: /0x.*▾/, includeHidden: true }),
+    page.locator('header').getByRole('button', {
+      name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i,
+      includeHidden: true,
+    }),
   ).toBeVisible()
   await expect.poll(balanceQuery.reads).toBeGreaterThan(0)
   await expect(
@@ -1013,7 +1014,9 @@ test('恢复连接期间钱包静默换账户，丢弃原地址与签名能力',
       .getByRole('button', { name: '连接钱包', exact: true }),
   ).toBeVisible()
   await expect(
-    page.locator('header').getByRole('button', { name: /0x.*▾/ }),
+    page
+      .locator('header')
+      .getByRole('button', { name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i }),
   ).toHaveCount(0)
   expect(exchange.agentRegistrations()).toBe(1)
   expect(exchange.writes).toHaveLength(0)
@@ -1038,9 +1041,12 @@ test('余额读取失败不误判新用户，重试查询后再显示交易状�
   await page.goto('/')
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
-  await expect(page.getByRole('dialog').getByRole('alert')).toContainText(
-    '连接未完成',
-  )
+  await expect(
+    page
+      .getByRole('dialog')
+      .getByRole('alert')
+      .filter({ hasText: '连接未完成' }),
+  ).toBeVisible()
   await page.getByRole('button', { name: '关闭钱包面板' }).click()
   const overview = page.getByRole('region', { name: '账户概览' })
   await expect(overview).toContainText('账户核验失败')
@@ -3514,6 +3520,7 @@ async function mockFunding(
 
 async function openFunds(page: Page) {
   await page.goto('/')
+  await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
   await page
@@ -3528,7 +3535,7 @@ async function openFunds(page: Page) {
 test('Web3 存款：切换测试链、一次点击连续授权和存款、核对到账后返回交易', async ({
   page,
 }) => {
-  await mockExchange(page)
+  const exchange = await mockExchange(page)
   const funds = await mockFunding(page, { mainnet: true })
   await openFunds(page)
   const dialog = page.getByRole('dialog')
@@ -3562,6 +3569,7 @@ test('Web3 存款：切换测试链、一次点击连续授权和存款、核对
     dialog.getByRole('button', { name: '返回交易', exact: true }),
   ).toHaveCount(0)
   await dialog.getByRole('button', { name: '关闭钱包面板' }).click()
+  exchange.pushMarket('BTC', 70000)
   await expect(
     page.getByRole('button', { name: '下单', exact: true }),
   ).toBeEnabled()
@@ -3791,7 +3799,10 @@ for (const mode of [
     await expect(
       account.getByRole('button', { name: '划转', exact: true }),
     ).toHaveCount(canTransfer ? 1 : 0)
-    await page.locator('header').getByRole('button', { name: /0x.*▾/ }).click()
+    await page
+      .locator('header')
+      .getByRole('button', { name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i })
+      .click()
     const dialog = page.getByRole('dialog')
     await expect(
       dialog.getByRole('button', { name: '划转', exact: true }),
@@ -4130,6 +4141,7 @@ test('Web3 账户区资金入口连接后保留提款意图，窄屏弹窗可操
   await mockWithdrawal(page)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
+  await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
   await page
     .getByRole('region', { name: '账户概览' })
     .getByRole('button', { name: '提款', exact: true })
@@ -4237,7 +4249,10 @@ test('Web3 首次入金：未激活账户不请求交易授权签名，直接引
   })
   exists = true
   await dialog.getByRole('button', { name: '关闭钱包面板' }).click()
-  await page.locator('header').getByRole('button', { name: /0x.*▾/ }).click()
+  await page
+    .locator('header')
+    .getByRole('button', { name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i })
+    .click()
   await page.getByRole('button', { name: '重新连接并核验' }).click()
   await expect(
     page.getByRole('button', { name: '下单', exact: true }),
@@ -4944,7 +4959,10 @@ test('交易连接默认仅标签页保存；断开不自动恢复，重连复�
       persistent: !!localStorage.getItem('hl-testnet-trading-connection-v1'),
     }))
   expect(await storageState()).toEqual({ session: true, persistent: false })
-  await page.locator('header').getByRole('button', { name: /0x.*▾/ }).click()
+  await page
+    .locator('header')
+    .getByRole('button', { name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i })
+    .click()
   await page.getByRole('button', { name: '断开钱包', exact: true }).click()
   expect(await storageState()).toEqual({ session: true, persistent: false })
   await page.reload()
@@ -5013,7 +5031,10 @@ test('交易连接核验失败保留凭据但禁止下单，重试只读恢复',
     ),
   ).toBe(true)
   fail = false
-  await page.locator('header').getByRole('button', { name: /0x.*▾/ }).click()
+  await page
+    .locator('header')
+    .getByRole('button', { name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i })
+    .click()
   await page.getByRole('button', { name: '重新连接并核验' }).click()
   await expect(
     page.getByRole('button', { name: '下单', exact: true }),
@@ -5928,6 +5949,11 @@ test('止盈止损价格与收益双向联动，随价格方向数量更新并�
   await expect(profit).toHaveValue('5.5556')
   await page.getByRole('button', { name: '收益单位', exact: true }).click()
   await page.getByRole('menuitemradio', { name: 'USDC', exact: true }).click()
+  await expect(page.getByLabel('数量（BTC）', { exact: true })).toHaveValue(
+    '0.00097',
+  )
+  await expect(profit).toHaveValue('1.94')
+  await page.getByLabel('数量（BTC）', { exact: true }).fill('0.001')
   await expect(profit).toHaveValue('2')
   await profit.fill('3')
   await expect(tp).toHaveValue('69000')
@@ -6228,7 +6254,10 @@ test('断开期间代理被撤销，重连必须重新授权且不能使用旧�
 }) => {
   const exchange = await mockExchange(page)
   await ready(page)
-  await page.locator('header').getByRole('button', { name: /0x.*▾/ }).click()
+  await page
+    .locator('header')
+    .getByRole('button', { name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i })
+    .click()
   await page.getByRole('button', { name: '断开钱包', exact: true }).click()
   exchange.revokeAgent()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
