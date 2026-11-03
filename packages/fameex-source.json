@@ -52,7 +52,8 @@
     },
     {
       "path": "packages/kline/src/chart/useBaseKlineChart.ts",
-      "sourceSha256": "d63d16834c88de415c91325e0b1b9401b03e6b8823fa5364635fb9609461cd17"
+      "sourceSha256": "d63d16834c88de415c91325e0b1b9401b03e6b8823fa5364635fb9609461cd17",
+      "adaptation": "容器宽度变化保留缩放和滚动，仅高度变化同步成交量窗格。"
     },
     {
       "path": "packages/kline/src/chart/constants.ts",
@@ -2492,6 +2493,400 @@
       "sourcePath": "packages/icon/svg-files/behavioral/Transfer2.svg",
       "sourceSha256": "15aeffa4ccba2a3f04070055ab8800b61e4c62ddaeb2171962c493f52adfd762",
       "note": "复用原交换方向图标路径，颜色跟随 currentColor"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/manager.ts",
+      "sourceSha256": "d11eb4bbcc976d6b8d161bbdb61c2a56889f26b82350f6272dc09232476e037a",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/typeGuards.ts",
+      "sourceSha256": "59a7d4e6b4db521e72a96fcd912f672091c4c983e2c7492dce61e6ed8d47764c",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/useTpslOverlay.ts",
+      "sourceSha256": "136e5ae694232ee49a1566a27425d638227b8c458aea3e4189797216b9bc7e6d",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/lifecycle.ts",
+      "sourceSha256": "565acdb7bf296997ef30784e3463e6dea3ec5475833d9e25a53b30295f4e2939",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/utils.ts",
+      "sourceSha256": "10df83b0e83a0dc2c58a8735e37393b7cbabdfb357d34e9886f6d3362da1f35c",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/types.ts",
+      "sourceSha256": "333d96b571d75b2f1ab8ecba7730417c39cca9b2a1434277b139ddecf02bea76",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/constants.ts",
+      "sourceSha256": "49a04dd2862df448d7d1f3b52809872be4493676f12bd5d986f3d17899ffde6f",
+      "adaptation": "统一交易线字体为 12px、标签和操作区域高度为 22px，左右内边距 6px，价格轴标签同步放大。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/index.ts",
+      "sourceSha256": "dd1d35635405627a3278dacde9bb9b39070b02fcc148503badaa3fdded9a9323",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/idFactory.ts",
+      "sourceSha256": "833fb89abca4adb8cbaa2909906bf79e7c7dcbb06af42243fc2b7aa848a12291",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/syncEstimateSide.ts",
+      "sourceSha256": "3fe775f015b01363b942dc30f58b5b837d1f8a5b04fc26d523c5ba2f73d7daae",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/options.ts",
+      "sourceSha256": "1b1f008b9d3b45af1b6e1484b91d30e0928c4b4c5c01a181c689cb07df1f2ae8",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/useOverlayInteractions.ts",
+      "sourceSha256": "f8fa06f0293b1a2ed06f315540b8e3a448d1cbd7dc979278b3fc5f45fa195b57",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/builders/mainLine.ts",
+      "sourceSha256": "5c4b62e7e229e0f47fe0475856031da16da35195b6bace76bda55b899009f35a",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/builders/types.ts",
+      "sourceSha256": "4efa8c5bc1df2690a520ac37b1aacea6455cec0d48624e7eed9a6868d1b67f08",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/builders/positionControls.ts",
+      "sourceSha256": "c737b374100341de835fcfd930ebf3a466a052369c3696f775e858cca5371de8",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/builders/orderControls.ts",
+      "sourceSha256": "5c8178bcf53997ca57d4c37cdded423ee74fa7b5bcab2671c346679d4f216088",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/builders/estimateLines.ts",
+      "sourceSha256": "2a213b9d94dc43151a0e4a50d551e3f41dc371159fe9891aee6d802650f90593",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/tpslButton.ts",
+      "sourceSha256": "be1667aaf405144f2e0ea5c518fdecc904f4dfe89e5437af55445fd4f0cc13bb",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/area.ts",
+      "sourceSha256": "cbb853635ccd0bd32c8ea1eea60038182062ec7d42a8f282479f92d303ce5599",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/mainLine.ts",
+      "sourceSha256": "feeaf95a1707512302089e944eeb108de113554d5aa049bb068c0702f86b5517",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/mainLineHitbox.ts",
+      "sourceSha256": "a1c560cd774a0598a44583501deeb082ed7f9d870263c9fa58c40d8f4ba1b2b0",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/horizontalLine.ts",
+      "sourceSha256": "aa7e33816a3eac49cdbeff12e11847b077bfe904b55aad40f28ac896b8935c0a",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/verticalConnector.ts",
+      "sourceSha256": "5405fd6073533c4576187f12b853413c1f9586391768054496e517a186e60308",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/estimateLine.ts",
+      "sourceSha256": "ce49aab9bbfc5e387e2adfa9844cd59de94da82a002855ec9e139dae1415c612",
+      "adaptation": "布局注释使用共享常量名称，尺寸由共享交易线样式控制。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/utils.ts",
+      "sourceSha256": "f9a864b1e301388b6f43f7aac3766dab9a0ade754f2adf4044454df45381c2a4",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/positionLabel.ts",
+      "sourceSha256": "e99473ab1fbc9d06983728607526fa1713c77992ca0aea45a4bcbc587f79561f",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/types.ts",
+      "sourceSha256": "9cc1144cbf5f2ea68ed2bbf6eb40a3840a2ccf470ad7b13c1fc92c029697ca90",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/priceLabel.ts",
+      "sourceSha256": "b31761d1e723bc3e928779a151f060cd5348d316bd4236772a5dff700747f3aa",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/limitLabel.ts",
+      "sourceSha256": "aeebfdda07839eb13927015089c154d10cc2a180e947907aa0244ec1af8c815a",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/profitLabel.ts",
+      "sourceSha256": "453f402a71d304c0df9f7cf5c4d4b23d0558ba0991b4857e3169945fa1a80b3e",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/dragHandle.ts",
+      "sourceSha256": "8e642da62b35c35e7d785c402461625c181e6eed19fcc463434a912150dfe5d2",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/index.ts",
+      "sourceSha256": "508625017a222c045635abf014edc75bbc2abf3ca2bd5e34ac34e97693411b61",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/buttonHitbox.ts",
+      "sourceSha256": "ddd75df7877c5fb09f63ad284c364564ddf06e40d92abc59053d86cd39468674",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/figures/closeButton.ts",
+      "sourceSha256": "b736305609104506892afb2da2ef18c934e8137e573edb9e14d479d1c0209ad0",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/templates/priceLabelTemplate.ts",
+      "sourceSha256": "e6f138ec260ebb8e706d4076ed3f2c30cd465a72c116fef8bcf8ffdf59446492",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/templates/positionLabelTemplate.ts",
+      "sourceSha256": "5639752d92531a9e41ccc3004a9f2b50dd73d0aa899722a1bc186f875932d1bf",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/templates/areaTemplate.ts",
+      "sourceSha256": "4110e8a88b2a784a144595ef4c4c50448f8b705d718e5a31687934ce5caef047",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/templates/limitLabelTemplate.ts",
+      "sourceSha256": "982e036655d97793b07405865f4adf2b776316ae005550d993e1749621caf186",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/templates/verticalConnectorTemplate.ts",
+      "sourceSha256": "c41c80cc43454e88facddb84165297112ad1e507ddaa907ed6640182e5bc91df",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/templates/horizontalLineTemplate.ts",
+      "sourceSha256": "0915c0bc1e5e9efa5ec90a044442471e81a5751cad55930005ae58d11f00736b",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/templates/index.ts",
+      "sourceSha256": "2130f033cd6dbbc629be0975cf49a2eb485a9c80f05ea81f7588e905f292ec1c",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/templates/mainLineHitboxTemplate.ts",
+      "sourceSha256": "2a3e2204f4c43e5b80f82b4009482e79b618ebeb75e60e9f2b060a7750684331",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/templates/closeButtonTemplate.ts",
+      "sourceSha256": "0f2912a5ba853c4aa09f533c1420b50f148ce1b7c3b30f85620b2a79a68cc8b7",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/templates/tpslButtonTemplate.ts",
+      "sourceSha256": "2dfe1d5131f75f59324d8049baeac197003933a7d13db69612a4bd120eb13ad3",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/templates/profitLabelTemplate.ts",
+      "sourceSha256": "1015bd07bd8655420b0161bdc2daf1f2529598271120437a1063c6028f0c8ba0",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/templates/estimateLineTemplate.ts",
+      "sourceSha256": "044365ddb92c4cee0f7d819f8b0388f32167d51914c9029b93f4c5ce46194ecf",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/helpers/measurements.ts",
+      "sourceSha256": "ef167e246aeea0cf7a6c75de32e2299a2aaa598694513cfe1723149a6f17a9ca",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/helpers/avoidYAxisLabelOverlap.ts",
+      "sourceSha256": "9f1aec81e6ed82e4dc3761a4ce6fd33040282d330db11a4df9ae84b05417d880",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/helpers/drag.ts",
+      "sourceSha256": "0ec35e2b3a3c55d52278b3fa890b714caca270e9ea45f2a5bcdd28ed37948e49",
+      "adaptation": "复用 FameEX 交易线模板、悬停、拖拽及生命周期；沿用本项目依赖，替换 es-toolkit 小函数；增加只读拖拽拦截和按 TP/SL 侧回调，Biome 格式化。交易通过本项目 Hyperliquid 测试网接口提交。"
+    },
+    {
+      "path": "packages/kline/src/trade-overlays/helpers/overlayConstants.ts",
+      "sourceSha256": "c3788f7d87065b705576255fb6a2f8ba0d0e6824f915f0f4eea3819af2e73730",
+      "adaptation": "持仓、订单与止盈止损的左侧标签统一从图表左边缘内缩 80px。"
+    },
+    {
+      "path": "packages/kline/src/shared/layers.ts",
+      "sourceSha256": "80fafee10b8b8cea2efd2b122df8b735705378c80a6688c2b1ad74cf8d81f74c",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/xabcd.ts",
+      "sourceSha256": "f0bd32a8e003bd2898583a0efe79b2072269866e53c967d6cc800a1bffdf8b0a",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/LICENSE",
+      "sourceSha256": "ff8311d55ca5766d3888c688b0ecc0f292289a659e45bfee4dfc0870ab74e4ca",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/index.ts",
+      "sourceSha256": "cb3b2fba7e6571931d5f26f447e31f36bdc12318b9c79b5622edef72554972e4",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/horizontalStraightLine.tsx",
+      "sourceSha256": "eb6109c7e2c51c2acd4b98f49681fa7c23d734b5abef3ff7c4725d44c7b098e3",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/horizontalRayLine.tsx",
+      "sourceSha256": "5ea1342f0679f4c65d197cb446802fcf10e5ff8d113960c8b9dedd2523639f13",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/horizontalSegment.tsx",
+      "sourceSha256": "49e54333ef0aafabb8753fe6877f5abaf0d33315087ccd082bb61938816b2c55",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/verticalStraightLine.tsx",
+      "sourceSha256": "b37f86624484ccd1da162e244f2d5231bc1b49cb9cb28e3aa0e23c461446be86",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/verticalRayLine.tsx",
+      "sourceSha256": "bc5c1230554562dfc7815daf4b13fe7b6adf749a559c840ac8fd98cbae5d4c17",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/verticalSegment.tsx",
+      "sourceSha256": "19db2bf2b916b0df47269a563e3207422ae10900bdefc7ae78ff2ec4cd1695d8",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/straightLine.tsx",
+      "sourceSha256": "df07310aa8516f311c4a2465ca58a9b2f5ce1fe24e6d9efcdd920a6c292f7ed0",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/rayLine.tsx",
+      "sourceSha256": "c96205076eb6e7fb5fb1de52c72df98b7ed17d2425cbf77a18403d36c1c5c0a3",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/segment.tsx",
+      "sourceSha256": "2f273574296766d6cab6c3ff2f9875707eab1cbd094f982cbc035ddac72f5c97",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/priceLine.tsx",
+      "sourceSha256": "c2d4223312d4b72cd6c785c95be71c8839e9b6a6f6ca048842c1d9b6ebf83eee",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/priceChannelLine.tsx",
+      "sourceSha256": "f8b6c327e4b8a90705073d112ac8a35c322e187bd563147ce309120096ee6da7",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/parallelStraightLine.tsx",
+      "sourceSha256": "129edab9c11014fddf16cb9d3e6fabdc8f453bc8b861c284110f85db7698dbd8",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/fibonacciLine.tsx",
+      "sourceSha256": "a8d0791056ad562fbc544ff9bff8113505b7cddac4a06ee18a9fa73a6c596640",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/takeProfitStopLoss.tsx",
+      "sourceSha256": "140e467c9a47180cbe4e444d6dae2695342e55114b72f52f0d0f6e177d7ddcc4",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/cursor.tsx",
+      "sourceSha256": "1acc6d9fbbca2ec1c9260114993e2ca381d3d52cf88461d683197985f2888f1f",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/crossCursor.tsx",
+      "sourceSha256": "ba3cdd3913e345d86547973936660b8e5801f1dff87e8b8901ab91f426719c72",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/xabcd.tsx",
+      "sourceSha256": "99c232d4c469f9dc69732fdcdcf5e9e1704f9e0f29da980e3f69c31aba7c0f65",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/weakMagnet.tsx",
+      "sourceSha256": "fdb61b15106402f135688ff875a38691dfe29734983c9d7c27ab87d95a488b9e",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/strongMagnet.tsx",
+      "sourceSha256": "24165bbd574da66a5bcbc1b204719e83af0c39f2f33eeb4d3a0a084772c65a76",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/lock.tsx",
+      "sourceSha256": "3654658e2e3a2be824502a38eb1825b426df275dafc22b5e0595566838b5ce50",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/unlock.tsx",
+      "sourceSha256": "20d99676d2dd1daade0fbdcddc4fb27046672fd9503d46bd81acbe6074c0695d",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/visible.tsx",
+      "sourceSha256": "62eda18cbc8389a31f6f73b53a203d0b6ecc3e530ffa533fad279ceb9c5d3d32",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/invisible.tsx",
+      "sourceSha256": "c590e6093f451e989e241fc8b78f8e5b269284c8d859ee6693d522ea2aa54c5f",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/drawing/toolbar/icons/remove.tsx",
+      "sourceSha256": "2587414d388d786cfeae17a2f454de045cf6cd6c006fad2bb5c1dbb3eec265b5",
+      "adaptation": "复用 FameEX 绘图与交易覆盖物；本地格式、依赖及无障碍适配，交易回调接 Hyperliquid。"
+    },
+    {
+      "path": "packages/kline/src/shared/colors.ts",
+      "sourceSha256": "2fb01daf159aff678688f46f9c02c1eba3621c81246ebaddeede42a3a9e4374a"
     }
   ],
   "orderTypeSelectorReference": {

@@ -15,11 +15,10 @@ import {
   parseAccountMode,
 } from '@/lib/account-types'
 import { loadCashFunds, validateCashTicketFunds } from '@/lib/cash-order'
+import { assertProtectionUnchanged } from '@/lib/chart-trading'
 import { fundingFeedback, tradeFeedbackTone } from '@/lib/feedback'
 import {
-  API_URL,
   assertSession,
-  assertTradingAccount,
   authorizeTrading,
   connectWallet,
   DEPOSIT_REQUIRED_MESSAGE,
@@ -32,9 +31,19 @@ import {
   restoreTrading,
   type WalletSession,
 } from '@/lib/hyperliquid'
+import { loadIsolatedMargin, marginDelta } from '@/lib/isolated-margin'
 import { isCash } from '@/lib/market-catalog'
-import { preparePositionProtection, type Ticket } from '@/lib/order-ticket'
-import { Money, positiveDecimal, prepareOrder } from '@/lib/orders'
+import { orderConfirmation } from '@/lib/order-confirmation'
+import {
+  type PositionProtectionOptions,
+  preparePositionProtection,
+  type Ticket,
+} from '@/lib/order-ticket'
+import { Money } from '@/lib/orders'
+import {
+  type PositionActionOptions,
+  preparePositionAction,
+} from '@/lib/position-actions'
 import {
   type Action,
   type ConfirmationAction,
@@ -49,6 +58,7 @@ import {
   clearTradingConnection,
   loadTradingConnection,
   rememberOrderConfirmation,
+  setTradingConnectionDisconnected,
   skipOrderConfirmation,
 } from '@/lib/trading-connection'
 import {
@@ -81,8 +91,13 @@ export function useTerminal() {
     'wallet' | 'deposit' | 'transfer' | 'withdraw' | null
   >(null)
   const [transferToPerp, setTransferToPerp] = useState(false)
+  const [bookPrice, setBookPrice] = useState<{
+    coin: string
+    price: string
+  } | null>(null)
   const [connecting, setConnecting] = useState<string | null>(null)
   const [connectionError, setConnectionError] = useState('')
+  const [needsDeposit, setNeedsDeposit] = useState(false)
   const connectPending = useRef(false)
   const providers = useWalletProviders()
   const restoreAttempted = useRef(false)
@@ -121,8 +136,8 @@ export function useTerminal() {
     else dismissNotification('account')
   }, [account.error])
   useEffect(() => {
-    if (funding.busy)
-      notify('loading', '资金操作处理中，请在钱包中核对并确认。', 'funding')
+    if (funding.busy || (funding.error && web3Panel))
+      dismissNotification('funding')
     else if (funding.error) notify('warning', funding.error, 'funding')
     else if (funding.notification) {
       const feedback = fundingFeedback(
@@ -131,29 +146,35 @@ export function useTerminal() {
       )
       notify(feedback.tone, feedback.text, 'funding')
     } else dismissNotification('funding')
-  }, [funding.busy, funding.error, funding.notification])
+  }, [funding.busy, funding.error, funding.notification, web3Panel])
 
   useEffect(() => {
     setPending(address ? loadPending(address) : null)
   }, [address])
   useEffect(() => {
     if (!wallet) return
-    const changed = () => {
+    const changed = (forget: boolean) => {
       if (wallet.lifecycle) wallet.lifecycle.active = false
       connectVersion.current += 1
-      clearTradingConnection()
+      if (forget) clearTradingConnection()
+      else setTradingConnectionDisconnected(wallet.address, true)
       setConnecting(null)
       activeWallet.current = null
       setWallet(null)
+      setWeb3Panel('wallet')
+      setConnectionError('')
+      setNeedsDeposit(false)
       setAction(null)
       dismissNotification('wallet-progress')
       setMessage('钱包账户已变化或断开，请重新连接。', 'warning')
     }
-    wallet.provider.on('accountsChanged', changed)
-    wallet.provider.on('disconnect', changed)
+    const accountsChanged = (accounts: string[]) => changed(accounts.length > 0)
+    const disconnected = () => changed(false)
+    wallet.provider.on('accountsChanged', accountsChanged)
+    wallet.provider.on('disconnect', disconnected)
     return () => {
-      wallet.provider.removeListener('accountsChanged', changed)
-      wallet.provider.removeListener('disconnect', changed)
+      wallet.provider.removeListener('accountsChanged', accountsChanged)
+      wallet.provider.removeListener('disconnect', disconnected)
     }
   }, [wallet, setMessage])
   const unresolved =
@@ -166,11 +187,13 @@ export function useTerminal() {
     Date.now() - account.snapshot.at < 30000 &&
     !account.error
   const checkingAccount = !!wallet && (!!connecting || !account.snapshot)
-  const needsTradingConnection = !!wallet && accountReady && !tradingReady
+  const needsTradingConnection = !!wallet && !connecting && !tradingReady
   const onboarding = !wallet
     ? '连接钱包开始交易'
     : needsTradingConnection
-      ? '启用交易'
+      ? needsDeposit
+        ? '存款'
+        : '完成钱包连接'
       : null
   const canTrade = tradingReady && accountReady && !unresolved
 
@@ -205,12 +228,14 @@ export function useTerminal() {
       name: string,
       providerId = 'injected',
       silent = false,
+      persist = false,
     ) => {
       if (connectPending.current) return
       connectPending.current = true
       const version = ++connectVersion.current
       setConnecting(name)
       setConnectionError('')
+      setNeedsDeposit(false)
       if (!silent)
         notify('loading', '等待钱包连接，请在钱包中确认。', 'wallet-progress')
       let session: WalletSession | null = null
@@ -228,17 +253,30 @@ export function useTerminal() {
           activeWallet.current.lifecycle.active = false
         activeWallet.current = session
         setWallet(session)
-        setWeb3Panel((panel) => (panel === 'wallet' ? null : panel))
-        const restored = await restoreTrading(session)
+        let restored = await restoreTrading(session, persist)
+        if (!silent && !restored.exchange) {
+          await Promise.all([
+            info.clearinghouseState({ user: session.address }),
+            info.spotClearinghouseState({ user: session.address }),
+          ])
+          if (version !== connectVersion.current) return
+          notify(
+            'loading',
+            '正在连接交易账户，请在钱包中确认交易权限签名。',
+            'wallet-progress',
+          )
+          restored = await authorizeTrading(session, persist)
+        }
         if (version !== connectVersion.current) return
         activeWallet.current = restored
         setWallet(restored)
+        setWeb3Panel((panel) => (panel === 'wallet' ? null : panel))
         if (!silent)
           setMessage(
-            restored.exchange
-              ? '交易连接已恢复，无需重复签名。'
-              : '钱包已连接，正在读取余额与交易记录。',
-            'success',
+            restored.connectionSaved
+              ? '钱包连接完成，可以直接交易。'
+              : '钱包连接完成，但浏览器无法保存会话，刷新后需要重新连接。',
+            restored.connectionSaved ? 'success' : 'warning',
           )
       } catch (e) {
         if (version !== connectVersion.current) return
@@ -253,8 +291,18 @@ export function useTerminal() {
           activeWallet.current = session
           setWallet(session)
         }
+        if (session && isDepositRequired(e)) {
+          setNeedsDeposit(true)
+          setWeb3Panel((panel) =>
+            panel === 'wallet' || panel === null ? 'deposit' : panel,
+          )
+          setMessage(DEPOSIT_REQUIRED_MESSAGE, 'info')
+          return
+        }
         const text = isUserRejection(e)
-          ? '已取消连接钱包，可重新选择钱包连接。'
+          ? session
+            ? '交易权限签名已取消，钱包保持只读。可重新连接完成签名。'
+            : '已取消连接钱包，可重新选择钱包连接。'
           : e && typeof e === 'object' && 'code' in e && e.code === -32002
             ? '钱包中已有待处理的连接请求，请打开钱包扩展完成确认或取消后重试。'
             : `连接未完成：${errorText(e)}。请检查钱包或网络后重试；不会自动签名。`
@@ -273,7 +321,7 @@ export function useTerminal() {
   useEffect(() => {
     if (restoreAttempted.current || wallet || connecting) return
     const saved = loadTradingConnection()
-    if (!saved) return
+    if (!saved || saved.disconnected) return
     const provider = providers.find(
       (item) => (item.rdns ?? item.id) === saved.providerId,
     )
@@ -295,7 +343,7 @@ export function useTerminal() {
       if (unresolved.native) {
         account.refresh()
         setMessage(
-          '原生请求没有客户端订单 ID，无法按本地编号确认。请在 TWAP / 当前委托和官方测试网页核对；不会自动重发。',
+          '此请求没有客户端订单 ID。请在仓位、TWAP、当前委托及官方测试网页核对实际状态；不会自动重发。',
           'warning',
         )
         return
@@ -338,45 +386,23 @@ export function useTerminal() {
     }
   }
 
-  async function execute(next: Action, persist = false) {
-    if (!wallet || busyRef.current || funding.busy) return
+  async function execute(next: Action) {
+    if (!wallet || busyRef.current || funding.busy) return false
     busyRef.current = true
     setBusy(true)
     setAction(null)
-    notify(
-      'loading',
-      next.kind === 'approve'
-        ? '等待钱包签名以启用交易…'
-        : '请求处理中，请勿重复提交。',
-      'trade-progress',
-    )
+    notify('loading', '请求处理中，请勿重复提交。', 'trade-progress')
     let cloid: `0x${string}` | undefined
     try {
       if (wallet.address !== next.account)
         throw new Error('账户已改变，请重新预览')
-      if (next.kind === 'approve') {
-        const authorized = await authorizeTrading(wallet, persist)
-        if (
-          activeWallet.current?.lifecycle !== wallet.lifecycle ||
-          wallet.lifecycle?.active === false
-        )
-          throw new Error('授权过程中账户已变化，请重新连接')
-        setWallet(authorized)
-        setMessage(
-          authorized.connectionSaved
-            ? '交易已启用。下单、撤单无需逐笔钱包确认，刷新后可恢复连接。'
-            : '交易已启用，但浏览器无法保存连接，刷新后需要重新启用。',
-          authorized.connectionSaved ? 'success' : 'warning',
-        )
-        return
-      }
       if (next.kind === 'ticket' && next.ticket.kind === 'chase') {
         if (unresolved || Date.now() - next.at > 15000)
           throw new Error('请核对未确认订单或重新预览追价单')
         const result = await chase.start(next.ticket)
         setMessage(result.message, tradeFeedbackTone(result.state))
         log(result)
-        return
+        return !['rejected', 'unconfirmed'].includes(result.state)
       }
       if (next.kind === 'ticket' && isCash(next.ticket.market)) {
         if (unresolved || Date.now() - next.at > 15000)
@@ -397,6 +423,12 @@ export function useTerminal() {
       )
       setMessage(result.message, tradeFeedbackTone(result.state))
       log(result)
+      return ![
+        'rejected',
+        'partial-rejected',
+        'pending',
+        'unconfirmed',
+      ].includes(result.state)
     } catch (e) {
       if (
         e instanceof ApiRequestError &&
@@ -441,6 +473,7 @@ export function useTerminal() {
         message: text,
         cloid,
       })
+      return false
     } finally {
       busyRef.current = false
       setBusy(false)
@@ -449,15 +482,13 @@ export function useTerminal() {
     }
   }
 
-  function confirmAction(next: Action, skip = false, persist = false) {
+  function confirmAction(next: Action, skip = false) {
     if (next.kind === 'order' || next.kind === 'ticket')
-      rememberOrderConfirmation(next.kind === 'order' && next.order.r, skip)
-    return execute(next, persist)
+      rememberOrderConfirmation(orderConfirmation(next).reduceOnly, skip)
+    return execute(next)
   }
-  function requestOrder(
-    next: Exclude<ConfirmationAction, { kind: 'approve' }>,
-  ) {
-    const close = next.kind === 'order' && next.order.r
+  function requestOrder(next: ConfirmationAction) {
+    const close = orderConfirmation(next).reduceOnly
     if (
       !(next.kind === 'ticket' && next.ticket.kind === 'chase') &&
       skipOrderConfirmation(close)
@@ -509,89 +540,178 @@ export function useTerminal() {
         oid: order.oid,
       })
   }
-  async function previewClose(
+  async function submitPosition(
     position: NonNullable<
       typeof account.snapshot
     >['state']['assetPositions'][number]['position'],
-    options?: { size: string; kind: 'market' | 'limit'; price: string },
+    options: PositionActionOptions,
+    skip = false,
   ) {
-    if (!wallet) return
+    if (!wallet || busyRef.current || funding.busy) return false
+    busyRef.current = true
+    setBusy(true)
     try {
       const selected = markets.find((m) => m.name === position.coin)
       if (!selected) throw new Error('找不到仓位对应的市场')
-      const current = await info.clearinghouseState({
-        user: wallet.address,
-        dex: selected.dex,
-      })
-      const latest = current.assetPositions.find(
+      const [state, book] = await Promise.all([
+        info.clearinghouseState({ user: wallet.address, dex: selected.dex }),
+        info.l2Book({ coin: position.coin }),
+      ])
+      if (activeWallet.current !== wallet)
+        throw new Error('账户已变化，请重新确认')
+      const latest = state.assetPositions.find(
         (item) => item.position.coin === position.coin,
       )?.position
       if (!latest || new Money(latest.szi).eq(0))
         throw new Error('仓位已关闭，请刷新账户')
+      if (!new Money(latest.szi).eq(position.szi))
+        throw new Error('仓位数量或方向已变化，请重新确认')
       if (
-        new Money(latest.szi).isPositive() !==
-        new Money(position.szi).isPositive()
+        !book ||
+        Date.now() - book.time > 15000 ||
+        book.time > Date.now() + 5000
       )
-        throw new Error('仓位方向已变化，请重新确认')
-      const size = options?.size ?? new Money(latest.szi).abs().toFixed()
-      if (positiveDecimal(size, '平仓数量').gt(new Money(latest.szi).abs()))
-        throw new Error('平仓数量超过当前仓位')
-      const book = await info.l2Book({ coin: position.coin })
-      if (!book || Date.now() - book.time > 15000)
         throw new Error('该市场行情过期，暂不能平仓')
-      const side = new Money(position.szi).gt(0) ? 'sell' : 'buy'
-      const price =
-        options?.kind === 'limit'
-          ? options.price
-          : book.levels[side === 'buy' ? 1 : 0][0]?.px
+      const price = book.levels[new Money(latest.szi).gt(0) ? 0 : 1][0]?.px
       if (!price) throw new Error('当前盘口没有对手方报价')
-      const order = prepareOrder({
-        market: selected,
-        side,
-        kind: options?.kind ?? 'market',
+      const mark = new Money(latest.positionValue)
+        .div(new Money(latest.szi).abs())
+        .toFixed()
+      const ticket = preparePositionAction(
+        { ...selected, context: { ...selected.context, markPx: mark } },
+        latest.szi,
         price,
-        size,
-        reduceOnly: true,
-        slippageBps: 50,
-      })
-      requestOrder({
-        kind: 'order',
-        orderKind: options?.kind ?? 'market',
+        options,
+      )
+      if (options.kind === 'market' || options.kind === 'reverse')
+        rememberOrderConfirmation(true, skip)
+      busyRef.current = false
+      return await execute({
+        kind: 'ticket',
         account: wallet.address,
         coin: position.coin,
         at: Date.now(),
-        order,
+        ticket,
       })
-      return true
-    } catch (e) {
-      setMessage(errorText(e), 'error')
+    } catch (error) {
+      setMessage(errorText(error), 'error')
       return false
+    } finally {
+      busyRef.current = false
+      setBusy(false)
     }
   }
 
-  async function previewProtection(
-    name: string,
+  async function submitProtection(
+    position: NonNullable<
+      typeof account.snapshot
+    >['state']['assetPositions'][number]['position'],
     takeProfit: string,
     stopLoss: string,
+    options: PositionProtectionOptions,
+    replaceOrder?: OpenOrder,
   ) {
-    if (!wallet) throw new Error('请先连接钱包')
-    const selected = markets.find((item) => item.name === name)
-    if (!selected) throw new Error('市场不存在')
-    const [state, contexts] = await Promise.all([
-      info.clearinghouseState({ user: wallet.address, dex: selected.dex }),
-      info.metaAndAssetCtxs({ dex: selected.dex }),
-    ])
-    if (activeAddress.current !== wallet.address) throw new Error('账户已变化')
-    const position =
-      state.assetPositions.find((item) => item.position.coin === name)?.position
-        .szi ?? '0'
-    const mark =
-      contexts[1][contexts[0].universe.findIndex((item) => item.name === name)]
-        ?.markPx
-    if (!mark) throw new Error('无法读取标记价')
-    previewTicket(
-      preparePositionProtection(selected, mark, position, takeProfit, stopLoss),
-    )
+    if (!wallet || busyRef.current || funding.busy) return false
+    busyRef.current = true
+    setBusy(true)
+    try {
+      const selected = markets.find((item) => item.name === position.coin)
+      if (!selected) throw new Error('市场不存在')
+      const [state, contexts, openOrders] = await Promise.all([
+        info.clearinghouseState({ user: wallet.address, dex: selected.dex }),
+        info.metaAndAssetCtxs({ dex: selected.dex }),
+        replaceOrder
+          ? info.frontendOpenOrders({ user: wallet.address, dex: selected.dex })
+          : Promise.resolve([]),
+      ])
+      if (activeWallet.current !== wallet)
+        throw new Error('账户已变化，请重新确认')
+      const latest = state.assetPositions.find(
+        (item) => item.position.coin === position.coin,
+      )?.position
+      if (!latest || !new Money(latest.szi).eq(position.szi))
+        throw new Error('仓位数量或方向已变化，请重新确认')
+      const mark =
+        contexts[1][
+          contexts[0].universe.findIndex((item) => item.name === position.coin)
+        ]?.markPx
+      if (!mark) throw new Error('无法读取标记价')
+      if (replaceOrder) {
+        if (!!takeProfit === !!stopLoss)
+          throw new Error('一次只能修改一笔保护单')
+        assertProtectionUnchanged(
+          replaceOrder,
+          openOrders.find((order) => order.oid === replaceOrder.oid),
+          position.coin,
+          latest.szi,
+          takeProfit ? 'tp' : 'sl',
+        )
+        options = {
+          ...options,
+          size: Number(replaceOrder.origSz) === 0 ? undefined : replaceOrder.sz,
+        }
+      }
+      const ticket = preparePositionProtection(
+        selected,
+        mark,
+        latest.szi,
+        takeProfit,
+        stopLoss,
+        options,
+      )
+      if (replaceOrder && ticket.kind === 'orders') {
+        ticket.replaceOid = replaceOrder.oid
+        ticket.label = '修改止盈 / 止损'
+      }
+      busyRef.current = false
+      return await execute({
+        kind: 'ticket',
+        account: wallet.address,
+        coin: position.coin,
+        at: Date.now(),
+        ticket,
+      })
+    } catch (error) {
+      setMessage(errorText(error), 'error')
+      void account.refresh()
+      return false
+    } finally {
+      busyRef.current = false
+      setBusy(false)
+    }
+  }
+  async function submitIsolatedMargin(
+    name: string,
+    amount: string,
+    direction: 'add' | 'remove',
+  ) {
+    if (!wallet || busyRef.current || funding.busy) return false
+    busyRef.current = true
+    setBusy(true)
+    try {
+      const selected = markets.find((m) => m.name === name)
+      if (!selected) throw new Error('市场不存在')
+      const quote = await loadIsolatedMargin(wallet.address, selected)
+      if (activeWallet.current !== wallet)
+        throw new Error('账户已变化，请重新确认')
+      const ntli = marginDelta(amount, quote[direction], direction)
+      busyRef.current = false
+      return await execute({
+        kind: 'isolatedMargin',
+        account: wallet.address,
+        coin: name,
+        at: Date.now(),
+        asset: selected.asset,
+        isBuy: true,
+        ntli,
+      })
+    } catch (error) {
+      setMessage(errorText(error), 'error')
+      return false
+    } finally {
+      busyRef.current = false
+      setBusy(false)
+    }
   }
   function previewTwapCancel(twapId: number, name: string) {
     const selected = markets.find((item) => item.name === name)
@@ -625,48 +745,22 @@ export function useTerminal() {
     setMessage('已按你的核对结果解除本地保护，没有重新发送交易。')
   }
 
-  function exportEvidence() {
-    const blob = new Blob(
-      [
-        JSON.stringify(
-          {
-            version: 1,
-            network: 'hyperliquid-testnet',
-            apiUrl: API_URL,
-            capturedAt: new Date().toISOString(),
-            account: address,
-            events: journal,
-            snapshot: account.snapshot,
-            market: { coin, bookTime: feed.book?.time },
-          },
-          null,
-          2,
-        ),
-      ],
-      { type: 'application/json' },
-    )
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `hyperliquid-testnet-evidence-${Date.now()}.json`
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
   function selectMarket(name: string) {
     if (!markets.some((m) => m.name === name)) return
     setCoin(name)
     setAction(null)
   }
   function disconnect() {
-    clearTradingConnection()
+    if (wallet) setTradingConnectionDisconnected(wallet.address, true)
     restoreAttempted.current = true
     setConnecting(null)
     connectVersion.current += 1
     if (activeWallet.current?.lifecycle)
       activeWallet.current.lifecycle.active = false
     activeWallet.current = null
-    setWeb3Panel(null)
+    setWeb3Panel('wallet')
+    setConnectionError('')
+    setNeedsDeposit(false)
     setWallet(null)
     setMessage('已断开本地钱包会话。交易所授权会在到期或撤销后失效。')
     setAction(null)
@@ -683,33 +777,9 @@ export function useTerminal() {
         isCross,
       })
   }
-  async function previewApproval() {
-    if (!wallet || !needsTradingConnection || busyRef.current || funding.busy)
-      return
-    busyRef.current = true
-    setBusy(true)
-    try {
-      await assertTradingAccount(wallet)
-      setAction({
-        kind: 'approve',
-        account: wallet.address,
-        coin: '测试网账户',
-        at: Date.now(),
-      })
-    } catch (e) {
-      setMessage(
-        isDepositRequired(e) ? DEPOSIT_REQUIRED_MESSAGE : errorText(e),
-        isDepositRequired(e) ? 'warning' : 'error',
-      )
-      if (
-        isDepositRequired(e) &&
-        activeWallet.current?.lifecycle === wallet.lifecycle
-      )
-        setWeb3Panel('deposit')
-    } finally {
-      busyRef.current = false
-      setBusy(false)
-    }
+  function continueConnection() {
+    if (needsDeposit) setWeb3Panel('deposit')
+    else connect()
   }
   async function transferFunds(amount: string, toPerp: boolean) {
     if (await funding.transfer(amount, toPerp)) {
@@ -769,6 +839,11 @@ export function useTerminal() {
     }
   }
   return {
+    bookPrice,
+    selectBookPrice: (price: string) => {
+      if (!busyRef.current && !funding.busy && !feed.stale)
+        setBookPrice({ coin, price })
+    },
     changeAccountType,
     transferFunds,
     transferToPerp,
@@ -784,7 +859,7 @@ export function useTerminal() {
     confirmAction,
     chase,
     previewTwapCancel,
-    previewProtection,
+    submitProtection,
     acknowledgeNative,
     markets,
     marketsError,
@@ -807,20 +882,20 @@ export function useTerminal() {
     canTrade,
     tradingReady,
     checkingAccount,
-    needsTradingConnection,
     onboarding,
     connect,
     disconnect,
     selectMarket,
-    previewApproval,
+    continueConnection,
+    needsDeposit,
     previewOrder,
     previewTicket,
     previewCancel,
-    previewClose,
+    submitPosition,
+    submitIsolatedMargin,
     previewLeverage,
     execute,
     reconcile,
-    exportEvidence,
   }
 }
 export type TerminalModel = ReturnType<typeof useTerminal>

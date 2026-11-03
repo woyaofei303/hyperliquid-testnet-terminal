@@ -1,5 +1,100 @@
 // 前端文案：简体中文为源文案，英文与同一交易状态共享，不通过切换路由重建会话。
 export const en: Record<string, string> = {
+  收起画图工具: 'Collapse drawing tools',
+  展开画图工具: 'Expand drawing tools',
+  '无法清除本地绘图，请检查浏览器存储权限':
+    'Unable to clear saved drawings. Check browser storage permissions.',
+  预估亏损: 'Estimated loss',
+  预估收益: 'Estimated profit',
+  收益额: 'PnL',
+  保护单修改参数无效: 'Invalid protection order modification',
+  一次只能修改一笔保护单: 'Modify one protection order at a time',
+  '保护单已变化，请关闭后重新确认':
+    'The protection order changed. Close and review it again.',
+  '修改止盈 / 止损': 'Modify TP/SL',
+  图表撤单: 'Cancel chart order',
+  图表止盈止损: 'Chart TP/SL',
+  图表平仓: 'Close chart position',
+  图表交易操作: 'Chart trading actions',
+  没有匹配的指标: 'No matching indicators',
+  副图指标: 'Subchart indicators',
+  主图指标: 'Main chart indicators',
+  指标分类: 'Indicator categories',
+  搜索指标: 'Search indicators',
+  恢复默认指标: 'Restore default indicators',
+  止盈止损线: 'TP/SL lines',
+  订单线: 'Order lines',
+  持仓线: 'Position lines',
+  交易线: 'Trade lines',
+  '最多保存 200 个绘图': 'Up to 200 drawings per market',
+  本地绘图数据无法恢复: 'Unable to restore saved drawings',
+  绘图无法保存在本地: 'Unable to save drawings locally',
+  清除绘图: 'Clear drawings',
+  隐藏绘图: 'Hide drawings',
+  显示绘图: 'Show drawings',
+  锁定绘图: 'Lock drawings',
+  解锁绘图: 'Unlock drawings',
+  '磁吸：强': 'Magnet: strong',
+  '磁吸：弱': 'Magnet: weak',
+  '磁吸：关闭': 'Magnet: off',
+  光标: 'Cursor',
+  'XABCD 形态': 'XABCD pattern',
+  斐波那契回撤: 'Fibonacci retracement',
+  平行线: 'Parallel lines',
+  价格通道: 'Price channel',
+  价格线: 'Price line',
+  趋势线段: 'Trend segment',
+  趋势射线: 'Trend ray',
+  趋势直线: 'Trend line',
+  垂直线段: 'Vertical segment',
+  垂直射线: 'Vertical ray',
+  垂直直线: 'Vertical line',
+  水平线段: 'Horizontal segment',
+  水平射线: 'Horizontal ray',
+  水平直线: 'Horizontal line',
+  线段工具: 'Line tools',
+  画图工具: 'Drawing tools',
+  连接: 'Connect',
+  连接权限与保持连接: 'Permissions and session persistence',
+  '连接将请求账户访问与交易签名；不会自动下单或转移资金。':
+    'Connecting requests account access and a trading signature. It does not place orders or transfer funds.',
+  连接权限: 'Connection permissions',
+  '读取公开地址、余额与交易记录。':
+    'Read your public address, balances and trade history.',
+  '下单、撤单和调整仓位：若没有有效会话，连接时需在钱包签署一次无 Gas 的交易权限消息。':
+    'Place and cancel orders and adjust positions: if no valid session exists, sign one gas-free trading permission message during connection.',
+  '存款、划转和提款仍需主钱包确认，交易会话不能转走资金。':
+    'Deposits, transfers and withdrawals still require your main wallet. The trading session cannot transfer funds.',
+  '默认仅在当前标签页保存交易密钥；勾选后保存在此浏览器。不会读取或保存主钱包私钥。':
+    'The trading key stays in this tab by default. Check to keep it in this browser. Your main wallet private key is never read or stored.',
+  '交易会话使用 JulianTerminal API 钱包，会替换同名旧会话。':
+    'The session uses a JulianTerminal API wallet and replaces any previous session with that name.',
+  '正在连接交易账户，请在钱包中确认交易权限签名。':
+    'Connecting your trading account. Confirm the trading permission signature in your wallet.',
+  '钱包连接完成，可以直接交易。': 'Wallet connected. You can now trade.',
+  '钱包连接完成，但浏览器无法保存会话，刷新后需要重新连接。':
+    'Wallet connected, but this browser could not save the session. Reconnect after refreshing.',
+  '交易权限签名已取消，钱包保持只读。可重新连接完成签名。':
+    'Trading permission signature cancelled. The wallet remains read-only. Reconnect to complete signing.',
+  完成钱包连接: 'Complete wallet connection',
+  '已连接 · 可交易': 'Connected \u00b7 ready to trade',
+  '已连接 · 请先存款': 'Connected \u00b7 deposit first',
+  '已连接 · 待完成签名': 'Connected \u00b7 signature required',
+  可交易: 'Ready to trade',
+  待完成连接: 'Connection incomplete',
+  继续连接并交易: 'Continue connecting to trade',
+  '从 Arbitrum Sepolia 存入 USDC，到账后即可继续连接并交易。':
+    'Deposit USDC from Arbitrum Sepolia, then continue connecting to trade once credited.',
+  '完成钱包连接后可提交调整，无需逐笔钱包确认。':
+    'Complete wallet connection to submit changes without confirming each action in your wallet.',
+  'Hyperliquid 测试网账户尚未激活。请先存入测试 USDC 并等待到账，再完成钱包连接。':
+    'Your Hyperliquid testnet account is not activated. Deposit test USDC and wait for credit before completing wallet connection.',
+  ' 根蜡烛，时间使用本地时区': ' candles, local time zone',
+  水龙头: 'Faucet',
+  交易设置: 'Trading settings',
+  下单确认: 'Order confirmation',
+  平仓确认: 'Close confirmation',
+
   '）': ')',
   '图表加载失败：': 'Chart failed: ',
   此市场暂无历史成交: 'No historical trades for this market',
@@ -249,6 +344,18 @@ export const en: Record<string, string> = {
   市场分类: 'Market category',
   所有: 'All',
   自选: 'Favorites',
+  暂无自选: 'No favorites yet',
+  方向筛选: 'Filter by side',
+  币种筛选: 'Filter by asset',
+  币种: 'Asset',
+  没有匹配的记录: 'No matching records',
+  'Arbitrum Sepolia ETH 余额不足': 'Insufficient Arbitrum Sepolia ETH',
+  '激活费（如适用）': 'Activation fee (if applicable)',
+  操作已确认: 'Confirmed',
+  资金结果待确认: 'Awaiting funding confirmation',
+  一键自选主流币对: 'Add popular pairs',
+  '无法保存自选，请允许浏览器本地存储后重试。':
+    'Unable to save favorites. Allow browser local storage and try again.',
   合约: 'Perpetuals',
   '扩展市场加载失败：': 'Additional markets failed: ',
   最新价格: 'Last price',
@@ -348,7 +455,6 @@ export const en: Record<string, string> = {
   追价策略: 'Chase orders',
   操作记录: 'Activity log',
   刷新: 'Refresh',
-  '导出验证记录 ↗': 'Export audit log ↗',
   资产: 'Asset',
   冻结数量: 'On hold',
   '合约 / 杠杆': 'Market / leverage',
@@ -679,4 +785,70 @@ export const en: Record<string, string> = {
     'Slippage must be between 0.01% and 10%, with at most two decimals',
   '预测价格必须在 0.00001 至 0.99999 之间':
     'Prediction price must be between 0.00001 and 0.99999',
+  限价平仓: 'Limit close',
+  市价平仓: 'Market close',
+  设置移动止损: 'Set trailing stop',
+  反向仓位: 'Reverse position',
+  反手: 'Reverse',
+  委托数量: 'Order size',
+  激活价格: 'Activation price',
+  '多头 → 空头': 'Long → Short',
+  '空头 → 多头': 'Short → Long',
+  '仓位的止盈/止损': 'Position TP/SL',
+  全部仓位: 'Entire position',
+  配置金额: 'Custom size',
+  限价保护: 'Limit protection',
+  止盈价格: 'Take-profit price',
+  止损价格: 'Stop-loss price',
+  收益: 'Profit',
+  亏损: 'Loss',
+  收益单位: 'Profit unit',
+  亏损单位: 'Loss unit',
+  请输入有效价格: 'Enter a valid price',
+  请输入非负数: 'Enter a non-negative number',
+  目标收益无法换算为有效价格: 'This return does not produce a valid price',
+  '仓位数量或方向已变化，请关闭后重新确认。':
+    'Position size or side changed. Close this dialog and confirm again.',
+  '已有保护单可在当前委托核对并撤销，避免重复设置。':
+    'Review and cancel existing protection orders in Open orders to avoid duplicates.',
+  '以市价平掉现有仓位并开立等量反向仓位，需要足够保证金；部分成交时最终仓位可能与目标不同。':
+    'Closes this position and opens an equal position on the opposite side at market. Sufficient margin is required; partial fills may leave a different final position.',
+  '由交易所跟踪最有利标记价，达到回撤距离后触发只减仓市价单。关闭页面不停止。':
+    'The exchange tracks the most favorable mark price and triggers a reduce-only market order at the retracement distance. It stays active after closing this page.',
+  '仅保护指定数量，不会随新增仓位扩大。':
+    'Protects only the specified size; it does not grow when the position increases.',
+  '默认保护触发时的全部仓位，仓位全部平仓后自动取消。':
+    'Protects the entire position at trigger time and cancels when the position is fully closed.',
+  '触发后提交限价单，不能保证成交。':
+    'Submits a limit order on trigger; execution is not guaranteed.',
+  '按标记价触发只减仓市价单，价格保护为 10%，不保证全部成交。':
+    'Triggers a reduce-only market order using mark price with 10% price protection. Full execution is not guaranteed.',
+  调整逐仓保证金: 'Adjust isolated margin',
+  保证金金额: 'Margin amount',
+  最大: 'Max',
+  保证金调整方向: 'Margin adjustment',
+  追加: 'Add',
+  移除: 'Remove',
+  可追加金额: 'Available to add',
+  可移除金额: 'Available to remove',
+  '追加保证金可降低该逐仓仓位的清算风险；移除保证金会提高风险，并受到最低保证金要求限制。':
+    'Adding margin reduces liquidation risk for this isolated position. Removing margin increases risk and is subject to minimum margin requirements.',
+  '该市场为严格逐仓，不允许手动移除保证金。':
+    'This market uses strict isolated margin and does not allow manual margin removal.',
+  只有逐仓仓位可以调整保证金:
+    'Only isolated positions support margin adjustments',
+  '保证金金额最多 2 位小数': 'Margin amount supports up to 2 decimal places',
+  保证金金额超过当前可用上限:
+    'Margin amount exceeds the current available limit',
+  保证金金额过大: 'Margin amount is too large',
+  仓位杠杆无效: 'Invalid position leverage',
+  '逐仓保证金调整已确认。': 'Isolated margin adjustment confirmed.',
+  '按所选单位输入数量或订单金额；金额会按参考价格换算并向下取整到市场允许精度。':
+    'Enter size or order value in the selected unit. Order value is converted at the reference price and rounded down to market precision.',
+  '全仓共享账户保证金，逐仓仅使用分配给该仓位的保证金。':
+    'Cross shares account margin; isolated uses only margin assigned to this position.',
+  '杠杆决定初始保证金要求，调整需经交易所校验。':
+    'Leverage determines initial margin requirements. Adjustments are validated by the exchange.',
+  '逐仓保证金已调整，正在刷新仓位。':
+    'Isolated margin adjusted. Refreshing the position.',
 }

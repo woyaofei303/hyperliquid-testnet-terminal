@@ -354,15 +354,18 @@ export function useBaseKlineChart({
       checkIsAtRealTime()
     })
 
+    let observedHeight = host.clientHeight
     const ro = new ResizeObserver(() => {
       const el = containerRef.current
       const current = chartRef.current
       if (!el || !current) return
       if (!isVisibleSize(el)) return
 
-      /** 容器变化后重新应用 density 并检查实时状态 */
-      applyCandleDensity()
-      ensureVolPaneHeight()
+      // 宽度变化由引擎重排，保留用户缩放与滚动；只有高度变化才调整 VOL。
+      if (el.clientHeight !== observedHeight) {
+        observedHeight = el.clientHeight
+        ensureVolPaneHeight()
+      }
       checkIsAtRealTime()
     })
     ro.observe(host)

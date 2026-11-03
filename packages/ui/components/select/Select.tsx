@@ -72,6 +72,8 @@ export const Select = ({
     <BaseSelect
       ref={ref}
       popoverProps={{
+        // 保持 portal 下拉在父弹窗的可访问范围内。
+        ...{ 'data-react-aria-top-layer': 'true' },
         classNames: {
           content: 'p-0 rounded-[8px] overflow-hidden',
         },

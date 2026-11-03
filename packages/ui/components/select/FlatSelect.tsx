@@ -91,6 +91,8 @@ export const FlatSelect = ({
     <Dropdown
       {...props}
       ref={ref}
+      // 下拉通过 portal 挂载到 body，需留在父弹窗的可访问范围内。
+      data-react-aria-top-layer="true"
       isDisabled={isDisabled}
       disableAnimation={Boolean(reduceMotion)}
       shouldCloseOnScroll={false}
@@ -130,6 +132,7 @@ export const FlatSelect = ({
         {items.map((item) => (
           <DropdownItem
             key={item.key}
+            textValue={item.label}
             hideSelectedIcon={hideSelectedIcon}
             className={cn(
               itemStyle(),

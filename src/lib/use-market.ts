@@ -170,7 +170,7 @@ export function useMarket(coin: string, interval: Interval) {
           info.candleSnapshot({
             coin,
             interval,
-            startTime: Date.now() - intervalMs(interval) * 300,
+            startTime: Date.now() - intervalMs(interval) * 2,
           }),
           info.l2Book({ coin }),
         ])

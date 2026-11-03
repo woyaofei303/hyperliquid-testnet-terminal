@@ -8,17 +8,14 @@ export type Action = {
   coin: string
   at: number
 } & (
-  | { kind: 'approve' }
   | { kind: 'order'; order: PreparedOrder; orderKind: 'limit' | 'market' }
   | { kind: 'ticket'; ticket: Ticket }
   | { kind: 'twapCancel'; asset: number; twapId: number }
   | { kind: 'cancel'; asset: number; oid: number }
+  | { kind: 'isolatedMargin'; asset: number; isBuy: boolean; ntli: number }
   | { kind: 'leverage'; asset: number; leverage: number; isCross: boolean }
 )
-export type ConfirmationAction = Extract<
-  Action,
-  { kind: 'approve' | 'order' | 'ticket' }
->
+export type ConfirmationAction = Extract<Action, { kind: 'order' | 'ticket' }>
 export interface JournalEntry {
   at: string
   account: string
@@ -35,7 +32,7 @@ export interface PendingOrder {
   coin: string
   expiresAt: number
   cloids?: `0x${string}`[]
-  native?: 'twap' | 'trailing'
+  native?: 'twap' | 'trailing' | 'margin'
 }
 export const pendingKey = 'hl-testnet-pending-order'
 
@@ -72,7 +69,9 @@ export function loadPending(account: string): PendingOrder | null {
           ? { cloids: value.cloids }
           : {}),
         ...('native' in value &&
-        (value.native === 'twap' || value.native === 'trailing')
+        (value.native === 'twap' ||
+          value.native === 'trailing' ||
+          value.native === 'margin')
           ? { native: value.native }
           : {}),
       }
@@ -98,12 +97,12 @@ export function validateLeverage(
 
 export async function submitTrade(
   wallet: import('./hyperliquid').WalletSession,
-  next: Exclude<Action, { kind: 'approve' }>,
+  next: Action,
   hasPending: boolean,
   onPending: (pending: PendingOrder | null) => void,
 ): Promise<Omit<JournalEntry, 'at'>> {
   if (!wallet.exchange || Date.now() >= wallet.expiresAt)
-    throw new Error('请先启用交易')
+    throw new Error('请先完成钱包连接')
   const base = { account: next.account, coin: next.coin }
   if (next.kind === 'ticket') {
     if (hasPending || loadPending(wallet.address))
@@ -159,6 +158,33 @@ export async function submitTrade(
       state: 'canceled',
       oid: next.oid,
       message: `已撤销订单 #${next.oid}`,
+    }
+  }
+  if (next.kind === 'isolatedMargin') {
+    if (hasPending || loadPending(wallet.address))
+      throw new Error('请先查询上一笔未确认请求')
+    if (Date.now() - next.at > 15000)
+      throw new Error('保证金快照已过期，请重新确认')
+    if (!Number.isSafeInteger(next.ntli) || next.ntli === 0)
+      throw new Error('保证金金额无效')
+    const expiresAt = Math.min(Date.now() + 60000, wallet.expiresAt)
+    onPending({
+      account: next.account,
+      coin: next.coin,
+      expiresAt,
+      cloid: `0x${crypto.randomUUID().replaceAll('-', '')}`,
+      native: 'margin',
+    })
+    await wallet.exchange.updateIsolatedMargin(
+      { asset: next.asset, isBuy: next.isBuy, ntli: next.ntli },
+      { expiresAfter: expiresAt },
+    )
+    onPending(null)
+    return {
+      ...base,
+      action: 'isolatedMargin',
+      state: 'confirmed',
+      message: '逐仓保证金已调整，正在刷新仓位。',
     }
   }
   await wallet.exchange.updateLeverage({

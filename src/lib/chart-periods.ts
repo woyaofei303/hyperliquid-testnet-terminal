@@ -49,3 +49,24 @@ export const intervalMs = (value: ChartInterval) =>
   ({ m: 60000, h: 3600000, d: 86400000, w: 604800000, M: 2592000000 }[
     value.slice(-1)
   ] ?? 0)
+
+export const historyPageSize = 300
+export function candleHistoryStart(
+  end: number,
+  count: number,
+  interval: ChartInterval,
+) {
+  if (interval === '1M') {
+    const date = new Date(end - 1)
+    return Math.max(
+      0,
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - count + 1, 1),
+    )
+  }
+  const step = intervalMs(interval)
+  const anchor = interval === '1w' ? 4 * 86400000 : 0
+  return Math.max(
+    0,
+    Math.ceil((end - anchor) / step) * step + anchor - count * step,
+  )
+}

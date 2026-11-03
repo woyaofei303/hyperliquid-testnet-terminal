@@ -2,6 +2,8 @@ import type { MarketContext } from './hyperliquid.ts'
 import type { TicketInput } from './order-ticket.ts'
 import { formatOrderPrice } from './orders.ts'
 
+export type BookPriceSelection = { coin: string; price: string }
+
 export type OrderFormFields = Omit<
   TicketInput,
   'market' | 'mark' | 'size' | 'slippageBps'

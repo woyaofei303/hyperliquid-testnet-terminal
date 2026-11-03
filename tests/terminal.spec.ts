@@ -87,8 +87,10 @@ async function mockExchange(
     twapId: number
   }[] = []
   let position = 0
+  let extraPositions: Record<string, number> = {}
   let leverage = 2
   let isCross = true
+  let isolatedMargin = 35
   let agentAddress = ''
   let agentRegistrations = 0
   let agentRevoked = false
@@ -100,14 +102,19 @@ async function mockExchange(
     amount?: string
     toPerp?: boolean
     orders?: WireOrder[]
+    modifies?: { oid: number; order: WireOrder }[]
     cancels?: { a: number; o: number }[]
+    ntli?: number
+    isBuy?: boolean
+    sz?: string
+    reduceOnly?: boolean
     leverage?: number
     isCross?: boolean
     asset?: number
     grouping?: string
     twap?: { a: number; b: boolean; m: number; s: string; t: boolean }
     details?: { t: { p: string; a: boolean } | null; s: string | null }
-    a?: number
+    a?: number | true
     t?: number
     retracement?: { pct: string }
   }[] = []
@@ -177,10 +184,20 @@ async function mockExchange(
   let pushTrade = (_coin: string, _tid: number) => {}
   const tradeSubscriptions: string[] = []
   let pushMarket = (_coin: string, _price: number) => {}
-  const candles = (coin: string, interval: string) =>
-    Array.from({ length: 40 }, (_, i) => ({
-      t: Math.floor(Date.now() / 300000) * 300000 - (40 - i) * 300000,
-      T: Math.floor(Date.now() / 300000) * 300000 - (39 - i) * 300000,
+  const candles = (
+    coin: string,
+    interval: string,
+    count = 40,
+    end = Date.now(),
+  ) => {
+    const step =
+      Number.parseInt(interval, 10) *
+      ({ m: 60000, h: 3600000, d: 86400000, w: 604800000, M: 2592000000 }[
+        interval.slice(-1)
+      ] ?? 300000)
+    return Array.from({ length: count }, (_, i) => ({
+      t: Math.floor(end / step) * step - (count - i) * step,
+      T: Math.floor(end / step) * step - (count - i - 1) * step,
       s: coin,
       i: interval,
       o: '69900',
@@ -190,6 +207,7 @@ async function mockExchange(
       v: '1',
       n: 1,
     }))
+  }
   const state = () => ({
     marginSummary: {
       accountValue: '1000',
@@ -206,82 +224,111 @@ async function mockExchange(
     crossMaintenanceMarginUsed: '0',
     withdrawable: '965',
     time: Date.now(),
-    assetPositions: position
-      ? [
-          {
-            type: 'oneWay',
-            position: {
-              coin: 'BTC',
-              szi: String(position),
-              leverage: { type: 'cross', value: leverage },
-              entryPx: '70000',
-              positionValue: String(Math.abs(position) * 70000),
-              unrealizedPnl: '0',
-              returnOnEquity: '0',
-              liquidationPx: '35000',
-              marginUsed: '35',
-              maxLeverage: 40,
-              cumFunding: { allTime: '0', sinceOpen: '0', sinceChange: '0' },
-            },
-          },
-        ]
-      : [],
+    assetPositions: Object.entries({
+      ...extraPositions,
+      ...(position ? { BTC: position } : {}),
+    }).map(([coin, size]) => ({
+      type: 'oneWay',
+      position: {
+        coin,
+        szi: String(size),
+        leverage: {
+          type: isCross ? 'cross' : 'isolated',
+          value: leverage,
+        },
+        entryPx: '70000',
+        positionValue: String(Math.abs(size) * 70000),
+        unrealizedPnl: '0',
+        returnOnEquity: '0',
+        liquidationPx: '35000',
+        marginUsed: String(isolatedMargin),
+        maxLeverage: 40,
+        cumFunding: { allTime: '0', sinceOpen: '0', sinceChange: '0' },
+      },
+    })),
   })
   await page.addInitScript(
     ({ address, mode }) => {
       let current = address
       const callbacks = new Map<string, Set<(...args: unknown[]) => void>>()
+      const provider = {
+        request: async ({
+          method,
+          params,
+        }: {
+          method: string
+          params?: string[]
+        }): Promise<unknown> => {
+          if (method === 'wallet_requestPermissions') {
+            if (
+              JSON.stringify(params) !== JSON.stringify([{ eth_accounts: {} }])
+            )
+              throw new Error('仅请求标准账户访问权限')
+            sessionStorage.setItem(
+              'mock-permission-requests',
+              String(
+                Number(
+                  sessionStorage.getItem('mock-permission-requests') ?? 0,
+                ) + 1,
+              ),
+            )
+            return [{ parentCapability: 'eth_accounts' }]
+          }
+          if (method === 'eth_requestAccounts' || method === 'eth_accounts')
+            return [current]
+          if (method === 'eth_chainId') return '0x66eee'
+          if (method === 'eth_signTypedData_v4') {
+            sessionStorage.setItem(
+              'mock-wallet-signs',
+              String(
+                Number(sessionStorage.getItem('mock-wallet-signs') ?? 0) + 1,
+              ),
+            )
+            if (mode === 'deny-signature')
+              throw { code: 4001, message: 'User rejected signature' }
+            const typed = JSON.parse(params?.[1] ?? '{}')
+            if (
+              Number(typed.domain.chainId) !==
+              Number(await provider.request({ method: 'eth_chainId' }))
+            )
+              throw new Error('钱包不接受跨网络签名')
+            if (
+              ![
+                'HyperliquidTransaction:ApproveAgent',
+                'HyperliquidTransaction:UsdClassTransfer',
+                'HyperliquidTransaction:SendToEvmWithData',
+                'HyperliquidTransaction:UserSetAbstraction',
+              ].includes(typed.primaryType) ||
+              typed.message.hyperliquidChain !== 'Testnet'
+            )
+              throw new Error('仅允许测试网会话授权')
+            return `0x${'11'.repeat(64)}1b`
+          }
+          throw new Error(`Unexpected wallet method ${method}`)
+        },
+        on: (event: string, callback: (...args: unknown[]) => void) => {
+          const set = callbacks.get(event) ?? new Set()
+          set.add(callback)
+          callbacks.set(event, set)
+        },
+        removeListener: (
+          event: string,
+          callback: (...args: unknown[]) => void,
+        ) => {
+          callbacks.get(event)?.delete(callback)
+        },
+      }
       Object.defineProperty(window, 'ethereum', {
         configurable: true,
-        value: {
-          request: async ({
-            method,
-            params,
-          }: {
-            method: string
-            params?: string[]
-          }) => {
-            if (method === 'eth_requestAccounts' || method === 'eth_accounts')
-              return [current]
-            if (method === 'eth_chainId') return '0x66eee'
-            if (method === 'eth_signTypedData_v4') {
-              sessionStorage.setItem(
-                'mock-wallet-signs',
-                String(
-                  Number(sessionStorage.getItem('mock-wallet-signs') ?? 0) + 1,
-                ),
-              )
-              if (mode === 'deny-signature')
-                throw { code: 4001, message: 'User rejected signature' }
-              const typed = JSON.parse(params?.[1] ?? '{}')
-              if (Number(typed.domain.chainId) !== 421614)
-                throw new Error('钱包不接受跨网络签名')
-              if (
-                ![
-                  'HyperliquidTransaction:ApproveAgent',
-                  'HyperliquidTransaction:UsdClassTransfer',
-                  'HyperliquidTransaction:SendToEvmWithData',
-                  'HyperliquidTransaction:UserSetAbstraction',
-                ].includes(typed.primaryType) ||
-                typed.message.hyperliquidChain !== 'Testnet'
-              )
-                throw new Error('仅允许测试网会话授权')
-              return `0x${'11'.repeat(64)}1b`
-            }
-            throw new Error(`Unexpected wallet method ${method}`)
-          },
-          on: (event: string, callback: (...args: unknown[]) => void) => {
-            const set = callbacks.get(event) ?? new Set()
-            set.add(callback)
-            callbacks.set(event, set)
-          },
-          removeListener: (
-            event: string,
-            callback: (...args: unknown[]) => void,
-          ) => {
-            callbacks.get(event)?.delete(callback)
-          },
-        },
+        value: provider,
+      })
+      window.addEventListener('test-wallet-disconnect', () => {
+        for (const callback of callbacks.get('disconnect') ?? [])
+          callback({ code: 4900, message: 'Disconnected' })
+      })
+      window.addEventListener('test-wallet-empty-accounts', () => {
+        for (const callback of callbacks.get('accountsChanged') ?? [])
+          callback([])
       })
       window.addEventListener('test-network-change', () => {
         for (const callback of callbacks.get('chainChanged') ?? [])
@@ -379,7 +426,15 @@ async function mockExchange(
           if (mode === 'slow-history')
             await new Promise((resolve) => setTimeout(resolve, 900))
           if (mode === 'delayed-history') await historyReady
-          data = candles(request.req.coin, request.req.interval)
+          data =
+            mode === 'slow-history'
+              ? candles(
+                  request.req.coin,
+                  request.req.interval,
+                  300,
+                  request.req.endTime + 1,
+                )
+              : candles(request.req.coin, request.req.interval)
           break
         case 'twapHistory':
           data = twaps
@@ -454,6 +509,8 @@ async function mockExchange(
         )
         agentRegistrations++
         agentAddress = action.agentAddress
+        agentRevoked = false
+        agentValidUntil = null
         await route.fulfill({
           json: { status: 'ok', response: { type: 'default' } },
         })
@@ -497,8 +554,21 @@ async function mockExchange(
         }),
       })
       expect(recovered.toLowerCase()).toBe(agentAddress.toLowerCase())
-      if (action.type === 'order') {
-        const reports = action.orders.map((order: WireOrder, index: number) => {
+      if (action.type === 'order' || action.type === 'batchModify') {
+        const previous = orders
+        if (action.type === 'batchModify') {
+          expect(action.a).toBe(true)
+          orders = orders.filter(
+            (order) =>
+              !action.modifies.some(
+                (modify: { oid: number }) => modify.oid === order.oid,
+              ),
+          )
+        }
+        const reports = (
+          action.orders ??
+          action.modifies.map((modify: { order: WireOrder }) => modify.order)
+        ).map((order: WireOrder, index: number) => {
           expect([3, 10007, 110000, 100000120, 100000121]).toContain(order.a)
           if (mode === 'reject' || (mode === 'partial-batch' && index === 1))
             return { error: 'Insufficient margin' }
@@ -514,12 +584,16 @@ async function mockExchange(
             cloid: order.c,
             reduceOnly: order.r,
             orderType: order.t.trigger
-              ? `${order.t.trigger.tpsl} ${order.t.trigger.isMarket ? 'Market' : 'Limit'}`
+              ? `${order.t.trigger.tpsl === 'tp' ? 'Take Profit' : 'Stop'} ${order.t.trigger.isMarket ? 'Market' : 'Limit'}`
               : 'Limit',
             isTrigger: !!order.t.trigger,
             triggerPx: order.t.trigger?.triggerPx ?? '0',
             triggerCondition: 'N/A',
-            isPositionTpsl: action.grouping === 'positionTpsl',
+            isPositionTpsl:
+              action.grouping === 'positionTpsl' ||
+              (action.type === 'batchModify' &&
+                !!previous.find((old) => old.oid === action.modifies[index].oid)
+                  ?.isPositionTpsl),
             children: [],
           }
           outcomes.set(order.c, item)
@@ -609,6 +683,9 @@ async function mockExchange(
           status: 'ok',
           response: { type: 'trailingStop', data: { oid: nextOid++ } },
         }
+      } else if (action.type === 'updateIsolatedMargin') {
+        isolatedMargin += action.ntli / 1000000
+        data = { status: 'ok', response: { type: 'default' } }
       } else if (action.type === 'updateLeverage') {
         if (mode === 'reject-leverage') {
           await route.fulfill({
@@ -749,6 +826,21 @@ async function mockExchange(
     pushAccount() {
       pushAccount()
     },
+    setIsolated(margin: number, value = 20) {
+      isCross = false
+      isolatedMargin = margin
+      leverage = value
+    },
+    setExtraPositions(value: Record<string, number>) {
+      extraPositions = value
+    },
+    setOrders(value: Order[]) {
+      orders = value
+      for (const order of value) {
+        statuses.set(order.oid, 'open')
+        outcomes.set(order.cloid, order)
+      }
+    },
     setPosition(value: number) {
       position = value
     },
@@ -800,8 +892,6 @@ async function ready(page: Page) {
   await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
-  await page.locator('header').getByRole('button', { name: '启用交易' }).click()
-  await page.getByRole('button', { name: '建立连接' }).click()
   await expect(
     page.getByRole('button', { name: '下单', exact: true }),
   ).toBeEnabled()
@@ -814,30 +904,35 @@ async function confirmOrder(page: Page) {
     .click()
 }
 
-test('连接后先读取余额，未完成查询时不提前要求启用交易', async ({ page }) => {
+test('连接后先读取余额，未完成查询时不签名，查询后在连接中完成授权', async ({
+  page,
+}) => {
   const exchange = await mockExchange(page)
   const balanceQuery = exchange.pauseCashReads()
   await page.goto('/')
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
   await expect(
-    page.locator('header').getByRole('button', { name: /0x.*▾/ }),
+    page
+      .locator('header')
+      .getByRole('button', { name: /0x.*▾/, includeHidden: true }),
   ).toBeVisible()
   await expect.poll(balanceQuery.reads).toBeGreaterThan(0)
   await expect(
     page.getByRole('button', { name: '启用交易', exact: true }),
   ).toHaveCount(0)
-  await expect(page.getByRole('region', { name: '账户概览' })).toContainText(
-    '正在读取余额',
-  )
+  await expect(
+    page.getByRole('region', { name: '账户概览', includeHidden: true }),
+  ).toContainText('正在读取余额')
   expect(exchange.agentRegistrations()).toBe(0)
   balanceQuery.release()
-  await expect(page.getByRole('region', { name: '账户概览' })).toContainText(
-    '1,000.00',
-  )
   await expect(
-    page.locator('header').getByRole('button', { name: '启用交易' }),
+    page.getByRole('region', { name: '账户概览', includeHidden: true }),
+  ).toContainText('1,000.00')
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
   ).toBeEnabled()
+  expect(exchange.agentRegistrations()).toBe(1)
   expect(exchange.writes).toHaveLength(0)
 })
 
@@ -873,7 +968,7 @@ test('已有交易连接核验期间先展示余额，通过后直接下单且�
   await expect(
     page.getByRole('button', { name: '下单', exact: true }),
   ).toBeEnabled()
-  await expect(overview).toContainText('交易已启用')
+  await expect(overview).toContainText('已连接 · 可交易')
   expect(exchange.agentRegistrations()).toBe(1)
   expect(
     await page.evaluate(() => sessionStorage.getItem('mock-wallet-signs')),
@@ -943,18 +1038,27 @@ test('余额读取失败不误判新用户，重试查询后再显示交易状�
   await page.goto('/')
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText(
+    '连接未完成',
+  )
+  await page.getByRole('button', { name: '关闭钱包面板' }).click()
   const overview = page.getByRole('region', { name: '账户概览' })
   await expect(overview).toContainText('账户核验失败')
   await expect(
     page.getByRole('button', { name: '启用交易', exact: true }),
   ).toHaveCount(0)
   fail = false
-  await page.getByRole('button', { name: '刷新', exact: true }).click()
-  await expect(overview).toContainText('1,000.00')
   await expect(
-    page.locator('header').getByRole('button', { name: '启用交易' }),
-  ).toBeEnabled()
+    page.getByRole('button', { name: '刷新', exact: true }),
+  ).toHaveCount(0)
+  await expect(overview).toContainText('1,000.00', { timeout: 20000 })
   expect(exchange.agentRegistrations()).toBe(0)
+  await page.getByRole('button', { name: '完成钱包连接', exact: true }).click()
+  await page.getByRole('button', { name: '重新连接并核验' }).click()
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toBeEnabled()
+  expect(exchange.agentRegistrations()).toBe(1)
   expect(exchange.writes).toHaveLength(0)
 })
 
@@ -1142,7 +1246,7 @@ test('账户类型读取真实模式，确认后才签名，更新后合约与�
 test('账户类型加载期间打开弹窗，数据到达后可以切换而不静默返回', async ({
   page,
 }) => {
-  await mockExchange(page, 'deny-signature')
+  await mockExchange(page)
   const { promise, resolve } = Promise.withResolvers<void>()
   await page.route(
     'https://api.hyperliquid-testnet.xyz/info',
@@ -1153,9 +1257,28 @@ test('账户类型加载期间打开弹窗，数据到达后可以切换而不�
       } else await route.fallback()
     },
   )
+  await page.addInitScript(() => {
+    const provider = window.ethereum
+    if (!provider) throw new Error('Missing mock wallet')
+    const request = provider.request.bind(provider)
+    provider.request = (async (params: {
+      method: string
+      params?: unknown[]
+    }) => {
+      if (
+        params.method === 'eth_signTypedData_v4' &&
+        String(params.params?.[1]).includes('UserSetAbstraction')
+      )
+        throw { code: 4001, message: 'User rejected account type' }
+      return request(params as Parameters<typeof request>[0])
+    }) as typeof provider.request
+  })
   await page.goto('/')
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+  await expect(
+    page.getByRole('dialog', { name: '连接', exact: true }),
+  ).toHaveCount(0)
   await page.getByRole('button', { name: '账户类型', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '账户类型', exact: true })
   await dialog
@@ -1215,7 +1338,23 @@ test('账户类型拒绝切换时保留原状态，不误报成功', async ({ pa
 })
 
 test('账户类型未连接或取消签名，不发送切换请求', async ({ page }) => {
-  const { writes } = await mockExchange(page, 'deny-signature')
+  const { writes } = await mockExchange(page)
+  await page.addInitScript(() => {
+    const provider = window.ethereum
+    if (!provider) throw new Error('Missing mock wallet')
+    const request = provider.request.bind(provider)
+    provider.request = (async (params: {
+      method: string
+      params?: unknown[]
+    }) => {
+      if (
+        params.method === 'eth_signTypedData_v4' &&
+        String(params.params?.[1]).includes('UserSetAbstraction')
+      )
+        throw { code: 4001, message: 'User rejected account type' }
+      return request(params as Parameters<typeof request>[0])
+    }) as typeof provider.request
+  })
   await page.goto('/')
   const button = page.getByRole('button', { name: '账户类型', exact: true })
   await button.click()
@@ -1229,6 +1368,9 @@ test('账户类型未连接或取消签名，不发送切换请求', async ({ pa
   )
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+  await expect(
+    page.getByRole('dialog', { name: '连接', exact: true }),
+  ).toHaveCount(0)
   await expect(button).toContainText('手动')
   await button.click()
   await dialog
@@ -1338,18 +1480,21 @@ test('市价成交后可以部分减仓、全部平仓，并使用 reduce-only',
   await page.getByLabel('数量（BTC）', { exact: true }).fill('0.001')
   await page.getByRole('button', { name: '下单', exact: true }).click()
   await confirmOrder(page)
-  await page.getByRole('button', { name: '市价 / 限价', exact: true }).click()
-  await expect(page.getByLabel('BTC 减仓数量')).toHaveValue('0.001')
-  await page.getByLabel('BTC 减仓数量').fill('0.0005')
-  await page.getByRole('button', { name: '预览平仓', exact: true }).click()
+  await page.getByRole('button', { name: '市价', exact: true }).click()
+  await expect(
+    page.getByRole('dialog').getByLabel('数量（BTC）', { exact: true }),
+  ).toHaveValue('0.001')
+  await page
+    .getByRole('dialog')
+    .getByLabel('数量（BTC）', { exact: true })
+    .fill('0.0005')
   await expect(page.getByRole('dialog')).toContainText('只减仓已启用')
-  await confirmOrder(page)
+  await page.getByRole('button', { name: '市价平仓', exact: true }).click()
   await expect(
     page.getByRole('cell', { name: '0.0005', exact: true }),
   ).toBeVisible()
-  await page.getByRole('button', { name: '市价 / 限价', exact: true }).click()
-  await page.getByRole('button', { name: '预览平仓', exact: true }).click()
-  await confirmOrder(page)
+  await page.getByRole('button', { name: '市价', exact: true }).click()
+  await page.getByRole('button', { name: '市价平仓', exact: true }).click()
   await expect(page.getByText('暂无记录', { exact: true })).toBeVisible()
   expect(writes[1].orders?.[0]).toMatchObject({
     a: 3,
@@ -1395,7 +1540,7 @@ for (const held of [0.01, -0.01]) {
       .getByRole('checkbox', { name: '止盈 / 止损', exact: true })
       .check()
     await page
-      .getByLabel('止盈触发价（USDC，可选）')
+      .getByLabel('止盈价格', { exact: true })
       .fill(held > 0 ? '72000' : '68000')
     await page.getByRole('checkbox', { name: '只减仓 Reduce-only' }).check()
     await expect(
@@ -1482,8 +1627,6 @@ test('用户拒绝会话授权后保持只读，不发送交易请求', async ({
   await page.goto('/')
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
-  await page.locator('header').getByRole('button', { name: '启用交易' }).click()
-  await page.getByRole('button', { name: '建立连接' }).click()
   await expect(
     page.getByRole('status').filter({ hasText: '签名已取消' }),
   ).toBeVisible()
@@ -1491,7 +1634,7 @@ test('用户拒绝会话授权后保持只读，不发送交易请求', async ({
     '签名已取消',
   )
   await expect(
-    page.getByRole('button', { name: '启用交易', exact: true }).first(),
+    page.getByRole('button', { name: '重新连接并核验' }),
   ).toBeEnabled()
   expect(writes).toHaveLength(0)
 })
@@ -1504,10 +1647,13 @@ test('账户切换使待签名预览失效，不能继续发送旧账户订单',
   await page.evaluate(() =>
     window.dispatchEvent(new Event('test-account-change')),
   )
-  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('dialog', { name: '确认订单' })).toHaveCount(0)
   await expect(
-    page.getByRole('button', { name: '连接钱包', exact: true }),
+    page.getByRole('dialog', { name: '连接', exact: true }),
   ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: '浏览器钱包 连接 →' }),
+  ).toBeEnabled()
   expect(writes).toHaveLength(0)
 })
 
@@ -1694,7 +1840,7 @@ test('保证金模式草稿可取消；确认后发送正确参数并回读设�
   await page.getByRole('radio', { name: '逐仓', exact: true }).check()
   await page
     .getByRole('dialog')
-    .getByRole('button', { name: '取消', exact: true })
+    .getByRole('button', { name: '关闭设置', exact: true })
     .click()
   expect(writes).toHaveLength(0)
   await expect(trigger).toContainText('全仓')
@@ -1768,7 +1914,10 @@ test('基础版完整周期、真实工具图标、指标和全屏可操作', as
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await page.goto('/')
-  const chart = page.getByRole('region', { name: /基础版 K 线图，已加载/ })
+  const chart = page.getByRole('region', {
+    name: /基础版 K 线图，已加载/,
+    includeHidden: true,
+  })
   await expect(page.getByRole('button', { name: '重置图表' })).toBeEnabled()
   for (const name of [
     '分时',
@@ -1803,13 +1952,17 @@ test('基础版完整周期、真实工具图标、指标和全屏可操作', as
   ).toHaveAttribute('aria-pressed', 'false')
   const canvasCount = await chart.locator('canvas').count()
   await page.getByRole('button', { name: '指标', exact: true }).click()
+  await page.getByRole('tab', { name: '副图指标' }).click()
   await page.getByRole('checkbox', { name: '成交量 VOL' }).uncheck()
   await expect
     .poll(() => chart.locator('canvas').count())
     .toBeLessThan(canvasCount)
   await page.getByRole('checkbox', { name: '成交量 VOL' }).check()
   await expect.poll(() => chart.locator('canvas').count()).toBe(canvasCount)
-  await page.getByRole('button', { name: '基础版', exact: true }).click()
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: '关闭', exact: true })
+    .click()
   await page.getByRole('button', { name: '重置图表' }).click()
   const fullscreen = page.getByRole('button', { name: '全屏图表' })
   await expect(fullscreen.locator('use')).toHaveAttribute(
@@ -2199,11 +2352,9 @@ test('高级订单：四种触发单、附带保护和阶梯单使用正确请�
   expect(new Set(writes.at(-1)?.orders?.map((order) => order.c)).size).toBe(3)
   await page.getByRole('tab', { name: '限价单', exact: true }).click()
   await page.getByRole('checkbox', { name: '止盈 / 止损', exact: true }).check()
+  await page.getByRole('textbox', { name: '止盈价格' }).fill('72000')
   await page
-    .getByRole('textbox', { name: '止盈触发价（USDC，可选）' })
-    .fill('72000')
-  await page
-    .getByRole('textbox', { name: '止损触发价（USDC，可选）' })
+    .getByRole('textbox', { name: '止损价格', exact: true })
     .fill('68000')
   pushMarket('BTC', 70000)
   await signPreview(page)
@@ -2260,7 +2411,7 @@ test('高级订单：TWAP 响应丢失保留保护，查询不会拿本地 ID �
   ).toBeVisible()
   await page.getByRole('button', { name: '查询未确认订单' }).click()
   await expect(
-    page.locator('output').filter({ hasText: '无法按本地编号确认' }),
+    page.locator('output').filter({ hasText: '此请求没有客户端订单 ID' }),
   ).toBeVisible()
   await expect(
     page.getByRole('button', {
@@ -2308,15 +2459,17 @@ test('仓位保护查询最新仓位后提交反向只减仓 TP/SL', async ({ pa
   await page.getByRole('textbox', { name: '数量（BTC）' }).fill('0.01')
   await signPreview(page)
   await page.getByRole('button', { name: '止盈 / 止损', exact: true }).click()
-  await page.getByRole('textbox', { name: '仓位止盈价' }).fill('72000')
-  await page.getByRole('textbox', { name: '仓位止损价' }).fill('68000')
-  await page.getByRole('button', { name: '预览保护单' }).click()
-  await confirmOrder(page)
+  await page.getByRole('textbox', { name: '止盈价格' }).fill('72000')
+  await page.getByRole('textbox', { name: '止损价格' }).fill('68000')
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: '确认', exact: true })
+    .click()
   await expect.poll(() => writes.at(-1)?.grouping).toBe('positionTpsl')
   expect(
     writes
       .at(-1)
-      ?.orders?.every((order) => order.r && !order.b && order.s === '0.01'),
+      ?.orders?.every((order) => order.r && !order.b && order.s === '0'),
   ).toBe(true)
   await page.getByRole('tab', { name: '当前委托', exact: true }).click()
   await expect(page.getByRole('region', { name: '交易记录' })).toContainText(
@@ -2416,13 +2569,16 @@ test('成交量在两套引擎均为 60% 不透明度，关闭再打开 VOL 不�
     )
   await expect.poll(volumePixels).toBeGreaterThan(100)
   await page.getByRole('button', { name: '指标', exact: true }).click()
+  await page.getByRole('tab', { name: '副图指标' }).click()
   await page.getByRole('checkbox', { name: '成交量 VOL' }).uncheck()
   await page.getByRole('checkbox', { name: '成交量 VOL' }).check()
   await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: '重置图表', exact: true }).click()
   await expect.poll(volumePixels).toBeGreaterThan(100)
   await page.getByRole('button', { name: 'TradingView', exact: true }).click()
   const frame = page.frameLocator('iframe').first()
   await expect(frame.locator('canvas').first()).toBeVisible()
+  await page.getByRole('button', { name: '重置图表', exact: true }).click()
   await expect
     .poll(() =>
       frame.locator('canvas').evaluateAll((canvases) =>
@@ -2458,6 +2614,8 @@ test('切回基础版恢复最新蜡烛、默认间距和右侧留白，保留�
   const candleExtent = () =>
     canvas.evaluate((element) => {
       if (!(element instanceof HTMLCanvasElement)) throw Error('缺少画布')
+      if (!element.width || !element.height)
+        return { left: 0, right: 0, rightGap: 0, span: 0 }
       const ctx = element.getContext('2d')
       if (!ctx) throw Error('缺少画布上下文')
       const data = ctx.getImageData(0, 0, element.width, element.height).data
@@ -2542,6 +2700,174 @@ test('切回基础版恢复最新蜡烛、默认间距和右侧留白，保留�
   })
   expect(socketConnections).toHaveLength(2)
   expect(writes).toEqual([])
+})
+
+for (const product of ['perp', 'spot', 'outcome'] as const) {
+  test(`限价盘口填价与数量金额比例联动且不自动下单：${product}`, async ({
+    page,
+  }) => {
+    const exchange = await mockExchange(page)
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    await ready(page)
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    if (product !== 'perp') {
+      await page.getByRole('button', { name: '交易市场', exact: true }).click()
+      await page
+        .getByRole('tab', {
+          name: product === 'spot' ? '现货' : '预测',
+          exact: true,
+        })
+        .click()
+      await page
+        .getByRole('option', {
+          name: product === 'spot' ? 'HYPE / USDC' : 'BTC 达到目标价？ · Yes',
+          exact: true,
+        })
+        .click()
+    }
+    if (product === 'outcome')
+      await panel.getByRole('tab', { name: '卖出', exact: true }).click()
+    const base = product === 'perp' ? 'BTC' : product === 'spot' ? 'HYPE' : '份'
+    const price = panel.getByRole('textbox', {
+      name: '价格（USDC）',
+      exact: true,
+    })
+    await price.fill(
+      product === 'perp' ? '70000' : product === 'spot' ? '20' : '0.5',
+    )
+    await panel
+      .getByRole('button', { name: '下单比例 50%', exact: true })
+      .click()
+    if (product === 'perp') {
+      exchange.setBookPrice(139999)
+      exchange.pushFastBook(139999)
+    }
+    if (product === 'spot') {
+      exchange.setSpotBookPrice(39.99)
+      exchange.pushFastBook(39)
+    }
+    const picked =
+      product === 'perp' ? '140000' : product === 'spot' ? '40' : '0.51'
+    const row = page.getByRole('button', {
+      name: `卖盘 ${picked} 档位详情`,
+      exact: true,
+    })
+    await row.click()
+    await expect(price).toHaveValue(picked)
+    await expect(
+      panel.getByRole('textbox', { name: `数量（${base}）`, exact: true }),
+    ).toHaveValue(
+      product === 'perp' ? '0.25' : product === 'spot' ? '12.36' : '47',
+    )
+    await panel.getByRole('button', { name: '数量单位', exact: true }).click()
+    await page.getByRole('menuitemradio', { name: 'USDC', exact: true }).click()
+    const amount = panel.getByRole('textbox', {
+      name: '金额（USDC）',
+      exact: true,
+    })
+    await expect(amount).toHaveValue(
+      product === 'perp'
+        ? '35000.000000'
+        : product === 'spot'
+          ? '494.400000'
+          : '23.970000',
+    )
+    await panel
+      .getByRole('button', { name: '下单比例 25%', exact: true })
+      .click()
+    await expect(amount).toHaveValue(
+      product === 'perp'
+        ? '17500.000000'
+        : product === 'spot'
+          ? '247.200000'
+          : '11.730000',
+    )
+    if (product === 'perp') {
+      const submit = await panel
+        .getByRole('button', { name: '下单', exact: true })
+        .boundingBox()
+      const options = await panel
+        .getByRole('checkbox', { name: '止盈 / 止损', exact: true })
+        .evaluate((el) => {
+          const rect = el.closest('label')?.getBoundingClientRect()
+          return rect ? { bottom: rect.bottom } : null
+        })
+      if (!submit || !options) throw new Error('下单控件不可见')
+      expect(submit.y - options.bottom).toBeLessThanOrEqual(32)
+    }
+    await page.screenshot({
+      path: `output-tdd/playwright/order-linkage/${product}.png`,
+    })
+    await amount.click()
+    await amount.press('ControlOrMeta+A')
+    await amount.press('Backspace')
+    await expect(amount).toHaveValue('')
+    await price.fill(
+      product === 'perp' ? '70000' : product === 'spot' ? '20' : '0.5',
+    )
+    await expect(amount).toHaveValue('')
+    await row.click()
+    await expect(price).toHaveValue(picked)
+    await expect(amount).toHaveValue('')
+    if (product === 'perp') {
+      await panel.getByRole('tab', { name: '市价单', exact: true }).click()
+      await page
+        .getByRole('button', { name: '买盘 139998 档位详情', exact: true })
+        .click()
+      await panel.getByRole('tab', { name: '限价单', exact: true }).click()
+      await expect(price).toHaveValue(picked)
+    }
+    expect(exchange.writes).toHaveLength(0)
+  })
+}
+
+test('交易记录方向与币种组合筛选，空结果准确显示并随推送更新', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  exchange.setPosition(0.5)
+  exchange.setExtraPositions({ ETH: -2, SOL: 3 })
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await ready(page)
+  const records = page.getByRole('region', { name: '交易记录', exact: true })
+  const rows = records
+    .getByRole('table', { name: '仓位', exact: true })
+    .locator('tbody tr')
+  await expect(rows).toHaveCount(3)
+  await expect(
+    page.getByRole('button', { name: '刷新', exact: true }),
+  ).toHaveCount(0)
+  await records.getByRole('button', { name: '方向筛选', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: '多头', exact: true }).click()
+  await expect(rows).toHaveCount(2)
+  await records.getByRole('button', { name: '币种筛选', exact: true }).click()
+  await page
+    .getByRole('menuitemradio', { name: 'ETH / USDC', exact: true })
+    .click()
+  await expect(rows).toHaveCount(0)
+  await expect(
+    records.getByText('没有匹配的记录', { exact: true }),
+  ).toBeVisible()
+  await records.getByRole('button', { name: '方向筛选', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: '方向', exact: true }).click()
+  await expect(rows).toHaveCount(1)
+  await expect(rows).toContainText('ETH')
+  await page.screenshot({
+    path: 'output-tdd/playwright/order-linkage/record-filters.png',
+  })
+  await records.getByRole('tab', { name: '当前委托', exact: true }).click()
+  await expect(
+    records.getByRole('button', { name: '方向筛选', exact: true }),
+  ).toHaveText('方向')
+  await expect(
+    records.getByRole('button', { name: '币种筛选', exact: true }),
+  ).toHaveText('币种')
+  await records.getByRole('tab', { name: '仓位', exact: true }).click()
+  await expect(rows).toHaveCount(3)
+  exchange.setExtraPositions({ ETH: -2 })
+  exchange.pushAccount()
+  await expect(rows).toHaveCount(2)
+  expect(exchange.writes).toHaveLength(0)
 })
 
 for (const product of ['perp', 'spot', 'outcome'] as const) {
@@ -3199,7 +3525,7 @@ async function openFunds(page: Page) {
   ).toBeVisible()
 }
 
-test('Web3 存款：切换测试链、一次点击连续授权和存款、核对到账后启用交易', async ({
+test('Web3 存款：切换测试链、一次点击连续授权和存款、核对到账后返回交易', async ({
   page,
 }) => {
   await mockExchange(page)
@@ -3222,29 +3548,29 @@ test('Web3 存款：切换测试链、一次点击连续授权和存款、核对
     '0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa',
   )
   funds.setCredited()
-  await dialog.getByRole('button', { name: '核对资金状态' }).click()
   await expect(
     dialog.getByText('源链已确认 · 等待 Hyperliquid 到账'),
   ).toBeVisible()
   funds.setLedger()
-  await dialog.getByRole('button', { name: '核对资金状态' }).click()
-  await expect(dialog.getByText('Hyperliquid 到账已核验')).toBeVisible()
+  await expect(dialog.getByText('Hyperliquid 到账已核验')).toBeVisible({
+    timeout: 15000,
+  })
   await page.screenshot({
     path: 'output-tdd/playwright/web3-onboarding/deposit-credited.png',
   })
+  await expect(
+    dialog.getByRole('button', { name: '返回交易', exact: true }),
+  ).toHaveCount(0)
   await dialog.getByRole('button', { name: '关闭钱包面板' }).click()
-  await page
-    .getByRole('button', { name: '启用交易', exact: true })
-    .first()
-    .click()
-  await page.getByRole('button', { name: '建立连接' }).click()
   await expect(
     page.getByRole('button', { name: '下单', exact: true }),
   ).toBeEnabled()
 })
 
-test('Web3 未知资金结果刷新后保留保护且不会自动重发', async ({ page }) => {
-  await mockExchange(page)
+test('Web3 未知资金结果刷新后保留进度，不锁表单、不需人工解除且不会自动重发', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
   const funds = await mockFunding(page, { lost: true })
   await openFunds(page)
   await page.getByLabel('存款金额（USDC）').fill('10')
@@ -3252,19 +3578,30 @@ test('Web3 未知资金结果刷新后保留保护且不会自动重发', async 
     .getByRole('dialog')
     .getByRole('button', { name: '存款', exact: true })
     .click()
-  await expect(
-    page.getByText('结果未知，请核对钱包记录，勿重复提交'),
-  ).toBeVisible()
+  await expect(page.getByText('资金结果待确认')).toBeVisible()
   await page.reload()
-  await page.getByRole('button', { name: '连接钱包', exact: true }).click()
-  await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
   await page
     .locator('header')
     .getByRole('button', { name: '存款', exact: true })
     .click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByLabel('存款金额（USDC）')).toBeEditable()
+  await dialog.getByLabel('存款金额（USDC）').fill('5')
   await expect(
-    page.getByRole('button', { name: '资金请求待确认' }),
-  ).toBeDisabled()
+    dialog.getByRole('button', { name: '存款', exact: true }),
+  ).toBeEnabled()
+  await expect(dialog.getByText('解除本地保护')).toHaveCount(0)
+  await expect(dialog.getByText('手动核对未确认请求')).toHaveCount(0)
+  expect(funds.transactions).toHaveLength(2)
+  await openFundOperation(page, '划转')
+  await dialog.getByLabel('划转金额（USDC）').fill('5')
+  await dialog.getByRole('button', { name: '确认划转' }).click()
+  await expect.poll(() => exchange.writes.length).toBe(1)
+  expect(exchange.writes[0]).toMatchObject({
+    type: 'usdClassTransfer',
+    amount: '5',
+    toPerp: false,
+  })
   expect(funds.transactions).toHaveLength(2)
 })
 
@@ -3322,8 +3659,10 @@ test('Web3 划转使用主钱包确认，精度和可用余额校验在签名前
   })
 })
 
-test('Web3 多钱包发现不会自动连接，用户选择后才请求地址', async ({ page }) => {
-  await mockExchange(page)
+test('Web3 多钱包发现与断开：主动弹出连接列表，重新选择前不发起授权', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
   await mockFunding(page)
   await page.addInitScript(() => {
     const ethereum = window.ethereum
@@ -3332,7 +3671,7 @@ test('Web3 多钱包发现不会自动连接，用户选择后才请求地址', 
       const provider = {
         ...ethereum,
         request: async (params: { method: string; params?: unknown[] }) => {
-          if (params.method === 'eth_requestAccounts')
+          if (params.method === 'wallet_requestPermissions')
             localStorage.setItem('test-selected-wallet', name)
           return ethereum.request(
             params as Parameters<typeof ethereum.request>[0],
@@ -3373,33 +3712,100 @@ test('Web3 多钱包发现不会自动连接，用户选择后才请求地址', 
   ).toBeVisible()
   await page.getByRole('button', { name: '断开钱包', exact: true }).click()
   await expect(
-    page
-      .locator('header')
-      .getByRole('button', { name: '连接钱包', exact: true }),
+    page.getByRole('dialog', { name: '连接', exact: true }),
   ).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Rabby 连接 →' })).toBeEnabled()
+  expect(exchange.agentRegistrations()).toBe(1)
+  await page.getByRole('button', { name: '关闭钱包面板' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.getByRole('button', { name: '连接钱包', exact: true }).click()
+  await page.getByRole('button', { name: 'Rabby 连接 →' }).click()
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toBeEnabled()
+  await page.getByLabel('数量（BTC）', { exact: true }).fill('0.001')
+  await signPreview(page)
+  await expect.poll(() => exchange.writes.length).toBe(1)
+  expect(
+    await page.evaluate(() => sessionStorage.getItem('mock-wallet-signs')),
+  ).toBe('1')
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event('test-wallet-disconnect')),
+  )
+  await expect(
+    page.getByRole('dialog', { name: '连接', exact: true }),
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Rabby 连接 →' })).toBeEnabled()
+  expect(exchange.agentRegistrations()).toBe(1)
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem('mock-permission-requests'),
+    ),
+  ).toBe('2')
+  expect(exchange.writes).toHaveLength(1)
+  await page.getByRole('button', { name: 'Rabby 连接 →' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event('test-wallet-empty-accounts')),
+  )
+  await expect(
+    page.getByRole('dialog', { name: '连接', exact: true }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Rabby 连接 →' }).click()
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toBeEnabled()
+  expect(exchange.agentRegistrations()).toBe(1)
+  expect(
+    await page.evaluate(() => sessionStorage.getItem('mock-wallet-signs')),
+  ).toBe('1')
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem('mock-permission-requests'),
+    ),
+  ).toBe('4')
 })
 
-test('Web3 统一账户不能误用独立账户划转', async ({ page }) => {
-  const { writes } = await mockExchange(page)
-  await mockFunding(page)
-  await page.route(
-    'https://api.hyperliquid-testnet.xyz/info',
-    async (route) => {
-      if (route.request().postDataJSON().type === 'userAbstraction')
-        await route.fulfill({ json: 'unifiedAccount' })
-      else await route.fallback()
-    },
-  )
-  await openFunds(page)
-  await openFundOperation(page, '划转')
-  await expect(
-    page.getByText(
-      '当前为统一账户或组合保证金模式，资金共享。请在官方测试网页管理资金。',
-    ),
-  ).toBeVisible()
-  await expect(page.getByRole('button', { name: '确认划转' })).toHaveCount(0)
-  expect(writes).toHaveLength(0)
-})
+for (const mode of [
+  'default',
+  'disabled',
+  'dexAbstraction',
+  'unifiedAccount',
+  'portfolioMargin',
+]) {
+  test(`Web3 按账户类型显示所有划转入口：${mode}`, async ({ page }) => {
+    const { writes } = await mockExchange(page)
+    await mockFunding(page)
+    await mockWithdrawal(page)
+    await page.route(
+      'https://api.hyperliquid-testnet.xyz/info',
+      async (route) => {
+        if (route.request().postDataJSON().type === 'userAbstraction')
+          await route.fulfill({ json: mode })
+        else await route.fallback()
+      },
+    )
+    await ready(page)
+    const canTransfer = !['unifiedAccount', 'portfolioMargin'].includes(mode)
+    const account = page.getByRole('region', { name: '账户概览', exact: true })
+    await expect(
+      account.getByRole('button', { name: '划转', exact: true }),
+    ).toHaveCount(canTransfer ? 1 : 0)
+    await page.locator('header').getByRole('button', { name: /0x.*▾/ }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(
+      dialog.getByRole('button', { name: '划转', exact: true }),
+    ).toHaveCount(canTransfer ? 1 : 0)
+    await dialog.getByRole('button', { name: '提款', exact: true }).click()
+    await expect(
+      dialog.getByRole('button', { name: '最大值', exact: true }),
+    ).toBeEnabled()
+    await expect(
+      dialog.getByRole('button', { name: '现货转入合约', exact: true }),
+    ).toHaveCount(canTransfer ? 1 : 0)
+    expect(writes).toHaveLength(0)
+  })
+}
 
 test('Web3 EVM 网络变更保留 HyperCore 授权，账户变更则立即失效', async ({
   page,
@@ -3419,7 +3825,10 @@ test('Web3 EVM 网络变更保留 HyperCore 授权，账户变更则立即失效
     window.dispatchEvent(new Event('test-account-change')),
   )
   await expect(
-    page.getByRole('button', { name: '连接钱包开始交易' }),
+    page.getByRole('dialog', { name: '连接', exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: '浏览器钱包 连接 →' }),
   ).toBeEnabled()
   expect(writes).toHaveLength(0)
 })
@@ -3633,20 +4042,20 @@ test('Web3 提款：主钱包确认、固定测试网 CCTP 路由、目标链真
   expect(funds.writes).toHaveLength(1)
   expect(funds.writes[0]).toMatchObject({ amount: '10', sourceDex: '' })
   funds.index()
-  await dialog.getByRole('button', { name: '核对资金状态' }).click()
-  await expect(
-    dialog.getByText('目标链交易已找到 · 等待到账核验'),
-  ).toBeVisible()
+  await expect(dialog.getByText('目标链交易已找到 · 等待到账核验')).toBeVisible(
+    { timeout: 15000 },
+  )
   await expect(dialog.getByText('Arbitrum Sepolia 到账已核验')).toHaveCount(0)
   funds.receive()
-  await dialog.getByRole('button', { name: '核对资金状态' }).click()
-  await expect(dialog.getByText('Arbitrum Sepolia 到账已核验')).toBeVisible()
+  await expect(dialog.getByText('Arbitrum Sepolia 到账已核验')).toBeVisible({
+    timeout: 15000,
+  })
   await expect(
     dialog.getByRole('link', { name: /查看链上交易/ }),
   ).toHaveAttribute('href', /^https:\/\/sepolia.arbiscan.io\/tx\/0x/)
 })
 
-test('Web3 提款未知响应刷新后保留保护，按 nonce 恢复查询且不自动重发', async ({
+test('Web3 提款未知响应刷新后不锁表单，按 nonce 自动恢复查询且不自动重发', async ({
   page,
 }) => {
   await mockExchange(page)
@@ -3655,18 +4064,22 @@ test('Web3 提款未知响应刷新后保留保护，按 nonce 恢复查询且�
   await openFunds(page)
   const dialog = await fillWithdrawal(page)
   await dialog.getByRole('button', { name: '提现至 Arbitrum Sepolia' }).click()
-  await expect(
-    dialog.getByText('结果未知，请核对钱包记录，勿重复提交'),
-  ).toBeVisible()
+  await expect(dialog.getByText('资金结果待确认')).toBeVisible()
   await page.reload()
-  await openFunds(page)
+  await page
+    .locator('header')
+    .getByRole('button', { name: '存款', exact: true })
+    .click()
   await openFundOperation(page, '提款')
-  await expect(dialog.getByLabel('提款金额（USDC）')).toBeDisabled()
+  await expect(dialog.getByLabel('提款金额（USDC）')).toBeEditable()
+  await expect(dialog.getByText('解除本地保护')).toHaveCount(0)
   expect(funds.writes).toHaveLength(1)
   funds.index()
   funds.receive()
-  await dialog.getByRole('button', { name: '核对资金状态' }).click()
-  await expect(dialog.getByText('Arbitrum Sepolia 到账已核验')).toBeVisible()
+  await expect(dialog.getByText('Arbitrum Sepolia 到账已核验')).toBeVisible({
+    timeout: 15000,
+  })
+  expect(funds.writes).toHaveLength(1)
 })
 
 test('Web3 提款费用上升必须再次点击确认，修改金额不会签名，拒绝后可重试', async ({
@@ -3806,7 +4219,6 @@ test('Web3 首次入金：未激活账户不请求交易授权签名，直接引
   await page.goto('/')
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
-  await page.locator('header').getByRole('button', { name: '启用交易' }).click()
   const dialog = page.getByRole('dialog')
   await expect(
     dialog.getByRole('heading', { name: '存款', exact: true }),
@@ -3815,7 +4227,7 @@ test('Web3 首次入金：未激活账户不请求交易授权签名，直接引
   await expect(
     dialog.getByRole('button', { name: '需要 Arbitrum Sepolia ETH' }),
   ).toBeDisabled()
-  await expect(dialog.getByText(/源链 ETH 余额为 0/)).toBeVisible()
+  await expect(dialog.getByText('Arbitrum Sepolia ETH 余额不足')).toBeVisible()
   expect(exchangeWrites).toBe(0)
   expect(
     await page.evaluate(() => localStorage.getItem('test-sign-count')),
@@ -3825,9 +4237,8 @@ test('Web3 首次入金：未激活账户不请求交易授权签名，直接引
   })
   exists = true
   await dialog.getByRole('button', { name: '关闭钱包面板' }).click()
-  await page.locator('header').getByRole('button', { name: '启用交易' }).click()
-  await expect(page.getByRole('dialog', { name: '启用交易' })).toBeVisible()
-  await page.getByRole('button', { name: '建立连接' }).click()
+  await page.locator('header').getByRole('button', { name: /0x.*▾/ }).click()
+  await page.getByRole('button', { name: '重新连接并核验' }).click()
   await expect(
     page.getByRole('button', { name: '下单', exact: true }),
   ).toBeEnabled()
@@ -3857,8 +4268,6 @@ test('Web3 交易所返回 Must deposit 时转为存款引导，不保留错误�
   await page.goto('/')
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
-  await page.locator('header').getByRole('button', { name: '启用交易' }).click()
-  await page.getByRole('button', { name: '建立连接' }).click()
   await expect(
     page
       .getByRole('dialog')
@@ -3868,18 +4277,20 @@ test('Web3 交易所返回 Must deposit 时转为存款引导，不保留错误�
     page
       .getByRole('region', { name: '全局通知' })
       .getByText(
-        'Hyperliquid 测试网账户尚未激活。请先存入测试 USDC 并等待到账，再启用交易。',
+        'Hyperliquid 测试网账户尚未激活。请先存入测试 USDC 并等待到账，再完成钱包连接。',
         { exact: true },
       ),
   ).toBeVisible()
   expect(attempts).toBe(1)
   await page.getByRole('button', { name: '关闭钱包面板' }).click()
   await expect(
-    page.getByRole('button', { name: '启用交易', exact: true }).first(),
+    page
+      .getByRole('region', { name: '下单面板' })
+      .getByRole('button', { name: '存款', exact: true }),
   ).toBeEnabled()
 })
 
-test('Web3 独立资金弹窗：入口直达、无钱包 Tab，FameEX 下拉完整可见，关闭不签名', async ({
+test('Web3 独立资金弹窗：存提资产网络可下拉选择，无多余引导，关闭不签名', async ({
   page,
 }) => {
   const { writes } = await mockExchange(page)
@@ -3908,9 +4319,6 @@ test('Web3 独立资金弹窗：入口直达、无钱包 Tab，FameEX 下拉完�
       await expect(
         page.getByRole('option', { name: 'USDC', exact: true }),
       ).toBeVisible()
-      await page.screenshot({
-        path: `output-tdd/playwright/funding-dialogs/${name}-asset-open.png`,
-      })
       await page.getByRole('option', { name: 'USDC', exact: true }).click()
       const trigger = dialog.getByRole('button', {
         name: /Arbitrum Sepolia · 测试网/,
@@ -3923,9 +4331,25 @@ test('Web3 独立资金弹窗：入口直达、无钱包 Tab，FameEX 下拉完�
           exact: true,
         }),
       ).toBeVisible()
+      await page.screenshot({
+        path: `output-tdd/playwright/funding-dialogs/${name}-network-open.png`,
+      })
       await page.keyboard.press('Escape')
       await expect(trigger).toBeFocused()
     }
+    await expect(
+      dialog.getByText('没有测试资金？', { exact: true }),
+    ).toHaveCount(0)
+    await expect(
+      dialog.getByText('在您的合约和现货余额之间划转 USDC。', { exact: true }),
+    ).toHaveCount(0)
+    await expect(dialog.getByText(/通常约 5 分钟到账/)).toHaveCount(0)
+    await expect(dialog.getByText('解除本地保护', { exact: true })).toHaveCount(
+      0,
+    )
+    await expect(
+      dialog.getByText('手动核对未确认请求', { exact: true }),
+    ).toHaveCount(0)
     const viewport = await dialog.evaluate((element) => ({
       height: element.parentElement?.clientHeight,
       scrollHeight: element.parentElement?.scrollHeight,
@@ -3971,8 +4395,9 @@ test('Web3 提款单页：先展示费用与最大值，点击提款才签名，
   ).toBeEnabled()
   expect(funds.writes).toHaveLength(0)
   funds.increaseGas()
-  await dialog.getByRole('button', { name: '刷新余额' }).click()
-  await expect(dialog.getByText(/0\.00004000 HYPE/)).toBeVisible()
+  await expect(dialog.getByText(/0\.00004000 HYPE/)).toBeVisible({
+    timeout: 20000,
+  })
   await dialog.getByRole('button', { name: '现货转入合约' }).click()
   await expect(
     page.getByRole('dialog').getByRole('heading', { name: '划转 USDC' }),
@@ -4035,9 +4460,14 @@ test('Web3 提款报价期间切换账户，旧请求不得覆盖新账户或请
     window.dispatchEvent(new Event('test-account-change')),
   )
   await expect(
-    page.getByRole('dialog').getByRole('heading', { name: '连接钱包' }),
+    page.getByRole('dialog').getByRole('heading', { name: '连接' }),
   ).toBeVisible()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page
+    .getByRole('region', { name: '账户概览' })
+    .getByRole('button', { name: '提款', exact: true })
+    .click()
   await expect(
     page
       .getByRole('dialog')
@@ -4076,9 +4506,7 @@ test('Web3 存款授权 Gas 被拒后金额仍可编辑，无需解除保护即�
     dialog.getByText(/Gas 费低于当前区块基础费，交易被拒绝/),
   ).toBeVisible()
   await expect(amount).toBeEditable()
-  await expect(
-    dialog.getByText('结果未知，请核对钱包记录，勿重复提交'),
-  ).toHaveCount(0)
+  await expect(dialog.getByText('资金结果待确认')).toHaveCount(0)
   await expect(dialog.getByText('手动核对未确认请求')).toHaveCount(0)
   expect(funds.transactions).toHaveLength(0)
   await expect(dialog).toHaveCSS('opacity', '1')
@@ -4224,6 +4652,148 @@ test('Web3 授权确认期间切换钱包，停止下一笔存款', async ({ pag
   expect(funds.transactions).toHaveLength(1)
 })
 
+for (const saved of [null, '[]', '{invalid', '{"BTC":true}', '["delisted"]']) {
+  test(`市场自选为空时可一键添加可用主流合约：${saved}`, async ({ page }) => {
+    await mockExchange(page)
+    await page.goto('/')
+    await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
+    if (saved !== null)
+      await page.evaluate(
+        (value) => localStorage.setItem('hl-favorite-markets', value),
+        saved,
+      )
+    await page.getByRole('button', { name: '交易市场', exact: true }).click()
+    const selector = page.getByRole('region', { name: '市场选择器' })
+    await selector.getByRole('tab', { name: '自选', exact: true }).click()
+    await expect(selector.getByRole('option')).toHaveCount(0)
+    expect(
+      await page.evaluate(() => localStorage.getItem('hl-favorite-markets')),
+    ).toBe(saved)
+    await selector.getByRole('button', { name: '一键自选主流币对' }).click()
+    await expect(selector.getByRole('option')).toHaveCount(3)
+    for (const coin of ['BTC', 'ETH', 'SOL']) {
+      await expect(
+        selector.getByRole('button', {
+          name: `取消收藏 ${coin} / USDC`,
+          exact: true,
+        }),
+      ).toHaveAttribute('aria-pressed', 'true')
+    }
+    const stored = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('hl-favorite-markets') ?? '[]'),
+    )
+    expect(stored.filter((coin: string) => coin !== 'delisted').sort()).toEqual(
+      ['BTC', 'ETH', 'SOL'],
+    )
+  })
+}
+
+test('市场自选保留已有收藏，增删后刷新仍一致，清空后可重新一键添加', async ({
+  page,
+}) => {
+  await mockExchange(page)
+  await page.goto('/')
+  await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
+  await page.evaluate(() =>
+    localStorage.setItem('hl-favorite-markets', JSON.stringify(['BTC', '@7'])),
+  )
+  const trigger = page.getByRole('button', { name: '交易市场', exact: true })
+  await trigger.click()
+  const selector = page.getByRole('region', { name: '市场选择器' })
+  await expect(
+    selector.getByRole('button', { name: '一键自选主流币对' }),
+  ).toHaveCount(0)
+  await selector
+    .getByRole('button', { name: '收藏 ETH / USDC', exact: true })
+    .click()
+  await selector.getByRole('tab', { name: '自选', exact: true }).click()
+  await expect(selector.getByRole('option')).toHaveCount(3)
+  await selector
+    .getByRole('button', { name: '取消收藏 BTC / USDC', exact: true })
+    .click()
+  await page.reload()
+  await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
+  await trigger.click()
+  await selector.getByRole('tab', { name: '自选', exact: true }).click()
+  await expect(selector.getByRole('option')).toHaveCount(2)
+  for (const coin of ['ETH', 'HYPE'])
+    await selector
+      .getByRole('button', { name: `取消收藏 ${coin} / USDC`, exact: true })
+      .click()
+  await expect(
+    selector.getByRole('button', { name: '一键自选主流币对' }),
+  ).toBeVisible()
+  expect(
+    await page.evaluate(() => localStorage.getItem('hl-favorite-markets')),
+  ).toBe('[]')
+})
+
+test('市场自选存储失败会提示且不会显示已保存', async ({ page }) => {
+  await mockExchange(page)
+  await page.addInitScript(() => {
+    const setItem = Storage.prototype.setItem
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'hl-favorite-markets')
+        throw new DOMException('Storage blocked', 'QuotaExceededError')
+      setItem.call(this, key, value)
+    }
+  })
+  await page.goto('/')
+  await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: '交易市场', exact: true }).click()
+  await page.getByRole('button', { name: '一键自选主流币对' }).click()
+  await expect(
+    page.getByText('无法保存自选，请允许浏览器本地存储后重试。', {
+      exact: true,
+    }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('region', { name: '市场选择器' }).getByRole('option'),
+  ).toHaveCount(0)
+  expect(
+    await page.evaluate(() => localStorage.getItem('hl-favorite-markets')),
+  ).toBeNull()
+})
+
+test('市场币种图标按基础币种加载，失败有占位，切换后恢复图标', async ({
+  page,
+}) => {
+  await mockExchange(page)
+  await page.route('https://app.hyperliquid.xyz/coins/*.svg', async (route) => {
+    if (route.request().url().endsWith('/BTC.svg')) return route.abort()
+    await route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="14" fill="green"/></svg>',
+    })
+  })
+  await page.goto('/')
+  await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
+  const trigger = page.getByRole('button', { name: '交易市场', exact: true })
+  await expect(trigger.locator('img')).toHaveCount(0)
+  await expect(trigger.locator('[aria-hidden=true]').first()).toHaveText('B')
+  await trigger.click()
+  const selector = page.getByRole('region', { name: '市场选择器' })
+  await expect(
+    selector
+      .getByRole('option', { name: 'HYPE / USDC', exact: true })
+      .locator('img'),
+  ).toHaveAttribute('src', 'https://app.hyperliquid.xyz/coins/HYPE.svg')
+  await selector
+    .getByRole('option', { name: 'ETH / USDC', exact: true })
+    .click()
+  await expect(trigger.locator('img')).toHaveAttribute(
+    'src',
+    'https://app.hyperliquid.xyz/coins/ETH.svg',
+  )
+  await expect
+    .poll(() =>
+      trigger
+        .locator('img')
+        .evaluate((image: HTMLImageElement) => image.naturalWidth),
+    )
+    .toBeGreaterThan(0)
+})
+
 for (const width of [1280, 390]) {
   test(`市场下拉表头与数值列右侧对齐，滚动排序后保持一致：${width}`, async ({
     page,
@@ -4285,6 +4855,11 @@ for (const width of [1280, 390]) {
     ).toBeLessThanOrEqual(1)
     const menu = await selector.boundingBox()
     if (!menu) throw new Error('市场下拉不可见')
+    const trigger = await page
+      .getByRole('button', { name: '交易市场', exact: true })
+      .boundingBox()
+    if (!trigger) throw new Error('市场触发按钮不可见')
+    expect(Math.abs(menu.x - trigger.x)).toBeLessThanOrEqual(1)
     expect(menu.y).toBeGreaterThanOrEqual(0)
     expect(menu.y + menu.height).toBeLessThanOrEqual(720)
     await page.screenshot({
@@ -4311,7 +4886,7 @@ test('交易连接刷新后恢复，不重复授权；交易所撤销后不能�
   exchange.revokeAgent()
   await page.reload()
   await expect(
-    page.getByRole('button', { name: '启用交易', exact: true }).first(),
+    page.getByRole('button', { name: '完成钱包连接', exact: true }),
   ).toBeVisible()
   expect(exchange.agentRegistrations()).toBe(1)
   expect(exchange.writes).toEqual([])
@@ -4358,7 +4933,7 @@ test('普通下单可取消确认、记住偏好；撤单和刷新不会再次�
   expect(exchange.writes).toHaveLength(3)
 })
 
-test('交易连接默认仅标签页保存；保持连接须主动勾选，断开清除凭据', async ({
+test('交易连接默认仅标签页保存；断开不自动恢复，重连复用授权，保持连接可升级保存', async ({
   page,
 }) => {
   const exchange = await mockExchange(page)
@@ -4371,20 +4946,40 @@ test('交易连接默认仅标签页保存；保持连接须主动勾选，断�
   expect(await storageState()).toEqual({ session: true, persistent: false })
   await page.locator('header').getByRole('button', { name: /0x.*▾/ }).click()
   await page.getByRole('button', { name: '断开钱包', exact: true }).click()
-  expect(await storageState()).toEqual({ session: false, persistent: false })
+  expect(await storageState()).toEqual({ session: true, persistent: false })
+  await page.reload()
+  await expect(
+    page.getByRole('button', { name: '连接钱包', exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toHaveCount(0)
+  expect(exchange.agentRegistrations()).toBe(1)
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
-  await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
-  await page.locator('header').getByRole('button', { name: '启用交易' }).click()
-  await expect(page.getByRole('dialog', { name: '启用交易' })).toHaveCSS(
+  expect(exchange.agentRegistrations()).toBe(1)
+  await expect(page.getByRole('dialog', { name: '连接' })).toHaveCSS(
     'opacity',
     '1',
   )
   await page.screenshot({
-    path: 'output-tdd/playwright/trading-flow-audit/enable-trading.png',
+    path: 'output-tdd/playwright/trading-flow-audit/connection-permissions.png',
     animations: 'disabled',
   })
+  await expect(
+    page.getByText('连接权限与保持连接', { exact: true }),
+  ).toHaveCount(0)
+  await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toBeEnabled()
+  expect(await storageState()).toEqual({ session: true, persistent: false })
+  exchange.revokeAgent()
+  await page.reload()
+  await page.getByRole('button', { name: '完成钱包连接', exact: true }).click()
   await page.getByRole('checkbox', { name: '保持连接', exact: true }).check()
-  await page.getByRole('button', { name: '建立连接' }).click()
+  await page
+    .getByRole('button', { name: '重新连接并核验', exact: true })
+    .click()
   await expect(
     page.getByRole('button', { name: '下单', exact: true }),
   ).toBeEnabled()
@@ -4457,7 +5052,7 @@ test('交易所连接过期时，不恢复旧账户签名能力', async ({ page 
   exchange.expireAgent()
   await page.reload()
   await expect(
-    page.locator('header').getByRole('button', { name: '启用交易' }),
+    page.getByRole('button', { name: '完成钱包连接', exact: true }),
   ).toBeVisible()
   expect(
     await page.evaluate(
@@ -4468,7 +5063,7 @@ test('交易所连接过期时，不恢复旧账户签名能力', async ({ page 
   expect(exchange.writes).toHaveLength(0)
 })
 
-test('已启用连接被交易所拒绝后回到待启用状态，不保留错误连接或待确认锁', async ({
+test('有效连接被交易所拒绝后回到待连接状态，不保留错误连接或待确认锁', async ({
   page,
 }) => {
   const exchange = await mockExchange(page)
@@ -4485,7 +5080,7 @@ test('已启用连接被交易所拒绝后回到待启用状态，不保留错�
   await page.getByLabel('数量（BTC）', { exact: true }).fill('0.001')
   await signPreview(page)
   await expect(
-    page.locator('header').getByRole('button', { name: '启用交易' }),
+    page.getByRole('button', { name: '完成钱包连接', exact: true }),
   ).toBeVisible()
   await expect(
     page.getByRole('button', { name: '查询未确认订单' }),
@@ -4498,43 +5093,48 @@ test('已启用连接被交易所拒绝后回到待启用状态，不保留错�
   expect(exchange.agentRegistrations()).toBe(1)
 })
 
-test('开仓与平仓确认偏好相互独立，账户面板可恢复确认', async ({ page }) => {
+test('开仓与平仓确认偏好相互独立，Header 设置可恢复且刷新保留', async ({
+  page,
+}) => {
   const exchange = await mockExchange(page)
   await ready(page)
   await page.getByRole('tab', { name: '市价单', exact: true }).click()
   await page.getByLabel('数量（BTC）', { exact: true }).fill('0.001')
   await page.getByRole('button', { name: '下单', exact: true }).click()
-  await page.screenshot({
-    path: 'output-tdd/playwright/trading-flow-audit/order-confirmation.png',
-    animations: 'disabled',
-  })
   await page.getByRole('checkbox', { name: '不再显示此消息' }).check()
   await confirmOrder(page)
-  await page.getByRole('button', { name: '市价 / 限价', exact: true }).click()
-  await expect(page.getByLabel('BTC 减仓数量')).toHaveValue('0.001')
-  await page.getByLabel('BTC 减仓数量').fill('0.0005')
-  await page.getByRole('button', { name: '预览平仓', exact: true }).click()
+  await page.getByRole('button', { name: '交易设置', exact: true }).click()
   await expect(
-    page.getByRole('dialog', { name: '确认减仓 / 平仓' }),
-  ).toBeVisible()
-  await page.getByRole('checkbox', { name: '不再显示此消息' }).check()
-  await confirmOrder(page)
+    page.getByRole('switch', { name: '下单确认', exact: true }),
+  ).not.toBeChecked()
+  await expect(
+    page.getByRole('switch', { name: '平仓确认', exact: true }),
+  ).toBeChecked()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: '市价', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '市价平仓', exact: true })
+  await dialog.getByLabel('数量（BTC）', { exact: true }).fill('0.0005')
+  await dialog.getByRole('checkbox', { name: '不再显示此消息' }).check()
+  await dialog.getByRole('button', { name: '市价平仓', exact: true }).click()
   await expect(
     page.getByRole('cell', { name: '0.0005', exact: true }),
   ).toBeVisible()
-  await page.getByRole('button', { name: '市价 / 限价', exact: true }).click()
-  await page.getByRole('button', { name: '预览平仓', exact: true }).click()
-  await expect(page.getByText('暂无记录', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '市价', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByText('暂无记录', { exact: true })).toBeVisible()
   expect(exchange.writes).toHaveLength(3)
-  expect(
-    await page.evaluate(() => sessionStorage.getItem('mock-wallet-signs')),
-  ).toBe('1')
-  await page.locator('header').getByRole('button', { name: /0x.*▾/ }).click()
-  await page.getByRole('button', { name: '恢复下单和平仓确认' }).click()
+  await page.getByRole('button', { name: '交易设置', exact: true }).click()
+  await page.getByRole('switch', { name: '下单确认', exact: true }).check()
+  await page.getByRole('switch', { name: '平仓确认', exact: true }).check()
+  await page.keyboard.press('Escape')
+  await page.reload()
+  await page.getByRole('button', { name: '交易设置', exact: true }).click()
   await expect(
-    page.getByRole('button', { name: '已恢复订单确认' }),
-  ).toBeVisible()
+    page.getByRole('switch', { name: '下单确认', exact: true }),
+  ).toBeChecked()
+  await expect(
+    page.getByRole('switch', { name: '平仓确认', exact: true }),
+  ).toBeChecked()
   expect(
     await page.evaluate(() => [
       localStorage.getItem('hl-skip-order-confirm'),
@@ -4629,7 +5229,7 @@ test('全局提示悬浮展示成功结果，不挤动交易布局', async ({ pa
   await mockExchange(page)
   await ready(page)
   const notices = page.getByRole('region', { name: '全局通知' })
-  await expect(notices).toContainText('交易已启用')
+  await expect(notices).toContainText('钱包连接完成')
   await expect(notices.locator('[data-feedback="success"]')).toBeVisible()
   const chart = page.getByRole('region', { name: '行情图表', exact: true })
   const before = await chart.boundingBox()
@@ -4638,7 +5238,7 @@ test('全局提示悬浮展示成功结果，不挤动交易布局', async ({ pa
   expect(await chart.boundingBox()).toEqual(before)
 })
 
-test('钱包连接等待原生权限确认，拒绝可重试，成功后不自动签名或下单', async ({
+test('钱包连接等待原生权限确认，拒绝可重试，成功后衔接交易签名，不自动下单', async ({
   page,
 }) => {
   const exchange = await mockExchange(page)
@@ -4653,7 +5253,8 @@ test('钱包连接等待原生权限确认，拒绝可重试，成功后不自�
     Object.defineProperty(wallet, 'request', {
       configurable: true,
       value: async (params: Parameters<typeof request>[0]) => {
-        if (params.method !== 'eth_requestAccounts') return request(params)
+        if (params.method !== 'wallet_requestPermissions')
+          return request(params)
         sessionStorage.setItem(
           'test-connect-requests',
           String(
@@ -4666,7 +5267,7 @@ test('钱包连接等待原生权限确认，拒绝可重试，成功后不自�
             (event) => {
               if ((event as CustomEvent).detail === 'reject')
                 reject({ code: 4001, message: 'User rejected connection' })
-              else resolve(['0x1111111111111111111111111111111111111111'])
+              else resolve([{ parentCapability: 'eth_accounts' }])
             },
             { once: true },
           )
@@ -4675,14 +5276,16 @@ test('钱包连接等待原生权限确认，拒绝可重试，成功后不自�
     })
   })
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '连接钱包', exact: true })
+  const dialog = page.getByRole('dialog', { name: '连接', exact: true })
   await dialog.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
   await expect(dialog.getByRole('status')).toContainText(
     '请在浏览器钱包中确认连接',
   )
   await expect(
-    dialog.getByText('连接不会提交订单或转移资金。', { exact: true }),
-  ).toBeVisible()
+    dialog.getByText('连接将请求账户访问与交易签名；不会自动下单或转移资金。', {
+      exact: true,
+    }),
+  ).toHaveCount(0)
   await expect(
     dialog.getByRole('button', { name: /浏览器钱包.*等待/ }),
   ).toBeDisabled()
@@ -4714,15 +5317,15 @@ test('钱包连接等待原生权限确认，拒绝可重试，成功后不自�
   )
   await expect(dialog).toHaveCount(0)
   await expect(
-    page.locator('header').getByRole('button', { name: '启用交易' }),
-  ).toBeVisible()
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toBeEnabled()
   expect(
     await page.evaluate(() => sessionStorage.getItem('test-connect-requests')),
   ).toBe('2')
   expect(
     await page.evaluate(() => sessionStorage.getItem('mock-wallet-signs')),
-  ).toBeNull()
-  expect(exchange.agentRegistrations()).toBe(0)
+  ).toBe('1')
+  expect(exchange.agentRegistrations()).toBe(1)
   expect(exchange.writes).toHaveLength(0)
 })
 
@@ -4738,20 +5341,14 @@ test('已有交易登记但本地密钥丢失不算新账户，也不能仅凭�
   await page.reload()
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
-  await expect(page.getByRole('region', { name: '账户概览' })).toContainText(
-    '已连接 · 待启用交易',
-  )
-  await page.locator('header').getByRole('button', { name: '启用交易' }).click()
-  const dialog = page.getByRole('dialog', { name: '启用交易', exact: true })
-  await expect(dialog).toBeVisible()
-  await expect(dialog).toContainText('与账户是否曾交易无关')
   await expect(
-    page.getByRole('dialog', { name: '存款', exact: true }),
-  ).toHaveCount(0)
-  expect(exchange.agentRegistrations()).toBe(1)
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toBeEnabled()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(exchange.agentRegistrations()).toBe(2)
   expect(
     await page.evaluate(() => sessionStorage.getItem('mock-wallet-signs')),
-  ).toBe('1')
+  ).toBe('2')
   expect(exchange.writes).toHaveLength(0)
 })
 
@@ -4768,13 +5365,14 @@ test('钱包已有权限请求时提示处理原生窗口，不自动重复连�
     Object.defineProperty(wallet, 'request', {
       configurable: true,
       value: async (params: Parameters<typeof request>[0]) => {
-        if (params.method !== 'eth_requestAccounts') return request(params)
+        if (params.method !== 'wallet_requestPermissions')
+          return request(params)
         throw { code: -32002, message: 'Request already pending' }
       },
     })
   })
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '连接钱包', exact: true })
+  const dialog = page.getByRole('dialog', { name: '连接', exact: true })
   await dialog.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
   await expect(dialog.getByRole('alert')).toContainText(
     '钱包中已有待处理的连接请求',
@@ -4863,8 +5461,7 @@ test('断网与未捕获异常提示去重并限制数量，不暴露异常原�
       await route.fulfill({ status: 503, body: 'Service unavailable' })
     else await route.fallback()
   })
-  await page.getByRole('button', { name: '刷新', exact: true }).click()
-  await expect(notices).toContainText('账户查询失败')
+  await expect(notices).toContainText('账户查询失败', { timeout: 20000 })
   await expect(notices.locator('output')).toHaveCount(3)
   expect(await chart.boundingBox()).toEqual(before)
   await page.screenshot({
@@ -5101,13 +5698,19 @@ test('语言和动态元数据跟随币对，切换不刷新、不丢失下单�
     'BTC',
   )
   await expect(page).toHaveTitle(/BTC \/ USDC.*永续/)
-  const icon = page.locator('head link[rel="icon"]')
-  await expect(icon).toHaveAttribute('type', 'image/svg+xml')
+  const icon = page.locator('head link[rel="icon"][type="image/png"]')
+  await expect(icon).toHaveAttribute('sizes', '32x32')
   const iconPath = await icon.getAttribute('href')
-  expect(iconPath).toMatch(/^\/icon\.svg/)
+  expect(iconPath).toMatch(/^\/icon\.png/)
   const iconResponse = await page.request.get(iconPath ?? '')
   expect(iconResponse.status()).toBe(200)
-  expect(await iconResponse.text()).toContain('Hyperliquid Terminal')
+  expect((await iconResponse.body()).subarray(1, 4).toString()).toBe('PNG')
+  await expect(
+    page.locator('head link[rel="icon"][href^="/favicon.ico"]'),
+  ).toHaveCount(1)
+  await expect(
+    page.locator('head link[rel="apple-touch-icon"]'),
+  ).toHaveAttribute('sizes', '180x180')
   await expect(page.getByRole('navigation', { name: '交易导航' })).toHaveCount(
     0,
   )
@@ -5183,13 +5786,19 @@ test('快速盘口独立于深档快照刷新，仓位通过账户推送更新',
   await expect(
     positions.getByRole('columnheader', { name: '盈亏 / 收益率' }),
   ).toBeVisible()
-  await positions.getByRole('button', { name: '市价 / 限价' }).click()
-  await page.getByRole('tab', { name: '限价', exact: true }).click()
+  await positions.getByRole('button', { name: '限价', exact: true }).click()
   await page.getByLabel('平仓价格', { exact: true }).fill('71000')
-  await page.getByRole('button', { name: '50%', exact: true }).click()
-  await expect(page.getByLabel('BTC 减仓数量')).toHaveValue('0.001')
-  await page.getByRole('button', { name: '预览平仓' }).click()
-  await confirmOrder(page)
+  await page
+    .getByRole('dialog')
+    .getByLabel('数量（BTC）', { exact: true })
+    .fill('0.001')
+  await expect(
+    page.getByRole('dialog').getByLabel('数量（BTC）', { exact: true }),
+  ).toHaveValue('0.001')
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: '确认', exact: true })
+    .click()
   await expect
     .poll(() => exchange.writes.at(-1)?.orders?.[0])
     .toMatchObject({
@@ -5199,11 +5808,11 @@ test('快速盘口独立于深档快照刷新，仓位通过账户推送更新',
       t: { limit: { tif: 'Gtc' } },
     })
   await expect(
-    positions.getByRole('button', { name: '市价 / 限价' }),
+    positions.getByRole('button', { name: '市价', exact: true }),
   ).toBeEnabled()
   exchange.setPosition(0)
-  await positions.getByRole('button', { name: '市价 / 限价' }).click()
-  await page.getByRole('button', { name: '预览平仓' }).click()
+  await positions.getByRole('button', { name: '市价', exact: true }).click()
+  await page.getByRole('button', { name: '市价平仓', exact: true }).click()
   await expect(
     page.getByText('仓位已关闭，请刷新账户', { exact: true }),
   ).toBeVisible()
@@ -5293,8 +5902,883 @@ test('手动连接只提示本次连接并自动关闭，不重播历史资金�
     .click()
   const success = page.locator('[data-feedback="success"]')
   await expect(success).toHaveCount(1)
-  await expect(success).toHaveText('钱包已连接，正在读取余额与交易记录。')
+  await expect(success).toHaveText('钱包连接完成，可以直接交易。')
   await expect(success).toHaveCount(0, { timeout: 12000 })
-  expect(exchange.agentRegistrations()).toBe(0)
+  expect(exchange.agentRegistrations()).toBe(1)
   expect(exchange.writes).toHaveLength(0)
+})
+
+test('止盈止损价格与收益双向联动，随价格方向数量更新并拦截无效目标', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  await ready(page)
+  await page.getByLabel('价格（USDC）', { exact: true }).fill('70000')
+  await page.getByLabel('数量（BTC）', { exact: true }).fill('0.001')
+  await page.getByRole('checkbox', { name: '止盈 / 止损', exact: true }).check()
+  const tp = page.getByLabel('止盈价格', { exact: true })
+  const profit = page.getByRole('textbox', { name: '收益', exact: true })
+  await profit.fill('3')
+  await expect(tp).toHaveValue('71050')
+  await page.getByLabel('价格（USDC）', { exact: true }).fill('72000')
+  await expect(tp).toHaveValue('73080')
+  await page.getByRole('tab', { name: '卖出 / 做空', exact: true }).click()
+  await expect(tp).toHaveValue('70920')
+  await tp.fill('70000')
+  await expect(profit).toHaveValue('5.5556')
+  await page.getByRole('button', { name: '收益单位', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'USDC', exact: true }).click()
+  await expect(profit).toHaveValue('2')
+  await profit.fill('3')
+  await expect(tp).toHaveValue('69000')
+  await page.getByLabel('数量（BTC）', { exact: true }).fill('0.002')
+  await expect(tp).toHaveValue('70500')
+  await profit.fill('999999')
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toBeDisabled()
+  await profit.fill('3')
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toBeEnabled()
+  exchange.pushMarket('BTC', 72000)
+  await expect(
+    page.getByRole('button', { name: '买盘 71999 档位详情' }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: '下单', exact: true }).click()
+  await confirmOrder(page)
+  await expect
+    .poll(() => exchange.writes.at(-1)?.orders?.[1])
+    .toMatchObject({
+      b: true,
+      r: true,
+      s: '0.002',
+      t: { trigger: { triggerPx: '70500', tpsl: 'tp', isMarket: true } },
+    })
+})
+
+test('仓位移动止损提交原生请求，反手使用双倍数量且不只减仓', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  exchange.setPosition(0.002)
+  await ready(page)
+  const positions = page.getByRole('table', { name: '仓位', exact: true })
+  await positions.getByRole('button', { name: '移动止损', exact: true }).click()
+  let dialog = page.getByRole('dialog', { name: '设置移动止损', exact: true })
+  const distanceInput = dialog.getByLabel('回撤距离', { exact: true })
+  expect(
+    await distanceInput.evaluate(
+      (element) =>
+        !!element
+          .closest('[data-slot="input-wrapper"]')
+          ?.querySelector('[aria-label="回撤单位"]'),
+    ),
+  ).toBe(true)
+  await dialog.getByRole('button', { name: /回撤单位/ }).click()
+  await expect(
+    page.getByRole('menuitemradio', { name: 'USDC', exact: true }),
+  ).toBeVisible()
+  await page.mouse.move(0, 0)
+  await expect(page.getByRole('menu')).toHaveCSS('opacity', '1')
+  await page.screenshot({
+    path: 'output-tdd/playwright/wallet-permissions/trailing-unit.png',
+  })
+  await page.getByRole('menuitemradio', { name: 'USDC', exact: true }).click()
+  await expect(dialog.getByRole('button', { name: /回撤单位/ })).toContainText(
+    'USDC',
+  )
+  await dialog.getByRole('button', { name: '5%', exact: true }).click()
+  await dialog.getByLabel('回撤距离', { exact: true }).fill('5')
+  await dialog.getByRole('button', { name: '确认', exact: true }).click()
+  await expect
+    .poll(() => exchange.writes.at(-1))
+    .toMatchObject({
+      type: 'trailingStop',
+      sz: '0.002',
+      reduceOnly: true,
+      isBuy: false,
+      retracement: { pct: '5%' },
+    })
+  await expect(dialog).toHaveCount(0)
+  await positions.getByRole('button', { name: '反手', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: '反向仓位' })
+  await expect(dialog.getByText('0.004 BTC', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('多头 → 空头', { exact: true })).toHaveCSS(
+    'color',
+    'rgb(242, 86, 104)',
+  )
+  await expect(dialog.getByText('0.004 BTC', { exact: true })).toHaveCSS(
+    'color',
+    'rgb(242, 86, 104)',
+  )
+  await expect(
+    dialog.getByRole('button', { name: '卖出 / 做空', exact: true }),
+  ).toHaveCSS('background-color', 'rgb(242, 86, 104)')
+  await page.screenshot({
+    path: 'output-tdd/playwright/wallet-permissions/reverse-short.png',
+    animations: 'disabled',
+  })
+  await dialog.getByRole('button', { name: '卖出 / 做空', exact: true }).click()
+  await expect
+    .poll(() => exchange.writes.at(-1)?.orders?.[0])
+    .toMatchObject({
+      b: false,
+      r: false,
+      s: '0.004',
+      t: { limit: { tif: 'Ioc' } },
+    })
+  await expect(positions.getByText('空头', { exact: true })).toBeVisible()
+  await positions.getByRole('button', { name: '反手', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: '反向仓位' })
+  await expect(dialog.getByText('空头 → 多头', { exact: true })).toHaveCSS(
+    'color',
+    'rgb(0, 185, 150)',
+  )
+  await expect(dialog.getByText('0.004 BTC', { exact: true })).toHaveCSS(
+    'color',
+    'rgb(0, 185, 150)',
+  )
+  await expect(
+    dialog.getByRole('button', { name: '买入 / 做多', exact: true }),
+  ).toHaveCSS('background-color', 'rgb(0, 185, 150)')
+})
+
+test('仓位止盈止损支持固定数量限价保护，一次确认后提交', async ({ page }) => {
+  const exchange = await mockExchange(page)
+  exchange.setPosition(0.002)
+  await ready(page)
+  await page.getByRole('button', { name: '止盈 / 止损', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('止盈价格', { exact: true }).fill('72000')
+  await dialog.getByRole('checkbox', { name: '配置金额' }).check()
+  await dialog.getByLabel('数量（BTC）', { exact: true }).fill('0.001')
+  await dialog.getByRole('checkbox', { name: '限价保护' }).check()
+  await dialog.getByLabel('止盈限价', { exact: true }).fill('71900')
+  await dialog.getByRole('button', { name: '确认', exact: true }).click()
+  await expect
+    .poll(() => exchange.writes.at(-1))
+    .toMatchObject({
+      grouping: 'positionTpsl',
+      orders: [
+        {
+          r: true,
+          s: '0.001',
+          p: '71900',
+          t: { trigger: { triggerPx: '72000', tpsl: 'tp', isMarket: false } },
+        },
+      ],
+    })
+  await expect(dialog).toHaveCount(0)
+})
+
+test('逐仓保证金追加与移除校验额度并提交有符号微美元，全仓不显示入口', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  exchange.setPosition(0.002)
+  await ready(page)
+  await expect(
+    page.getByRole('button', { name: 'BTC 调整逐仓保证金' }),
+  ).toHaveCount(0)
+  exchange.setIsolated(35)
+  exchange.pushAccount()
+  await page.getByRole('button', { name: 'BTC 调整逐仓保证金' }).click()
+  let dialog = page.getByRole('dialog', { name: '调整逐仓保证金' })
+  await dialog.getByLabel('保证金金额', { exact: true }).fill('10')
+  await dialog.getByRole('button', { name: '确认', exact: true }).click()
+  await expect
+    .poll(() => exchange.writes.at(-1))
+    .toMatchObject({
+      type: 'updateIsolatedMargin',
+      asset: 3,
+      isBuy: true,
+      ntli: 10000000,
+    })
+  await expect(dialog).toHaveCount(0)
+  await page.getByRole('button', { name: 'BTC 调整逐仓保证金' }).click()
+  dialog = page.getByRole('dialog', { name: '调整逐仓保证金' })
+  await dialog
+    .getByRole('button', { name: '保证金调整方向', exact: true })
+    .click()
+  await page.getByRole('menuitemradio', { name: '移除', exact: true }).click()
+  await expect(dialog.getByText('31 USDC', { exact: true })).toBeVisible()
+  await dialog.getByLabel('保证金金额', { exact: true }).fill('32')
+  await expect(
+    dialog.getByRole('button', { name: '确认', exact: true }),
+  ).toBeDisabled()
+  await dialog.getByLabel('保证金金额', { exact: true }).fill('1.001')
+  await expect(
+    dialog.getByRole('button', { name: '确认', exact: true }),
+  ).toBeDisabled()
+  await dialog.getByRole('button', { name: '最大', exact: true }).click()
+  await expect(dialog.getByLabel('保证金金额', { exact: true })).toHaveValue(
+    '31',
+  )
+  await dialog.getByRole('button', { name: '确认', exact: true }).click()
+  await expect
+    .poll(() => exchange.writes.at(-1))
+    .toMatchObject({ type: 'updateIsolatedMargin', ntli: -31000000 })
+})
+
+test('交易说明支持悬浮与键盘聚焦，图表周期下拉仍可操作', async ({ page }) => {
+  await mockExchange(page)
+  await page.goto('/')
+  await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
+  const label = page
+    .locator('dfn')
+    .filter({ hasText: /^标记价格$/ })
+    .first()
+  await page.mouse.move(1, 1)
+  await label.hover()
+  await expect(page.getByRole('tooltip')).toBeVisible()
+  await page.mouse.move(1, 1)
+  await page.keyboard.press('Tab')
+  await label.focus()
+  await expect(page.getByRole('tooltip')).toBeVisible()
+  await page.getByRole('button', { name: '更多时间周期', exact: true }).click()
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: '30分', exact: true })
+    .click()
+  await expect(
+    page.getByRole('button', { name: '30分', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('连接内完成交易会话：精简列表，一次连接后直接下单，不再启用交易', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: '连接钱包', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '连接', exact: true })
+  await expect(
+    dialog.getByText('连接权限与保持连接', { exact: true }),
+  ).toHaveCount(0)
+  await expect(dialog.getByRole('checkbox')).toHaveCount(0)
+  await dialog.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toBeEnabled()
+  await expect(
+    page.getByRole('button', { name: '启用交易', exact: true }),
+  ).toHaveCount(0)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(exchange.agentRegistrations()).toBe(1)
+  expect(exchange.writes).toHaveLength(0)
+  await page.getByLabel('数量（BTC）', { exact: true }).fill('0.001')
+  await page.getByRole('button', { name: '下单', exact: true }).click()
+  await confirmOrder(page)
+  await expect.poll(() => exchange.writes.length).toBe(1)
+  expect(
+    await page.evaluate(() => sessionStorage.getItem('mock-wallet-signs')),
+  ).toBe('1')
+})
+
+test('连接签名返回前切换账户，旧授权结果不能保存或恢复交易能力', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  const response = Promise.withResolvers<void>()
+  let approvals = 0
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/exchange',
+    async (route) => {
+      if (route.request().postDataJSON().action.type === 'approveAgent') {
+        approvals++
+        await response.promise
+      }
+      await route.fallback()
+    },
+  )
+  await page.goto('/')
+  await page.getByRole('button', { name: '连接钱包', exact: true }).click()
+  await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+  try {
+    await expect.poll(() => approvals).toBe(1)
+    await expect(
+      page
+        .getByRole('dialog')
+        .getByRole('button', { name: '等待钱包确认…', exact: true }),
+    ).toBeDisabled()
+    await page.evaluate(() =>
+      window.dispatchEvent(new Event('test-account-change')),
+    )
+  } finally {
+    response.resolve()
+  }
+  await expect.poll(() => exchange.agentRegistrations()).toBe(1)
+  await expect(
+    page.getByRole('button', { name: '浏览器钱包 连接 →' }),
+  ).toBeEnabled()
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toHaveCount(0)
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem('hl-testnet-trading-connection-v1'),
+    ),
+  ).toBeNull()
+  expect(exchange.writes).toHaveLength(0)
+})
+
+test('断开期间代理被撤销，重连必须重新授权且不能使用旧密钥发单', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  await ready(page)
+  await page.locator('header').getByRole('button', { name: /0x.*▾/ }).click()
+  await page.getByRole('button', { name: '断开钱包', exact: true }).click()
+  exchange.revokeAgent()
+  await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+  await expect.poll(() => exchange.agentRegistrations()).toBe(2)
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toBeEnabled()
+  expect(
+    await page.evaluate(() => sessionStorage.getItem('mock-wallet-signs')),
+  ).toBe('2')
+  expect(exchange.writes).toHaveLength(0)
+})
+
+// 读取浏览器实际绘制的文字坐标，以真实鼠标操作 Canvas；不向产品增加测试接口。
+async function recordChartText(page: Page) {
+  await page.addInitScript(() => {
+    type Texts = Map<
+      HTMLCanvasElement,
+      { text: string; x: number; y: number }[]
+    >
+    const windowWithText = window as typeof window & { chartText: Texts }
+    windowWithText.chartText = new Map()
+    const fill = CanvasRenderingContext2D.prototype.fillText
+    const clear = CanvasRenderingContext2D.prototype.clearRect
+    CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+      if (args[0] === 0 && args[1] === 0)
+        windowWithText.chartText.set(this.canvas, [])
+      clear.apply(this, args)
+    }
+    CanvasRenderingContext2D.prototype.fillText = function (
+      text,
+      x,
+      y,
+      maxWidth,
+    ) {
+      const list = windowWithText.chartText.get(this.canvas) ?? []
+      list.push({
+        text: String(text),
+        x:
+          x +
+          (this.textAlign === 'left' || this.textAlign === 'start'
+            ? this.measureText(text).width / 2
+            : 0),
+        y: y + (this.textBaseline === 'top' ? 6 : 0),
+      })
+      windowWithText.chartText.set(this.canvas, list)
+      fill.call(this, text, x, y, maxWidth)
+    }
+  })
+}
+async function chartTextPoint(page: Page, needle: string) {
+  return page.evaluate((needle) => {
+    const texts = (
+      window as typeof window & {
+        chartText: Map<
+          HTMLCanvasElement,
+          { text: string; x: number; y: number }[]
+        >
+      }
+    ).chartText
+    for (const [canvas, items] of texts) {
+      if (
+        !canvas.isConnected ||
+        !canvas.closest('section[aria-label^="基础版"]')
+      )
+        continue
+      const rect = canvas.getBoundingClientRect()
+      if (!rect.width || !rect.height) continue
+      const match = items.find((item) => item.text.includes(needle))
+      if (match) return { x: rect.left + match.x, y: rect.top + match.y }
+    }
+    return null
+  }, needle)
+}
+
+test('基础图表：27 指标可搜索切换，绘图保存、恢复和清除互不影响交易线', async ({
+  page,
+}) => {
+  await mockExchange(page)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto('/')
+  const chart = page.getByRole('region', { name: /基础版 K 线图/ })
+  await expect(chart).toHaveAttribute('aria-label', /已加载 40 根/)
+  await expect(chart.locator('.pointer-events-auto')).toHaveCount(0)
+  await page.getByRole('button', { name: '指标', exact: true }).click()
+  await expect(page.getByRole('dialog').getByRole('checkbox')).toHaveCount(8)
+  await page.getByRole('checkbox', { name: 'BOLL', exact: true }).check()
+  await page.getByRole('tab', { name: '副图指标' }).click()
+  await expect(page.getByRole('dialog').getByRole('checkbox')).toHaveCount(19)
+  await page.getByRole('checkbox', { name: 'MACD', exact: true }).check()
+  await page.getByRole('textbox', { name: '搜索指标' }).fill('rsi')
+  await expect(page.getByRole('dialog').getByRole('checkbox')).toHaveCount(1)
+  await page.getByRole('checkbox', { name: 'RSI', exact: true }).check()
+  await page.screenshot({
+    path: 'output-tdd/playwright/kline-tools/indicators.png',
+  })
+  await page.getByRole('button', { name: '恢复默认指标' }).click()
+  await expect(
+    page.getByRole('checkbox', { name: 'RSI', exact: true }),
+  ).not.toBeChecked()
+  await page.keyboard.press('Escape')
+  const canvas = await chart.locator('canvas').first().boundingBox()
+  if (!canvas) throw new Error('No chart canvas')
+  await chart.getByRole('button', { name: '水平直线', exact: true }).click()
+  await page.mouse.click(canvas.x + 240, canvas.y + 110)
+  const saved = () =>
+    page.evaluate(() =>
+      JSON.parse(localStorage.getItem('hl-chart-drawings-v1:BTC') ?? '[]'),
+    )
+  await expect.poll(async () => (await saved()).length).toBe(1)
+  const line = await saved()
+  expect(line[0].name).toBe('horizontalStraightLine')
+  expect(line[0].points[0].value).toBeGreaterThan(0)
+  await chart.getByRole('button', { name: '锁定绘图' }).click()
+  await expect.poll(async () => (await saved())[0].lock).toBe(true)
+  await chart.getByRole('button', { name: '隐藏绘图' }).click()
+  await expect(chart.getByRole('button', { name: '显示绘图' })).toBeVisible()
+  await chart.getByRole('button', { name: '显示绘图' }).click()
+  await page.reload()
+  await expect(chart).toHaveAttribute('aria-label', /已加载 40 根/)
+  await expect(chart.getByRole('button', { name: '解锁绘图' })).toBeVisible()
+  await expect.poll(async () => (await saved()).length).toBe(1)
+  await page.screenshot({
+    path: 'output-tdd/playwright/kline-tools/drawing.png',
+  })
+  await page.getByRole('button', { name: '交易市场', exact: true }).click()
+  await page.getByRole('option', { name: 'ETH / USDC', exact: true }).click()
+  await expect(
+    chart.getByRole('button', { name: '锁定绘图', exact: true }),
+  ).toBeVisible()
+  await expect.poll(async () => (await saved()).length).toBe(1)
+  await page.getByRole('button', { name: '交易市场', exact: true }).click()
+  await page.getByRole('option', { name: 'BTC / USDC', exact: true }).click()
+  await expect(
+    chart.getByRole('button', { name: '解锁绘图', exact: true }),
+  ).toBeVisible()
+  await chart.getByRole('button', { name: '清除绘图' }).click()
+  await expect.poll(async () => (await saved()).length).toBe(0)
+  await chart.getByRole('button', { name: '线段工具', exact: true }).click()
+  await expect(
+    page.getByRole('button', { name: '价格通道', exact: true }),
+  ).toBeVisible()
+  await page.keyboard.press('Escape')
+  await chart.getByRole('button', { name: 'XABCD 形态', exact: true }).click()
+  for (const [x, y] of [
+    [140, 200],
+    [220, 100],
+    [300, 190],
+    [380, 130],
+    [460, 240],
+  ])
+    await page.mouse.click(canvas.x + x, canvas.y + y)
+  await expect.poll(async () => (await saved())[0]?.name).toBe('xabcd')
+  expect((await saved())[0].points).toHaveLength(5)
+  await chart.getByRole('button', { name: '清除绘图', exact: true }).click()
+  await expect.poll(async () => (await saved()).length).toBe(0)
+  expect(errors).toEqual([])
+})
+
+test('基础图表：画布拖出保护、取消回滚、修改原单和撤单平仓', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  exchange.setPosition(0.01)
+  await recordChartText(page)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto('/')
+  await ready(page)
+  await expect.poll(() => chartTextPoint(page, '0.01 BTC')).not.toBeNull()
+  async function dragProtection() {
+    await expect(
+      page.getByRole('button', { name: '图表止盈止损', exact: true }),
+    ).toBeEnabled()
+    // 弹窗状态已提交后，再等 Canvas 重建命中图形，避免鼠标落在上一帧已删除的对象上。
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    )
+    const holding = await chartTextPoint(page, '0.01 BTC')
+    if (!holding) throw new Error('Position line missing')
+    await page.mouse.move(holding.x, holding.y)
+    await expect.poll(() => chartTextPoint(page, '止盈 / 止损')).not.toBeNull()
+    const button = await chartTextPoint(page, '止盈 / 止损')
+    if (!button) throw new Error('Protection control missing')
+    await page.mouse.move(button.x, button.y)
+    await page.mouse.down()
+    await page.mouse.move(button.x, button.y - 60, { steps: 10 })
+    await page.mouse.up()
+  }
+  await dragProtection()
+  const dialog = page.getByRole('dialog', {
+    name: '仓位的止盈/止损',
+    includeHidden: true,
+  })
+  await expect(dialog).toBeVisible()
+  await expect(
+    dialog.getByRole('textbox', { name: '止盈价格', exact: true }),
+  ).not.toHaveValue('')
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(exchange.writes).toEqual([])
+  await dragProtection()
+  await dialog
+    .getByRole('textbox', { name: '止盈价格', exact: true })
+    .fill('70100')
+  await dialog.getByRole('button', { name: '确认', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect.poll(() => exchange.writes.length).toBe(1)
+  expect(exchange.writes[0].orders?.[0]).toMatchObject({
+    r: true,
+    s: '0',
+    t: { trigger: { triggerPx: '70100', tpsl: 'tp' } },
+  })
+  await expect.poll(() => chartTextPoint(page, '止盈 70100')).not.toBeNull()
+  const protection = await chartTextPoint(page, '止盈 70100')
+  if (!protection) throw new Error('Take-profit line missing')
+  await page.mouse.move(protection.x, protection.y)
+  await page.mouse.down()
+  await page.mouse.move(protection.x, protection.y - 20, { steps: 8 })
+  await page.mouse.up()
+  const edit = page.getByRole('dialog', { name: '修改止盈 / 止损' })
+  await expect(edit).toBeVisible()
+  await edit
+    .getByRole('textbox', { name: '止盈价格', exact: true })
+    .fill('70200')
+  await edit.getByRole('button', { name: '确认', exact: true }).click()
+  await expect(edit).toHaveCount(0)
+  await expect.poll(() => exchange.writes.length).toBe(2)
+  expect(exchange.writes[1]).toMatchObject({
+    type: 'batchModify',
+    a: true,
+    modifies: [
+      {
+        oid: 100,
+        order: { s: '0', r: true, t: { trigger: { triggerPx: '70200' } } },
+      },
+    ],
+  })
+  await expect.poll(() => chartTextPoint(page, '止盈 70200')).not.toBeNull()
+  await page.screenshot({
+    path: 'output-tdd/playwright/kline-tools/trade-lines.png',
+  })
+  const cancel = page.getByRole('button', { name: '图表撤单 #101' })
+  await cancel.focus()
+  await cancel.press('Enter')
+  await expect.poll(() => exchange.writes.length).toBe(3)
+  expect(exchange.writes[2].type).toBe('cancel')
+  await expect.poll(() => chartTextPoint(page, '止盈 70200')).toBeNull()
+  const close = page.getByRole('button', { name: '图表平仓', exact: true })
+  await close.focus()
+  await close.press('Enter')
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: '市价平仓', exact: true })
+    .click()
+  await expect.poll(() => exchange.writes.length).toBe(4)
+  expect(exchange.writes[3].orders?.[0]).toMatchObject({
+    r: true,
+    b: false,
+    s: '0.01',
+  })
+  await expect.poll(() => chartTextPoint(page, '0.01 BTC')).toBeNull()
+  expect(errors).toEqual([])
+})
+
+test('基础图表：交易线显隐、币种隔离、过期保护单拦截及断开清理', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  exchange.setPosition(0.01)
+  const tp: Order = {
+    coin: 'BTC',
+    side: 'A',
+    limitPx: '63000',
+    sz: '0',
+    origSz: '0',
+    oid: 90,
+    timestamp: Date.now(),
+    cloid: `0x${'1'.repeat(32)}`,
+    reduceOnly: true,
+    orderType: 'Take Profit Market',
+    isTrigger: true,
+    triggerPx: '70100',
+    triggerCondition: 'Price above 70100',
+    isPositionTpsl: true,
+    children: [],
+  }
+  const limit: Order = {
+    ...tp,
+    oid: 91,
+    cloid: `0x${'2'.repeat(32)}`,
+    limitPx: '69980',
+    sz: '0.02',
+    origSz: '0.02',
+    side: 'B',
+    isTrigger: false,
+    isPositionTpsl: false,
+    reduceOnly: false,
+    orderType: 'Limit',
+    triggerPx: '0',
+  }
+  exchange.setOrders([tp, limit])
+  await recordChartText(page)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto('/')
+  await ready(page)
+  await expect
+    .poll(() => chartTextPoint(page, '69980 · 0.02 BTC'))
+    .not.toBeNull()
+  await expect.poll(() => chartTextPoint(page, '止盈 70100')).not.toBeNull()
+  await page.getByRole('button', { name: '交易线', exact: true }).click()
+  await page.getByRole('checkbox', { name: '订单线', exact: true }).uncheck()
+  await expect.poll(() => chartTextPoint(page, '69980 · 0.02 BTC')).toBeNull()
+  await page.getByRole('checkbox', { name: '订单线', exact: true }).check()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: '清除绘图', exact: true }).click()
+  await expect.poll(() => chartTextPoint(page, '0.01 BTC')).not.toBeNull()
+  await expect
+    .poll(() => chartTextPoint(page, '69980 · 0.02 BTC'))
+    .not.toBeNull()
+  await page.getByRole('button', { name: '交易市场', exact: true }).click()
+  await page.getByRole('option', { name: 'ETH / USDC', exact: true }).click()
+  await expect.poll(() => chartTextPoint(page, '0.01 BTC')).toBeNull()
+  await expect.poll(() => chartTextPoint(page, '69980 · 0.02 BTC')).toBeNull()
+  await page.getByRole('button', { name: '交易市场', exact: true }).click()
+  await page.getByRole('option', { name: 'BTC / USDC', exact: true }).click()
+  await expect.poll(() => chartTextPoint(page, '止盈 70100')).not.toBeNull()
+  const protection = page.getByRole('button', {
+    name: '图表止盈止损',
+    exact: true,
+  })
+  await protection.focus()
+  await protection.press('Enter')
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: '止盈 70100' })
+    .click()
+  const edit = page.getByRole('dialog', { name: '修改止盈 / 止损' })
+  await edit
+    .getByRole('textbox', { name: '止盈价格', exact: true })
+    .fill('70200')
+  exchange.setOrders([limit])
+  await edit.getByRole('button', { name: '确认', exact: true }).click()
+  await expect(
+    page.getByText('保护单已变化，请关闭后重新确认', { exact: true }),
+  ).toBeVisible()
+  expect(exchange.writes).toHaveLength(0)
+  await edit.getByRole('button', { name: '关闭', exact: true }).click()
+  await expect.poll(() => chartTextPoint(page, '止盈 70100')).toBeNull()
+  await page.getByRole('button', { name: /0x1111/ }).click()
+  await page.getByRole('button', { name: '断开钱包', exact: true }).click()
+  await expect.poll(() => chartTextPoint(page, '0.01 BTC')).toBeNull()
+  await expect.poll(() => chartTextPoint(page, '69980 · 0.02 BTC')).toBeNull()
+  expect(errors).toEqual([])
+})
+
+test('基础图表：侧边收起展开，重置清除绘图并恢复默认指标和视野', async ({
+  page,
+}) => {
+  const { writes } = await mockExchange(page)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto('/')
+  const chart = page.getByRole('region', { name: /基础版 K 线图/ })
+  const canvas = chart.locator('canvas').first()
+  await expect(chart).toHaveAttribute('aria-label', /已加载 40 根/)
+  await expect(chart.locator('.pointer-events-auto')).toHaveCount(0)
+  const extent = () =>
+    canvas.evaluate((element) => {
+      if (!(element instanceof HTMLCanvasElement)) throw new Error('缺少画布')
+      const pixels = element
+        .getContext('2d')
+        ?.getImageData(0, Math.floor(element.height / 2), element.width, 1).data
+      const columns: number[] = []
+      if (pixels)
+        for (let x = 0; x < element.width; x++)
+          if (
+            pixels[x * 4] < 20 &&
+            pixels[x * 4 + 1] > 100 &&
+            pixels[x * 4 + 2] > 60 &&
+            pixels[x * 4 + 3] > 250
+          )
+            columns.push(x)
+      return {
+        span: (columns.at(-1) ?? 0) - (columns[0] ?? 0),
+        gap: element.width - (columns.at(-1) ?? 0),
+      }
+    })
+  await expect.poll(async () => (await extent()).span).toBeGreaterThan(100)
+  const initial = await extent()
+  const initialCanvases = await chart.locator('canvas').count()
+  await expect(
+    page.getByRole('button', { name: '画图工具', exact: true }),
+  ).toHaveCount(0)
+  const original = await canvas.elementHandle()
+  const box = await canvas.boundingBox()
+  if (!box) throw new Error('缺少图表边界')
+  await chart.getByRole('button', { name: '水平直线', exact: true }).click()
+  await page.mouse.click(box.x + 240, box.y + 110)
+  const drawings = () =>
+    page.evaluate(() =>
+      JSON.parse(localStorage.getItem('hl-chart-drawings-v1:BTC') ?? '[]'),
+    )
+  await expect.poll(async () => (await drawings()).length).toBe(1)
+  await page.evaluate(() =>
+    localStorage.setItem(
+      'hl-chart-drawings-v1:ETH',
+      localStorage.getItem('hl-chart-drawings-v1:BTC') ?? '[]',
+    ),
+  )
+  await chart.getByRole('button', { name: '收起画图工具', exact: true }).click()
+  await expect(
+    chart.getByRole('button', { name: '水平直线', exact: true }),
+  ).toHaveCount(0)
+  await expect(
+    chart.getByRole('button', { name: '展开画图工具', exact: true }),
+  ).toHaveAttribute('aria-expanded', 'false')
+  await expect
+    .poll(async () => (await canvas.boundingBox())?.width ?? 0)
+    .toBeGreaterThan(box.width)
+  await chart.getByRole('button', { name: '展开画图工具', exact: true }).click()
+  await expect
+    .poll(async () =>
+      Math.abs(((await canvas.boundingBox())?.width ?? 0) - box.width),
+    )
+    .toBeLessThan(6)
+  await expect.poll(async () => (await drawings()).length).toBe(1)
+  await page.getByRole('button', { name: '指标', exact: true }).click()
+  await page.getByRole('checkbox', { name: '均线 MA', exact: true }).uncheck()
+  await page.getByRole('tab', { name: '副图指标' }).click()
+  await page
+    .getByRole('checkbox', { name: '成交量 VOL', exact: true })
+    .uncheck()
+  await page.getByRole('checkbox', { name: 'MACD', exact: true }).check()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  const plot = await canvas.boundingBox()
+  if (!plot) throw new Error('缺少图表边界')
+  await page.mouse.move(plot.x + plot.width / 2, plot.y + plot.height / 2)
+  await page.mouse.wheel(0, -240)
+  await expect.poll(async () => (await extent()).span).not.toBe(initial.span)
+  const zoomed = await extent()
+  for (let round = 0; round < 3; round++) {
+    await chart
+      .getByRole('button', { name: '收起画图工具', exact: true })
+      .click()
+    await expect
+      .poll(async () => (await canvas.boundingBox())?.width ?? 0)
+      .toBeGreaterThan(box.width + 30)
+    await expect.poll(extent).toEqual(zoomed)
+    await chart
+      .getByRole('button', { name: '展开画图工具', exact: true })
+      .click()
+    await expect.poll(extent).toEqual(zoomed)
+  }
+  await page.mouse.move(plot.x + plot.width / 2, plot.y + plot.height / 2)
+
+  await page.mouse.down()
+  await page.mouse.move(
+    plot.x + plot.width / 2 + 240,
+    plot.y + plot.height / 2,
+    { steps: 10 },
+  )
+  await page.mouse.up()
+  await expect(
+    chart.getByRole('button', { name: '回到实时', exact: true }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: '重置图表', exact: true }).click()
+  await expect.poll(async () => (await drawings()).length).toBe(0)
+  await expect(
+    chart.getByRole('button', { name: '回到实时', exact: true }),
+  ).toBeHidden()
+  await expect.poll(extent).toEqual(initial)
+  expect(
+    await canvas.evaluate(
+      (element, original) => element === original,
+      original,
+    ),
+  ).toBe(true)
+  await page.getByRole('button', { name: '指标', exact: true }).click()
+  await expect(page.getByRole('dialog').locator('input:checked')).toHaveCount(1)
+  await expect(
+    page.getByRole('checkbox', { name: '均线 MA', exact: true }),
+  ).toBeChecked()
+  await page.getByRole('tab', { name: '副图指标' }).click()
+  await expect(page.getByRole('dialog').locator('input:checked')).toHaveCount(1)
+  await expect(
+    page.getByRole('checkbox', { name: '成交量 VOL', exact: true }),
+  ).toBeChecked()
+  await expect(
+    page.getByRole('checkbox', { name: 'MACD', exact: true }),
+  ).not.toBeChecked()
+  await page.keyboard.press('Escape')
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem('hl-chart-drawings-v1:ETH') ?? '[]')
+          .length,
+    ),
+  ).toBe(1)
+  await expect(chart.locator('canvas')).toHaveCount(initialCanvases)
+  await expect
+    .poll(async () =>
+      Math.abs(((await canvas.boundingBox())?.height ?? 0) - box.height),
+    )
+    .toBeLessThan(2)
+  await page.screenshot({ path: 'output-tdd/playwright/kline-tools/reset.png' })
+  await chart.getByRole('button', { name: '收起画图工具', exact: true }).click()
+
+  await expect
+    .poll(async () => (await canvas.boundingBox())?.width ?? 0)
+    .toBeGreaterThan(box.width + 30)
+  const handle = await chart
+    .getByRole('button', { name: '展开画图工具', exact: true })
+    .boundingBox()
+  const bounds = await chart
+    .getByRole('complementary', { name: '画图工具', exact: true })
+    .boundingBox()
+  expect(
+    handle &&
+      bounds &&
+      handle.width <= 12 &&
+      handle.height <= 28 &&
+      Math.abs(
+        handle.y + handle.height / 2 - (bounds.y + bounds.height * 0.72 - 20),
+      ) < 2,
+  ).toBeTruthy()
+  await page.screenshot({
+    path: 'output-tdd/playwright/kline-tools/collapsed.png',
+  })
+  await page.getByRole('button', { name: 'TradingView', exact: true }).click()
+  const frame = page.frameLocator('iframe').first()
+  await expect(frame.locator('canvas').first()).toBeVisible()
+  const previousPanes = await frame.locator('canvas').count()
+  for (let round = 0; round < 2; round++) {
+    await page.getByRole('button', { name: '重置图表', exact: true }).click()
+    await expect(
+      page.getByRole('button', { name: '重置图表', exact: true }),
+    ).toBeEnabled()
+    await expect.poll(() => frame.locator('canvas').count()).toBe(previousPanes)
+  }
+  expect(errors).toEqual([])
+  expect(writes).toEqual([])
 })

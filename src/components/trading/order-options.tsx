@@ -1,6 +1,7 @@
-import { Checkbox, Input, Select } from '@fameex/ui'
+import { Checkbox, FlatSelect, Input, Select } from '@fameex/ui'
 import { t, useLocale } from '@/i18n'
 import type { OrderFormFields } from '@/lib/order-form-fields'
+import { HelpLabel } from './help-label'
 
 export function OrderOptions({
   form,
@@ -22,7 +23,7 @@ export function OrderOptions({
     <>
       {(f.kind === 'limit' || f.kind === 'scale') && (
         <Select
-          label={t('订单有效方式')}
+          label={<HelpLabel label="订单有效方式" />}
           aria-label={t('订单有效方式')}
           selectedKeys={[f.tif]}
           items={[
@@ -39,19 +40,24 @@ export function OrderOptions({
       {f.kind === 'scale' && (
         <>
           <Input
-            label={t('最高价格（') + quote + t('）')}
+            label={
+              <HelpLabel
+                label={t('最高价格（') + quote + t('）')}
+                helpKey="最高价格"
+              />
+            }
             value={f.upperPrice}
             onChange={(value) => change('upperPrice', value)}
             inputMode="decimal"
           />
           <Input
-            label={t('阶梯档数（2–50）')}
+            label={<HelpLabel label="阶梯档数（2–50）" />}
             value={f.levels}
             onChange={(value) => change('levels', value)}
             inputMode="numeric"
           />
           <Select
-            label={t('数量分配')}
+            label={<HelpLabel label="数量分配" />}
             selectedKeys={[f.distribution]}
             items={[
               { key: 'equal', label: t('平均分配') },
@@ -75,7 +81,7 @@ export function OrderOptions({
       {f.kind === 'twap' && (
         <>
           <Input
-            label={t('执行时长（分钟，5–10080）')}
+            label={<HelpLabel label="执行时长（分钟，5–10080）" />}
             value={f.minutes}
             onChange={(value) => change('minutes', value)}
             inputMode="numeric"
@@ -84,10 +90,10 @@ export function OrderOptions({
             isSelected={f.randomize}
             onValueChange={(value) => change('randomize', value)}
           >
-            {t('随机执行')}
+            <HelpLabel label="随机执行" />
           </Checkbox>
           <Input
-            label={t('TWAP 触发价（可选）')}
+            label={<HelpLabel label="TWAP 触发价（可选）" />}
             value={f.twapTrigger}
             onChange={(value) => change('twapTrigger', value)}
             inputMode="decimal"
@@ -107,9 +113,14 @@ export function OrderOptions({
           )}
           <Input
             label={
-              f.side === 'buy'
-                ? t('TWAP 最高成交价（可选）')
-                : t('TWAP 最低成交价（可选）')
+              <HelpLabel
+                helpKey="TWAP 价格边界"
+                label={
+                  f.side === 'buy'
+                    ? 'TWAP 最高成交价（可选）'
+                    : 'TWAP 最低成交价（可选）'
+                }
+              />
             }
             value={f.twapLimit}
             onChange={(value) => change('twapLimit', value)}
@@ -124,31 +135,32 @@ export function OrderOptions({
       )}
       {f.kind === 'trailing' && (
         <>
-          <div className="flex items-end gap-2">
-            <Input
-              label={t('回撤距离')}
-              value={f.retracement}
-              onChange={(value) => change('retracement', value)}
-              inputMode="decimal"
-            />
-            <Select
-              aria-label={t('回撤单位')}
-              selectedKeys={[f.retracementUnit]}
-              items={[
-                { key: 'pct', label: '%' },
-                { key: 'px', label: quote },
-              ]}
-              onSelectionChange={(keys) =>
-                change(
-                  'retracementUnit',
-                  Array.from(keys)[0] === 'px' ? 'px' : 'pct',
-                )
-              }
-              className="w-24 shrink-0"
-            />
-          </div>
           <Input
-            label={t('激活价格（可选）')}
+            label={<HelpLabel label="回撤距离" />}
+            size="md"
+            value={f.retracement}
+            onChange={(value) => change('retracement', value)}
+            inputMode="decimal"
+            inputClassName="min-w-0"
+            endContent={
+              <FlatSelect
+                aria-label={t('回撤单位')}
+                value={f.retracementUnit}
+                items={[
+                  { key: 'pct', label: '%' },
+                  { key: 'px', label: quote },
+                ]}
+                onChange={(value) =>
+                  change('retracementUnit', value === 'px' ? 'px' : 'pct')
+                }
+                placement="bottom-end"
+                className="!w-24"
+                spanClassName="text-body-regular font-medium text-1"
+              />
+            }
+          />
+          <Input
+            label={<HelpLabel label="激活价格（可选）" />}
             value={f.activationPrice}
             onChange={(value) => change('activationPrice', value)}
             inputMode="decimal"

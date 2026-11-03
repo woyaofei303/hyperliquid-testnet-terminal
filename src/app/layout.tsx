@@ -3,6 +3,7 @@ import './globals.css'
 import { Providers } from '@/components/providers'
 
 export const metadata: Metadata = {
+  applicationName: 'Hyperliquid Terminal',
   metadataBase: new URL('https://hyperliquid.sunshinedairy.net'),
   alternates: { canonical: '/' },
 }

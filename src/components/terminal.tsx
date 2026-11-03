@@ -18,6 +18,7 @@ import { PerformancePanel } from './performance-panel'
 import { AccountPanel } from './trading/account-panel'
 import { AccountTypeSetting } from './trading/account-type-setting'
 import { CashOrderForm } from './trading/cash-order-form'
+import { ChartTradingContext } from './trading/chart-trade-lines'
 import { ConfirmDialog } from './trading/confirm-dialog'
 import { Header } from './trading/header'
 import { MarketHeader } from './trading/market-header'
@@ -57,19 +58,21 @@ export function Terminal() {
             <MarketHeader model={model} />
             <ModuleBoundary name={t('图表')}>
               <Profiler id="chartReact" onRender={recordReactRender}>
-                <Chart
-                  coin={coin}
-                  label={
-                    market
-                      ? `${marketLabel(market)} ${isCash(market) ? (market.kind === 'outcome' ? t('预测') : t('现货')) : t('永续')}`
-                      : undefined
-                  }
-                  priceDecimals={market ? pricePrecision(market) : 1}
-                  interval={interval}
-                  onIntervalChange={setIntervalValue}
-                  candles={feed.candles}
-                  szDecimals={market?.szDecimals ?? 5}
-                />
+                <ChartTradingContext value={model}>
+                  <Chart
+                    coin={coin}
+                    label={
+                      market
+                        ? `${marketLabel(market)} ${isCash(market) ? (market.kind === 'outcome' ? t('预测') : t('现货')) : t('永续')}`
+                        : undefined
+                    }
+                    priceDecimals={market ? pricePrecision(market) : 1}
+                    interval={interval}
+                    onIntervalChange={setIntervalValue}
+                    candles={feed.candles}
+                    szDecimals={market?.szDecimals ?? 5}
+                  />
+                </ChartTradingContext>
               </Profiler>
             </ModuleBoundary>
             {unresolved && !busy && (
@@ -131,6 +134,7 @@ export function Terminal() {
                     <CashOrderForm key={coin} model={model} market={market} />
                   ) : (
                     <OrderForm
+                      bookPrice={model.bookPrice}
                       market={market}
                       book={feed.book}
                       stale={feed.stale}
@@ -139,7 +143,7 @@ export function Terminal() {
                       onOnboarding={() =>
                         !model.wallet
                           ? model.connect()
-                          : model.previewApproval()
+                          : model.continueConnection()
                       }
                       busy={busy}
                       address={model.address}
@@ -205,9 +209,7 @@ export function Terminal() {
           action={action}
           market={model.markets.find((market) => market.name === action.coin)}
           onClose={() => setAction(null)}
-          onConfirm={(skip, persist) =>
-            model.confirmAction(action, skip, persist)
-          }
+          onConfirm={(skip) => model.confirmAction(action, skip)}
         />
       )}
     </main>

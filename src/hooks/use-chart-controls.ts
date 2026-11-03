@@ -1,8 +1,14 @@
 'use client'
-import { getVolumeStyles, type UseBaseKlineChartResult } from '@fameex/kline'
+import {
+  getVolPaneTargetHeight,
+  getVolumeStyles,
+  syncVolIndicatorPaneHeight,
+  type UseBaseKlineChartResult,
+} from '@fameex/kline'
 import type { CandleType, Chart } from 'klinecharts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChartEngine } from '@/components/trading/chart-toolbar'
+import { drawingStorageKey } from '@/lib/chart-drawings'
 import type { ChartInterval } from '@/lib/chart-periods'
 import type { IChartingLibraryWidget } from '../../public/lib/charting_library/charting_library'
 
@@ -10,6 +16,7 @@ export type ChartShape = 'candle_solid' | 'candle_stroke' | 'ohlc' | 'area'
 export function useChartControls(
   engine: ChartEngine,
   onIntervalChange: (value: ChartInterval) => void,
+  coin: string,
 ) {
   const container = useRef<HTMLDivElement>(null)
   const [kline, setKline] = useState<Chart | null>(null)
@@ -18,14 +25,23 @@ export function useChartControls(
   )
   const [shape, setShape] = useState<ChartShape>('candle_solid')
   const [timeline, setTimeline] = useState(false)
-  const [ma, setMa] = useState(true)
-  const [volume, setVolume] = useState(true)
+  const [drawing, setDrawing] = useState(true)
+  const [drawingReset, setDrawingReset] = useState(0)
+  const [indicatorsOpen, setIndicatorsOpen] = useState(false)
+  const [tradeLines, setTradeLines] = useState({
+    position: true,
+    order: true,
+    tpslOrder: true,
+  })
   const [fullscreen, setFullscreen] = useState(false)
   const [error, setError] = useState('')
-  const onKlineReady = useCallback(
-    (result: UseBaseKlineChartResult) => setKline(result.chartRef.current),
-    [],
-  )
+  const [resetting, setResetting] = useState(false)
+  const onKlineReady = useCallback((result: UseBaseKlineChartResult) => {
+    result.chartRef.current?.setTimezone(
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+    )
+    setKline(result.chartRef.current)
+  }, [])
   useEffect(() => {
     kline?.setStyles({ candle: { type: shape as CandleType } })
     const chart = tradingView?.activeChart()
@@ -34,27 +50,6 @@ export function useChartControls(
     )[shape]
     if (chart && chart.chartType() !== type) chart.setChartType(type)
   }, [kline, tradingView, shape])
-  useEffect(() => {
-    if (!kline) return
-    for (const [name, enabled, paneId] of [
-      ['MA', ma, 'candle_pane'],
-      ['VOL', volume, 'volume_pane'],
-    ] as const) {
-      const exists = kline.getIndicators({ name }).length > 0
-      if (!enabled && exists) kline.removeIndicator({ name })
-      if (enabled && !exists)
-        kline.createIndicator(
-          {
-            name,
-            paneId,
-            ...(name === 'VOL'
-              ? { calcParams: [], styles: getVolumeStyles() }
-              : {}),
-          },
-          true,
-        )
-    }
-  }, [kline, ma, volume])
   useEffect(() => {
     const changed = () =>
       setFullscreen(document.fullscreenElement === container.current)
@@ -66,12 +61,49 @@ export function useChartControls(
     setShape(value === 'time' ? 'area' : 'candle_solid')
     onIntervalChange(value === 'time' ? '1m' : value)
   }
-  function reset() {
-    if (engine === 'tradingview')
-      tradingView?.activeChart().executeActionById('chartReset')
-    else if (kline) {
-      // FameEX useResetKlineChartView：恢复间距与自动价格范围，不重新请求行情。
+  async function reset() {
+    if (resetting) return
+    setError('')
+    setIndicatorsOpen(false)
+    if (engine === 'tradingview') {
+      const chart = tradingView?.activeChart()
+      if (!chart) return
+      setResetting(true)
+      try {
+        chart.removeAllShapes()
+        chart.removeAllStudies()
+        await chart.createStudy('Volume', false, false)
+        const panes = chart.getPanes()
+        const height = getVolPaneTargetHeight(
+          panes.reduce((sum, pane) => sum + pane.getHeight(), 0),
+        )
+        if (height && panes.length === 2) panes[1].setHeight(height)
+        chart.executeActionById('chartReset')
+      } catch (error) {
+        setError(String(error))
+      } finally {
+        setResetting(false)
+      }
+    } else if (kline) {
+      kline.removeOverlay({ groupId: 'drawing_tools' })
+      for (const { id } of kline.getIndicators()) kline.removeIndicator({ id })
+      kline.createIndicator({ name: 'MA', paneId: 'candle_pane' }, true)
+      kline.createIndicator({
+        name: 'VOL',
+        paneId: 'volume_pane',
+        calcParams: [],
+        styles: getVolumeStyles(),
+      })
+      kline.setPaneOptions({ id: 'volume_pane', order: 10 })
+      syncVolIndicatorPaneHeight(kline)
+      try {
+        localStorage.removeItem(drawingStorageKey(coin))
+      } catch {
+        setError('无法清除本地绘图，请检查浏览器存储权限')
+      }
+      setDrawingReset((value) => value + 1)
       kline.setBarSpace(6)
+      kline.setOffsetRightDistance(60)
       for (const { id, paneId, name } of kline.getYAxes({}))
         kline.overrideYAxis({ id, paneId, name })
       kline.scrollToRealTime(200)
@@ -97,15 +129,19 @@ export function useChartControls(
       setTimeline(false)
       setShape(value)
     },
-    ma,
-    setMa,
-    volume,
-    setVolume,
+    kline,
+    drawing,
+    setDrawing,
+    drawingReset,
+    indicatorsOpen,
+    setIndicatorsOpen,
+    tradeLines,
+    setTradeLines,
     reset,
     fullscreen,
     toggleFullscreen,
     error,
-    ready: engine === 'kline' ? !!kline : !!tradingView,
+    ready: !resetting && (engine === 'kline' ? !!kline : !!tradingView),
     openIndicators: () =>
       tradingView?.activeChart().executeActionById('insertIndicator'),
   }

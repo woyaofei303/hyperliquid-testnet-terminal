@@ -249,3 +249,33 @@ test('只更新市场展示名不清空订阅，也不丢弃未完成的历史�
   assert.equal(feed.symbolInfo.description, 'BTC / USDC 永续')
   feed.dispose()
 })
+
+test('TradingView 历史请求按 300 根窗口分页，满足 countBack 且不重复右边界', async () => {
+  const requests: [number, number][] = []
+  const feed = source(async (start, end) => {
+    requests.push([start, end])
+    const rows: Candle[] = []
+    for (let t = start; t <= end; t += 300000) rows.push(candle(t))
+    return rows
+  })
+  const result = Promise.withResolvers<Bar[]>()
+  feed.tradingView.getBars(
+    feed.symbolInfo,
+    '5' as ResolutionString,
+    {
+      from: (time - 649 * 300000) / 1000,
+      to: (time + 300000) / 1000,
+      countBack: 650,
+      firstDataRequest: true,
+    },
+    result.resolve,
+    result.reject,
+  )
+  const bars = await result.promise
+  assert.equal(requests.length, 3)
+  assert.ok(requests.every(([start, end]) => end - start + 1 === 300 * 300000))
+  assert.equal(bars.length, 900)
+  assert.equal(new Set(bars.map((b) => b.time)).size, bars.length)
+  assert.equal(bars.at(-1)?.time, time)
+  feed.dispose()
+})

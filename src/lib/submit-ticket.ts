@@ -49,7 +49,7 @@ export async function submitOrderTicket(
   const expiresAt = Math.min(Date.now() + 60000, wallet.expiresAt)
   const base = { account: wallet.address, coin, action: ticket.label }
   if (ticket.kind === 'twap' || ticket.kind === 'trailing') {
-    if (!wallet.sendNative) throw new Error('请重新启用交易以使用高级订单')
+    if (!wallet.sendNative) throw new Error('请重新连接钱包以使用高级订单')
     onPending({
       account: wallet.address,
       coin,
@@ -66,6 +66,15 @@ export async function submitOrderTicket(
       oid: id,
     }
   }
+  if (
+    ticket.replaceOid !== undefined &&
+    (!Number.isSafeInteger(ticket.replaceOid) ||
+      ticket.replaceOid < 0 ||
+      ticket.orders.length !== 1 ||
+      !ticket.orders[0].r ||
+      !('trigger' in ticket.orders[0].t))
+  )
+    throw new Error('保护单修改参数无效')
   const orders = ticket.orders.map((order) => ({ ...order, c: cloid() }))
   onPending({
     account: wallet.address,
@@ -76,10 +85,19 @@ export async function submitOrderTicket(
   })
   let response: OrderResponse
   try {
-    response = await wallet.exchange.order(
-      { orders, grouping: ticket.grouping },
-      { expiresAfter: expiresAt },
-    )
+    response =
+      ticket.replaceOid === undefined
+        ? await wallet.exchange.order(
+            { orders, grouping: ticket.grouping },
+            { expiresAfter: expiresAt },
+          )
+        : await wallet.exchange.batchModify(
+            {
+              modifies: [{ oid: ticket.replaceOid, order: orders[0] }],
+              a: true,
+            },
+            { expiresAfter: expiresAt },
+          )
   } catch (error) {
     if (!(error instanceof ApiRequestError)) throw error
     const raw = error.response as OrderResponse

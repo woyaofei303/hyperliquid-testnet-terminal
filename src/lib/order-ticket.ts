@@ -84,6 +84,7 @@ export type Ticket = {
       kind: 'orders'
       orders: WireOrder[]
       grouping: 'na' | 'normalTpsl' | 'positionTpsl'
+      replaceOid?: number
     }
   | { kind: 'twap'; action: TwapAction; referencePrice: string }
   | { kind: 'trailing'; action: TrailingAction }
@@ -360,30 +361,60 @@ export function chasePrice(
   return formatOrderPrice(price.toFixed(), market)
 }
 
+export interface PositionProtectionOptions {
+  size?: string
+  takeProfitLimit?: string
+  stopLossLimit?: string
+}
 export function preparePositionProtection(
   market: Market,
   mark: string,
   position: string,
   takeProfit: string,
   stopLoss: string,
+  options: PositionProtectionOptions = {},
 ): Ticket {
   const signed = new Money(position)
   if (!signed.isFinite() || signed.isZero())
     throw new Error('当前没有可保护的仓位')
   if (!takeProfit && !stopLoss) throw new Error('请至少填写止盈价或止损价')
+  positiveDecimal(mark, '标记价')
+  if (
+    options.size !== undefined &&
+    positiveDecimal(options.size, '保护数量').gt(signed.abs())
+  )
+    throw new Error('保护数量超过当前仓位')
   const input = {
     market,
     mark,
     side: signed.gt(0) ? ('sell' as const) : ('buy' as const),
     price: mark,
-    size: signed.abs().toFixed(),
+    size: options.size ?? signed.abs().toFixed(),
     reduceOnly: true,
     slippageBps: 1000,
     tif: 'Ioc' as const,
   }
   const orders = []
-  if (takeProfit) orders.push(triggerOrder(input, 'tp', takeProfit, true))
-  if (stopLoss) orders.push(triggerOrder(input, 'sl', stopLoss, true))
+  if (takeProfit)
+    orders.push(
+      triggerOrder(
+        { ...input, price: options.takeProfitLimit ?? mark },
+        'tp',
+        takeProfit,
+        options.takeProfitLimit === undefined,
+      ),
+    )
+  if (stopLoss)
+    orders.push(
+      triggerOrder(
+        { ...input, price: options.stopLossLimit ?? mark },
+        'sl',
+        stopLoss,
+        options.stopLossLimit === undefined,
+      ),
+    )
+  // Hyperliquid 整仓 TP/SL 使用 s=0，触发时按实际仓位执行。
+  if (options.size === undefined) for (const order of orders) order.s = '0'
   return {
     label: '仓位止盈 / 止损',
     orderKind: 'positionTpsl',

@@ -4,6 +4,7 @@ export interface WalletProvider {
   id: string
   rdns?: string
   name: string
+  icon?: string
   provider: EIP1193Provider
 }
 function isProvider(value: unknown): value is EIP1193Provider {
@@ -44,6 +45,14 @@ export function discoverWallets(
         rdns:
           typeof detail.info.rdns === 'string'
             ? detail.info.rdns.slice(0, 256)
+            : undefined,
+        icon:
+          typeof detail.info.icon === 'string' &&
+          detail.info.icon.length < 131072 &&
+          /^data:image\/(?:png|jpeg|webp|gif|svg\+xml)[;,]/i.test(
+            detail.info.icon,
+          )
+            ? detail.info.icon
             : undefined,
         provider: detail.provider,
       },

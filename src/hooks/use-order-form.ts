@@ -1,6 +1,6 @@
 'use client'
 import { formatPrice } from '@nktkas/hyperliquid/utils'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import {
   type Book,
   errorText,
@@ -8,15 +8,21 @@ import {
   type MarketContext,
 } from '@/lib/hyperliquid'
 import {
+  type BookPriceSelection,
   defaultOrderFields,
   type OrderFormFields,
 } from '@/lib/order-form-fields'
-import { maximumOrderSize, sizeFromAmount } from '@/lib/order-sizing'
+import {
+  amountFromPercent,
+  maximumOrderSize,
+  sizeFromAmount,
+} from '@/lib/order-sizing'
 import { type OrderKind, prepareTicket, type Ticket } from '@/lib/order-ticket'
 import { Money, positiveDecimal, slippageBps } from '@/lib/orders'
 import type { useMarginSettings } from './use-margin-settings'
 
 export function useOrderForm({
+  bookPrice,
   market,
   book,
   stale,
@@ -24,6 +30,7 @@ export function useOrderForm({
   position,
   onTicket,
 }: {
+  bookPrice: BookPriceSelection | null
   market: MarketContext
   book: Book | null
   stale: boolean
@@ -33,6 +40,8 @@ export function useOrderForm({
 }) {
   const [fields, setFields] = useState(() => defaultOrderFields(market))
   const [error, setError] = useState('')
+  const selectedPercent = useRef<number | null>(null)
+  const appliedBookPrice = useRef(bookPrice)
   const [feeData, setFeeData] = useState<{
     user: string
     maker: string
@@ -69,6 +78,7 @@ export function useOrderForm({
   useEffect(() => {
     if (previousMarket.current === market.name) return
     previousMarket.current = market.name
+    selectedPercent.current = null
     setFields((previous) => ({
       ...defaultOrderFields(market),
       side: previous.side,
@@ -82,7 +92,45 @@ export function useOrderForm({
     key: K,
     value: OrderFormFields[K],
   ) {
-    setFields((previous) => ({ ...previous, [key]: value }))
+    if (key === 'amount' || key === 'side' || key === 'reduceOnly')
+      selectedPercent.current = null
+    if (
+      key === 'price' &&
+      typeof value === 'string' &&
+      fields.kind === 'limit'
+    ) {
+      let amount = fields.amount
+      try {
+        if (
+          current &&
+          amount &&
+          (selectedPercent.current != null ||
+            (new Money(maxSize).gt(0) && new Money(size).lte(maxSize)))
+        ) {
+          const maximum = maximumOrderSize({
+            maxTradeSize: current.maxTradeSzs[index],
+            position,
+            side: fields.side,
+            reduceOnly: fields.reduceOnly,
+            markPrice: current.markPx,
+            orderPrice: value,
+            precision: market.szDecimals,
+          })
+          amount = amountFromPercent(
+            maximum,
+            selectedPercent.current ?? percent,
+            fields.unit,
+            value,
+            market.szDecimals,
+          )
+        }
+      } catch {
+        // 价格还未输入完整时保留原数量。
+      }
+      setFields((previous) => ({ ...previous, price: value, amount }))
+    } else {
+      setFields((previous) => ({ ...previous, [key]: value }))
+    }
     setError('')
   }
   const index = fields.side === 'buy' ? 0 : 1
@@ -170,18 +218,34 @@ export function useOrderForm({
           ? '只减仓数量超过可平仓位'
           : ''
       : ''
+  const applyBookPrice = useEffectEvent(
+    (selection: BookPriceSelection | null) => {
+      if (selection?.coin === market.name && fields.kind === 'limit')
+        change('price', selection.price)
+    },
+  )
+  useEffect(() => {
+    if (appliedBookPrice.current === bookPrice) return
+    appliedBookPrice.current = bookPrice
+    applyBookPrice(bookPrice)
+  }, [bookPrice])
+
   function setPercent(value: number) {
-    if (!Number.isFinite(value) || value < 0 || value > 100) return
-    const quantity = new Money(maxSize)
-      .times(value)
-      .div(100)
-      .toDecimalPlaces(market.szDecimals, Money.ROUND_DOWN)
-    change(
-      'amount',
-      fields.unit === 'base'
-        ? quantity.toFixed()
-        : quantity.times(price).toFixed(6, Money.ROUND_DOWN),
-    )
+    try {
+      change(
+        'amount',
+        amountFromPercent(
+          maxSize,
+          value,
+          fields.unit,
+          price,
+          market.szDecimals,
+        ),
+      )
+      selectedPercent.current = value
+    } catch {
+      // 账户额度或价格尚未就绪时不改写数量。
+    }
   }
   function setUnit(unit: 'base' | 'usdc') {
     let amount = ''
@@ -197,6 +261,7 @@ export function useOrderForm({
     setFields((previous) => ({ ...previous, unit, amount }))
   }
   function setKind(kind: OrderKind) {
+    selectedPercent.current = null
     setFields((previous) => ({
       ...previous,
       kind,
@@ -206,6 +271,14 @@ export function useOrderForm({
   function preview() {
     try {
       if (stale) throw new Error('行情已过期，等待恢复后再下单')
+      if (
+        fields.protection &&
+        !fields.reduceOnly &&
+        ['limit', 'market'].includes(fields.kind) &&
+        !fields.takeProfit &&
+        !fields.stopLoss
+      )
+        throw new Error('请至少填写止盈价或止损价')
       if (!current) throw new Error('请等待账户下单额度读取完成')
       if (reduceOnlyError) throw new Error(reduceOnlyError)
       const quantity = sizeFromAmount(
@@ -254,6 +327,7 @@ export function useOrderForm({
     margin,
     fee,
     size,
+    referencePrice: price,
     maxSize,
     percent,
     available: current?.availableToTrade[index] ?? null,

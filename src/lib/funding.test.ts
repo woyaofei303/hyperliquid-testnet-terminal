@@ -263,7 +263,7 @@ test('资金失败分类仅识别明确拒绝，超时和 nonce 冲突仍按未�
     assert.equal(depositRejectionMessage(new Error(message)), null)
 })
 
-test('无哈希授权允许重新核验，实际资金请求未知或在途仍禁止重发', async () => {
+test('无哈希授权不标记待处理，未知或在途资金记录仍需核对结果', async () => {
   const { isFundingPending } = await import('./funding.ts')
   const record: FundingRecord = {
     account: user,

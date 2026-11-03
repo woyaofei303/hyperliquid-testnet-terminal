@@ -4,6 +4,7 @@ export {
   DropdownItem,
   DropdownMenu,
   DropdownTrigger,
+  Switch,
   Tab,
 } from '@heroui/react'
 export { Button } from './components/button'
@@ -18,3 +19,4 @@ export { dropdownStyle } from './components/select/style'
 export { Slider } from './components/slider'
 export { Spinner } from './components/spinner'
 export { Tabs } from './components/tabs'
+export { Tooltip } from './components/tooltip'

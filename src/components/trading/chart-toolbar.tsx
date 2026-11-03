@@ -1,6 +1,6 @@
 'use client'
 
-import { ChartIcon, Checkbox } from '@fameex/ui'
+import { ChartIcon, Checkbox, Tooltip } from '@fameex/ui'
 import { classNames } from '@fameex/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@heroui/react'
 import { useState } from 'react'
@@ -74,18 +74,20 @@ export function ChartToolbar({
           placement="bottom-start"
           triggerScaleOnOpen={false}
         >
-          <PopoverTrigger>
-            <button
-              type="button"
-              aria-label={t('更多时间周期')}
-              className={toolClass}
-            >
-              <ChartIcon
-                name="arrow-drop-down"
-                className={`size-3 ${open ? 'rotate-180' : ''}`}
-              />
-            </button>
-          </PopoverTrigger>
+          <Tooltip content={t('更多时间周期')}>
+            <PopoverTrigger>
+              <button
+                type="button"
+                aria-label={t('更多时间周期')}
+                className={toolClass}
+              >
+                <ChartIcon
+                  name="arrow-drop-down"
+                  className={`size-3 ${open ? 'rotate-180' : ''}`}
+                />
+              </button>
+            </PopoverTrigger>
+          </Tooltip>
           <PopoverContent className={popupClass}>
             <div className="grid grid-cols-4 gap-2">
               {chartIntervals.map((value) => (
@@ -111,19 +113,20 @@ export function ChartToolbar({
           placement="bottom-start"
           triggerScaleOnOpen={false}
         >
-          <PopoverTrigger>
-            <button
-              type="button"
-              aria-label={t('图表类型')}
-              title={t('图表类型')}
-              className={toolClass}
-              disabled={!controls.ready}
-            >
-              <ChartIcon
-                name={controls.shape === 'area' ? 'area' : 'k-line-chart'}
-              />
-            </button>
-          </PopoverTrigger>
+          <Tooltip content={t('图表类型')}>
+            <PopoverTrigger>
+              <button
+                type="button"
+                aria-label={t('图表类型')}
+                className={toolClass}
+                disabled={!controls.ready}
+              >
+                <ChartIcon
+                  name={controls.shape === 'area' ? 'area' : 'k-line-chart'}
+                />
+              </button>
+            </PopoverTrigger>
+          </Tooltip>
           <PopoverContent className={popupClass}>
             <fieldset
               className="grid min-w-28 gap-1"
@@ -153,58 +156,70 @@ export function ChartToolbar({
             </fieldset>
           </PopoverContent>
         </Popover>
-        {engine === 'kline' ? (
+        <Tooltip content={t('指标')}>
+          <button
+            type="button"
+            aria-label={t('指标')}
+            className={toolClass}
+            disabled={!controls.ready}
+            onClick={() =>
+              engine === 'kline'
+                ? controls.setIndicatorsOpen(true)
+                : controls.openIndicators()
+            }
+          >
+            <ChartIcon name="indicators" />
+          </button>
+        </Tooltip>
+        {engine === 'kline' && (
           <Popover placement="bottom-start" triggerScaleOnOpen={false}>
             <PopoverTrigger>
               <button
                 type="button"
-                aria-label={t('指标')}
-                title={t('指标')}
-                className={toolClass}
+                aria-label={t('交易线')}
+                className="rounded px-2 py-1 text-xs text-muted hover:text-ink"
                 disabled={!controls.ready}
               >
-                <ChartIcon name="indicators" />
+                {t('交易线')}
               </button>
             </PopoverTrigger>
             <PopoverContent className={popupClass}>
-              <div className="flex min-w-36 flex-col gap-3 p-2">
-                <Checkbox
-                  isSelected={controls.ma}
-                  onValueChange={controls.setMa}
-                >
-                  {t('均线 MA')}
-                </Checkbox>
-                <Checkbox
-                  isSelected={controls.volume}
-                  onValueChange={controls.setVolume}
-                >
-                  {t('成交量 VOL')}
-                </Checkbox>
+              <div className="flex flex-col gap-3 p-2">
+                {(
+                  [
+                    ['position', '持仓线'],
+                    ['order', '订单线'],
+                    ['tpslOrder', '止盈止损线'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <Checkbox
+                    key={key}
+                    isSelected={controls.tradeLines[key]}
+                    onValueChange={(value) =>
+                      controls.setTradeLines({
+                        ...controls.tradeLines,
+                        [key]: value,
+                      })
+                    }
+                  >
+                    {t(label)}
+                  </Checkbox>
+                ))}
               </div>
             </PopoverContent>
           </Popover>
-        ) : (
+        )}
+        <Tooltip content={t('重置图表')}>
           <button
             type="button"
-            aria-label={t('指标')}
-            title={t('指标')}
+            aria-label={t('重置图表')}
             className={toolClass}
             disabled={!controls.ready}
-            onClick={controls.openIndicators}
+            onClick={controls.reset}
           >
-            <ChartIcon name="indicators" />
+            <ChartIcon name="refresh" className="size-5 -scale-x-100" />
           </button>
-        )}
-        <button
-          type="button"
-          aria-label={t('重置图表')}
-          title={t('重置图表')}
-          className={toolClass}
-          disabled={!controls.ready}
-          onClick={controls.reset}
-        >
-          <ChartIcon name="refresh" className="size-5 -scale-x-100" />
-        </button>
+        </Tooltip>
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <div
@@ -227,19 +242,22 @@ export function ChartToolbar({
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          aria-label={controls.fullscreen ? t('退出全屏') : t('全屏图表')}
-          title={controls.fullscreen ? t('退出全屏') : t('全屏图表')}
-          onClick={controls.toggleFullscreen}
-          className={toolClass}
-        >
-          <ChartIcon
-            name={
-              controls.fullscreen ? 'aspect-ratio-close2' : 'aspect-ratio-open2'
-            }
-          />
-        </button>
+        <Tooltip content={controls.fullscreen ? t('退出全屏') : t('全屏图表')}>
+          <button
+            type="button"
+            aria-label={controls.fullscreen ? t('退出全屏') : t('全屏图表')}
+            onClick={controls.toggleFullscreen}
+            className={toolClass}
+          >
+            <ChartIcon
+              name={
+                controls.fullscreen
+                  ? 'aspect-ratio-close2'
+                  : 'aspect-ratio-open2'
+              }
+            />
+          </button>
+        </Tooltip>
       </div>
     </nav>
   )

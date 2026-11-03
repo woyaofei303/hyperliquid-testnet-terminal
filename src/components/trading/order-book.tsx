@@ -10,6 +10,7 @@ import { baseName, pricePrecision, quoteName } from '@/lib/market-catalog'
 import { orderBookData } from '@/lib/order-book-data'
 import { Money } from '@/lib/orders'
 import { DepthTooltip } from './depth-tooltip'
+import { HelpLabel } from './help-label'
 
 export function OrderBook({ model }: { model: TerminalModel }) {
   useLocale()
@@ -51,12 +52,10 @@ export function OrderBook({ model }: { model: TerminalModel }) {
               {quote})
             </span>
             <span>
-              {t('数量 (')}
-              {base})
+              <HelpLabel label="数量" /> ({base})
             </span>
             <span>
-              {t('合计 (')}
-              {base})
+              <HelpLabel label="合计" /> ({base})
             </span>
           </div>
           <BookSide
@@ -67,9 +66,12 @@ export function OrderBook({ model }: { model: TerminalModel }) {
             priceDecimals={priceDecimals}
             hovered={detail.hover}
             tooltipId={tooltipId}
+            onPrice={model.selectBookPrice}
           />
           <div className="grid h-7 shrink-0 grid-cols-3 items-center bg-surface px-3 text-right text-[11px] tabular-nums">
-            <span className="text-left text-muted">{t('价差')}</span>
+            <span className="text-left text-muted">
+              <HelpLabel label="价差" />
+            </span>
             <span>
               {depth.spread == null
                 ? '—'
@@ -87,6 +89,7 @@ export function OrderBook({ model }: { model: TerminalModel }) {
             priceDecimals={priceDecimals}
             hovered={detail.hover}
             tooltipId={tooltipId}
+            onPrice={model.selectBookPrice}
           />
           <div className="flex shrink-0 items-center justify-between border-t border-edge px-4 py-2.5 text-[11px] text-muted">
             <span>
@@ -218,6 +221,7 @@ function BookSide({
   priceDecimals,
   hovered,
   tooltipId,
+  onPrice,
 }: {
   rows: ReturnType<typeof orderBookData>['bids']
   opposite: ReturnType<typeof orderBookData>['bids']
@@ -226,6 +230,7 @@ function BookSide({
   priceDecimals: number
   hovered: { side: string; price: string } | null
   tooltipId: string
+  onPrice: (price: string) => void
 }) {
   useLocale()
 
@@ -254,6 +259,7 @@ function BookSide({
           }
           key={row.px}
           data-price={row.px}
+          onClick={() => onPrice(row.px)}
           data-in-range={
             hovered?.side === side &&
             (side === 'sell'

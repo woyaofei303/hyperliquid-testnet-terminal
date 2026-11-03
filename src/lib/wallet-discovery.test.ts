@@ -19,11 +19,13 @@ test('EIP-6963 discovery survives a conflicting global getter and keeps the chos
     on() {},
     removeListener() {},
   } as EIP1193Provider
+  const icon =
+    'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22/%3E'
   const announce = () =>
     target.dispatchEvent(
       new CustomEvent('eip6963:announceProvider', {
         detail: {
-          info: { uuid: 'one', name: 'MetaMask', rdns: 'io.metamask' },
+          info: { uuid: 'one', name: 'MetaMask', rdns: 'io.metamask', icon },
           provider,
         },
       }),
@@ -35,12 +37,18 @@ test('EIP-6963 discovery survives a conflicting global getter and keeps the chos
   })
   announce()
   assert.equal(wallets.length, 1)
+  assert.equal(wallets[0].icon, icon)
   assert.equal(wallets[0].provider, provider)
   const second = { ...provider }
   target.dispatchEvent(
     new CustomEvent('eip6963:announceProvider', {
       detail: {
-        info: { uuid: 'two', name: 'Rabby', rdns: 'io.rabby' },
+        info: {
+          uuid: 'two',
+          name: 'Rabby',
+          rdns: 'io.rabby',
+          icon: 'https://tracking.invalid/icon.png',
+        },
         provider: second,
       },
     }),
@@ -48,6 +56,7 @@ test('EIP-6963 discovery survives a conflicting global getter and keeps the chos
   assert.equal(wallets.length, 2)
   assert.equal(wallets[0].provider, provider)
   assert.equal(wallets[1].provider, second)
+  assert.equal(wallets[1].icon, undefined)
   stop()
   target.dispatchEvent(
     new CustomEvent('eip6963:announceProvider', {

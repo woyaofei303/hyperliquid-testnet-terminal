@@ -154,7 +154,7 @@ export function useChaseOrders(
   }, [wallet, publish])
   async function start(ticket: ChaseTicket) {
     if (!wallet?.exchange || session.current !== wallet)
-      throw new Error('请先启用交易')
+      throw new Error('请先完成钱包连接')
     if (lock.current) throw new Error('策略正在更新，请稍后重试')
     if (entries.current.filter((row) => row.active).length >= 5)
       throw new Error('最多同时运行 5 笔追价单')

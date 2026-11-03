@@ -17,7 +17,7 @@ test('真实测试网双图表、分层成交量及 Hyperliquid 布局 @live', a
     if (request.isNavigationRequest() && request.frame() === page.mainFrame())
       navigations++
   })
-  const screenshots = 'output-tdd/playwright/market-detail/live'
+  const screenshots = 'output-tdd/playwright/kline-tools/live'
   await page.setViewportSize({ width: 1440, height: 1080 })
   await page.goto('/')
   await expect(
@@ -160,7 +160,8 @@ test('真实测试网双图表、分层成交量及 Hyperliquid 布局 @live', a
     fullPage: true,
   })
   expect(navigations).toBe(1)
-  expect(sockets).toHaveLength(1)
+  // useMarket 分别连接快速盘口与完整行情；切币和切引擎均复用这两条连接。
+  expect(sockets).toHaveLength(2)
   expect(errors).toEqual([])
   expect(writes).toEqual([])
 })

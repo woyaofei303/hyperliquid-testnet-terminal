@@ -1,21 +1,25 @@
 'use client'
 
 import { Button, Checkbox, Input, Tab, Tabs } from '@fameex/ui'
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { useMarginSettings } from '@/hooks/use-margin-settings'
 import { useOrderForm } from '@/hooks/use-order-form'
 import { t, useLocale } from '@/i18n'
 import { display } from '@/lib/display'
 import type { Book, MarketContext } from '@/lib/hyperliquid'
 import { baseName, quoteName } from '@/lib/market-catalog'
+import type { BookPriceSelection } from '@/lib/order-form-fields'
 import type { Ticket } from '@/lib/order-ticket'
+import { HelpLabel } from './trading/help-label'
 import { MarginSettings } from './trading/margin-settings'
 import { OrderAmount } from './trading/order-amount'
 import { OrderOptions } from './trading/order-options'
 import { OrderTypeSelector } from './trading/order-type-selector'
+import { ProtectionFields } from './trading/protection-fields'
 import { SlippageSetting } from './trading/slippage-setting'
 
 interface Props {
+  bookPrice: BookPriceSelection | null
   market: MarketContext
   book: Book | null
   stale: boolean
@@ -31,6 +35,7 @@ interface Props {
   accountType: ReactNode
 }
 export function OrderForm({
+  bookPrice,
   market,
   book,
   stale,
@@ -56,6 +61,7 @@ export function OrderForm({
     onApply: onLeverage,
   })
   const form = useOrderForm({
+    bookPrice,
     market,
     book,
     stale,
@@ -63,6 +69,7 @@ export function OrderForm({
     position,
     onTicket,
   })
+  const [protectionValid, setProtectionValid] = useState(true)
   const { fields: f, change } = form
   const basic = f.kind === 'limit' || f.kind === 'market'
   const showPrice =
@@ -113,13 +120,17 @@ export function OrderForm({
       </Tabs>
       <div className="mb-3 space-y-1 text-xs">
         <div className="flex justify-between">
-          <span className="text-muted">{t('可用保证金')}</span>
+          <span className="text-muted">
+            <HelpLabel label="可用保证金" />
+          </span>
           <span>
             {display(form.available)} {quote}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted">{t('当前仓位')}</span>
+          <span className="text-muted">
+            <HelpLabel label="当前仓位" />
+          </span>
           <span>
             {position} {base}
           </span>
@@ -128,13 +139,19 @@ export function OrderForm({
       <form
         onSubmit={(event) => {
           event.preventDefault()
-          form.preview()
+          if (!basic || !f.protection || f.reduceOnly || protectionValid)
+            form.preview()
         }}
-        className="flex flex-1 flex-col gap-3"
+        className="flex flex-col gap-3"
       >
         {(f.kind.startsWith('stop-') || f.kind.startsWith('take-')) && (
           <Input
-            label={t('触发价格（') + quote + t('）')}
+            label={
+              <HelpLabel
+                label={t('触发价格（') + quote + t('）')}
+                helpKey="触发价格"
+              />
+            }
             value={f.trigger}
             onChange={(value) => change('trigger', value)}
             inputMode="decimal"
@@ -144,19 +161,31 @@ export function OrderForm({
           <div className="grid gap-1.5">
             <div className="flex items-center justify-between text-xs">
               <label htmlFor="order-price" className="text-muted">
-                {f.kind === 'scale'
-                  ? t('最低价格（') + quote + t('）')
-                  : f.kind === 'chase'
-                    ? f.side === 'buy'
-                      ? t('最高买入价（') + quote + t('）')
-                      : t('最低卖出价（') + quote + t('）')
-                    : t('价格（') + quote + t('）')}
+                <HelpLabel
+                  helpKey={
+                    f.kind === 'scale'
+                      ? '最低价格'
+                      : f.kind === 'chase'
+                        ? '追价边界'
+                        : '价格'
+                  }
+                  label={
+                    f.kind === 'scale'
+                      ? t('最低价格（') + quote + t('）')
+                      : f.kind === 'chase'
+                        ? f.side === 'buy'
+                          ? t('最高买入价（') + quote + t('）')
+                          : t('最低卖出价（') + quote + t('）')
+                        : t('价格（') + quote + t('）')
+                  }
+                />
               </label>
               <Button
                 variant="light"
                 type="button"
                 onPress={form.applyMarkPrice}
-                className="text-accent hover:text-ink"
+                size="sm"
+                className="h-5 min-w-0 p-0 text-xs text-accent hover:text-ink"
               >
                 {t('使用标记价')}
               </Button>
@@ -186,7 +215,7 @@ export function OrderForm({
           onPercent={form.setPercent}
         />
         <p className="flex justify-between text-[11px] text-muted">
-          <span>{f.reduceOnly ? t('可减仓数量') : t('最大可下')}</span>
+          <HelpLabel label={f.reduceOnly ? '可减仓数量' : '最大可下'} />
           <span>{settings.current ? `${form.maxSize} ${base}` : '—'}</span>
         </p>
         <OrderOptions form={form} quote={quote} />
@@ -196,7 +225,7 @@ export function OrderForm({
             onValueChange={(value) => change('reduceOnly', value)}
           >
             <span className="text-xs text-muted">
-              {t('只减仓 Reduce-only')}
+              <HelpLabel label="只减仓 Reduce-only" />
             </span>
           </Checkbox>
           {basic && !f.reduceOnly && (
@@ -204,25 +233,24 @@ export function OrderForm({
               isSelected={f.protection}
               onValueChange={(value) => change('protection', value)}
             >
-              <span className="text-xs text-muted">{t('止盈 / 止损')}</span>
+              <span className="text-xs text-muted">
+                <HelpLabel label="止盈 / 止损" />
+              </span>
             </Checkbox>
           )}
         </div>
         {basic && f.protection && !f.reduceOnly && (
-          <div className="grid gap-2">
-            <Input
-              label={t('止盈触发价（') + quote + t('，可选）')}
-              value={f.takeProfit}
-              onChange={(value) => change('takeProfit', value)}
-              inputMode="decimal"
-            />
-            <Input
-              label={t('止损触发价（') + quote + t('，可选）')}
-              value={f.stopLoss}
-              onChange={(value) => change('stopLoss', value)}
-              inputMode="decimal"
-            />
-          </div>
+          <ProtectionFields
+            onValidityChange={setProtectionValid}
+            market={market}
+            entry={form.referencePrice}
+            size={f.side === 'buy' ? form.size : `-${form.size}`}
+            leverage={settings.current?.leverage.value ?? 0}
+            takeProfit={f.takeProfit}
+            stopLoss={f.stopLoss}
+            onTakeProfit={(value) => change('takeProfit', value)}
+            onStopLoss={(value) => change('stopLoss', value)}
+          />
         )}
         {form.error && (
           <p role="alert" className="text-xs leading-5 text-loss">
@@ -240,9 +268,10 @@ export function OrderForm({
               (!enabled ||
                 stale ||
                 !settings.current ||
-                !!form.reduceOnlyError))
+                !!form.reduceOnlyError ||
+                (basic && f.protection && !f.reduceOnly && !protectionValid)))
           }
-          className="mt-auto min-h-9 w-full text-sm font-semibold"
+          className="mt-1 min-h-9 w-full text-sm font-semibold"
         >
           {busy
             ? t('操作处理中…')
@@ -265,7 +294,9 @@ export function OrderForm({
             [t('预计初始保证金'), form.margin],
           ].map(([label, value]) => (
             <div key={t(label)} className="flex justify-between gap-2">
-              <dt className="text-muted">{t(label)}</dt>
+              <dt className="text-muted">
+                <HelpLabel label={label} />
+              </dt>
               <dd className="text-right tabular-nums">
                 {value} {quote}
               </dd>
@@ -279,12 +310,16 @@ export function OrderForm({
           )}
           {f.kind.endsWith('-market') && (
             <div className="flex justify-between gap-2">
-              <dt className="text-muted">{t('最大滑点')}</dt>
+              <dt className="text-muted">
+                <HelpLabel label="最大滑点" />
+              </dt>
               <dd>10%</dd>
             </div>
           )}
           <div className="flex justify-between gap-2">
-            <dt className="text-muted">{t('预计手续费')}</dt>
+            <dt className="text-muted">
+              <HelpLabel label="预计手续费" />
+            </dt>
             <dd className="text-right tabular-nums">
               {form.fee} {quote}
             </dd>

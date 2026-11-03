@@ -7,9 +7,11 @@ import type {
 } from '../../public/lib/charting_library/charting_library'
 import {
   type ChartInterval,
+  candleHistoryStart,
   chartIntervals,
   chartPeriods,
   chartResolutions,
+  historyPageSize,
   intervalMs,
 } from './chart-periods.ts'
 import { createFrameBatch } from './frame-batch.ts'
@@ -120,26 +122,57 @@ export function createChartFeed(initial: ChartFeedContext) {
   const fail = (error: unknown) =>
     onError(error instanceof Error ? error.message : String(error))
 
-  async function load(end: number, count: number, initial: boolean) {
+  const pendingHistory = new Map<string, Promise<Candle[]>>()
+  async function load(
+    end: number,
+    count: number,
+    initial: boolean,
+    from?: number,
+  ) {
     const generation = epoch
-    // Hyperliquid 仅提供最近 5000 根；to 不包含边界蜡烛，避免翻页重复。
-    const start = Math.max(
-      end - Math.min(count, 5000) * step,
-      Date.now() - 5000 * step,
+    const selectedCoin = coin
+    const selectedInterval = interval
+    const readHistory = history
+    const oldest = candleHistoryStart(Date.now(), 5000, selectedInterval)
+    const target = Math.min(
+      from === undefined ? 1 : Math.max(count, historyPageSize),
+      5000,
     )
-    if (start >= end) return []
-    const candles = await history(start, end - 1)
-    if (!active || generation !== epoch) return null
-    const combined = new Map(
-      chartBars(candles, coin, interval).map((bar) => [bar.time, bar]),
-    )
+    let cursor = end
+    const combined = new Map<number, Bar>()
+    while (
+      cursor > oldest &&
+      (combined.size < target || cursor > (from ?? end))
+    ) {
+      const start = Math.max(
+        candleHistoryStart(cursor, historyPageSize, selectedInterval),
+        oldest,
+      )
+      const key = `${generation}:${start}:${cursor}`
+      let request = pendingHistory.get(key)
+      if (!request) {
+        request = readHistory(start, cursor - 1)
+        pendingHistory.set(key, request)
+      }
+      let candles: Candle[]
+      try {
+        candles = await request
+      } finally {
+        pendingHistory.delete(key)
+      }
+      if (!active || generation !== epoch) return null
+      for (const bar of chartBars(candles, selectedCoin, selectedInterval)) {
+        if (bar.time >= start && bar.time < cursor) combined.set(bar.time, bar)
+      }
+      cursor = start
+      // Sparse markets may have gaps: scan older windows only until countBack or retention is reached.
+    }
     for (const bar of queuedCandles
       ? chartBars(queuedCandles, coin, interval)
-      : updates)
-      combined.set(bar.time, bar)
-    const bars = [...combined.values()]
-      .filter((bar) => bar.time >= start && bar.time < end)
-      .sort((a, b) => a.time - b.time)
+      : updates) {
+      if (bar.time >= cursor && bar.time < end) combined.set(bar.time, bar)
+    }
+    const bars = [...combined.values()].sort((a, b) => a.time - b.time)
     lastHistoryTime = Math.max(lastHistoryTime, bars.at(-1)?.time ?? 0)
     if (initial) onLoaded(bars.length)
     onError('')
@@ -213,11 +246,9 @@ export function createChartFeed(initial: ChartFeedContext) {
       const generation = epoch
       void load(
         params.to * 1000,
-        Math.max(
-          params.countBack,
-          Math.ceil(((params.to - params.from) * 1000) / step),
-        ),
+        params.countBack,
         params.firstDataRequest,
+        params.from * 1000,
       )
         .then((bars) => {
           setTimeout(() => {
@@ -258,7 +289,7 @@ export function createChartFeed(initial: ChartFeedContext) {
       const generation = epoch
       try {
         const end = timestamp ?? Date.now()
-        const bars = await load(end, 300, type === 'init')
+        const bars = await load(end, historyPageSize, type === 'init')
         if (active && generation === epoch && bars)
           callback(bars.map(klineBar), {
             forward:
@@ -334,6 +365,7 @@ export function createChartFeed(initial: ChartFeedContext) {
       frame.schedule()
     },
     dispose() {
+      pendingHistory.clear()
       active = false
       frame.cancel()
       queuedCandles = null

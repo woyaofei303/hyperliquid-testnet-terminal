@@ -6,6 +6,7 @@ import { cashBalances } from '@/lib/cash-order'
 import { display } from '@/lib/display'
 import { spotAvailable } from '@/lib/funding'
 import { isCash, quoteName } from '@/lib/market-catalog'
+import { HelpLabel } from './help-label'
 
 /** FameEX FuturesAssetPanel 的纵向资产行；数值均取自 Hyperliquid 主账户。 */
 export function AccountPanel({ model }: { model: TerminalModel }) {
@@ -19,6 +20,7 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
       : null
   const state = account.snapshot?.state
   const shared = sharedAccount(account.snapshot?.mode)
+  const canTransfer = !!account.snapshot && !shared
   const quote = quoteName(model.market)
   const collateral = account.snapshot?.spot.balances.find(
     (item) => item.coin === quote,
@@ -31,8 +33,10 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
           ? t('正在核验交易连接')
           : t('正在读取余额')
         : model.tradingReady
-          ? t('交易已启用')
-          : t('已连接 · 待启用交易')
+          ? t('已连接 · 可交易')
+          : model.needsDeposit
+            ? t('已连接 · 请先存款')
+            : t('已连接 · 待完成签名')
     : t('未连接')
   return (
     <section
@@ -95,7 +99,9 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
           ])
           .map(([label, value]) => (
             <div key={t(label)} className="flex justify-between gap-4">
-              <dt className="text-muted">{t(label)}</dt>
+              <dt className="text-muted">
+                <HelpLabel label={label} />
+              </dt>
               <dd className="text-right tabular-nums">{value}</dd>
             </div>
           ))}
@@ -109,17 +115,19 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
         >
           {t('存款')}
         </Button>
+        {canTransfer && (
+          <Button
+            className="flex-1"
+            size="sm"
+            variant="bordered"
+            isDisabled={busy}
+            onPress={() => model.setWeb3Panel('transfer')}
+          >
+            {t('划转')}
+          </Button>
+        )}
         <Button
-          className="flex-1"
-          size="sm"
-          variant="bordered"
-          isDisabled={busy}
-          onPress={() => model.setWeb3Panel('transfer')}
-        >
-          {t('划转')}
-        </Button>
-        <Button
-          className="flex-1"
+          className={canTransfer ? 'flex-1' : 'col-span-2'}
           size="sm"
           variant="bordered"
           isDisabled={busy}

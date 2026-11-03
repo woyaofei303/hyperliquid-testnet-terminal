@@ -8,7 +8,11 @@ const address = '0x1111111111111111111111111111111111111111'
 function provider(accounts: () => Promise<`0x${string}`[]>, chain = '0x66eee') {
   return {
     request: async ({ method }: { method: string }) =>
-      method === 'eth_chainId' ? chain : accounts(),
+      method === 'eth_chainId'
+        ? chain
+        : method === 'wallet_requestPermissions'
+          ? [{ parentCapability: 'eth_accounts' }]
+          : accounts(),
     on() {},
     removeListener() {},
   } as EIP1193Provider
@@ -37,21 +41,84 @@ test('充值禁止主网及钱包账户变化，HyperCore 授权不强制切换 
   await assert.rejects(() => assertDepositSession(session), /账户已变化/)
 })
 
-test('手动连接只请求账户权限，刷新只读已有账户，不请求签名或切链', async () => {
-  const methods: string[] = []
+test('每次手动连接均请求原生账户权限，确认后读地址；静默恢复不弹权限', async () => {
+  const requests: { method: string; params?: unknown }[] = []
+  let permissionsGranted = false
   const wallet = {
     ...provider(async () => [address]),
-    request: async ({ method }: { method: string }) => {
-      methods.push(method)
-      if (method !== 'eth_requestAccounts' && method !== 'eth_accounts')
-        throw new Error(`Unexpected method: ${method}`)
+    request: async (request: { method: string; params?: unknown }) => {
+      requests.push(request)
+      if (request.method === 'wallet_requestPermissions') {
+        assert.deepEqual(request.params, [{ eth_accounts: {} }])
+        permissionsGranted = true
+        return [{ parentCapability: 'eth_accounts' }]
+      }
+      assert.equal(request.method, 'eth_accounts')
+      assert.equal(permissionsGranted, true)
       return [address]
     },
   } as EIP1193Provider
   const session = await connectWallet(wallet)
   assert.equal(session.address, address)
   assert.equal(session.exchange, null)
-  assert.deepEqual(methods, ['eth_requestAccounts'])
+  await connectWallet(wallet)
   await connectWallet(wallet, true)
-  assert.deepEqual(methods, ['eth_requestAccounts', 'eth_accounts'])
+  assert.deepEqual(
+    requests.map(({ method }) => method),
+    [
+      'wallet_requestPermissions',
+      'eth_accounts',
+      'wallet_requestPermissions',
+      'eth_accounts',
+      'eth_accounts',
+    ],
+  )
+})
+
+for (const code of [4001, 4100, -32002, -32603]) {
+  test(`权限拒绝、待确认或失败 ${code} 不得绕过权限读取账户或签名`, async () => {
+    const methods: string[] = []
+    const wallet = {
+      ...provider(async () => [address]),
+      request: async ({ method }: { method: string }) => {
+        methods.push(method)
+        throw { code, message: 'Permission request failed' }
+      },
+    } as EIP1193Provider
+    await assert.rejects(() => connectWallet(wallet), { code })
+    assert.deepEqual(methods, ['wallet_requestPermissions'])
+  })
+}
+
+for (const code of [4200, -32601]) {
+  test(`仅钱包不支持原生权限接口 ${code} 时回退标准连接请求`, async () => {
+    const methods: string[] = []
+    const wallet = {
+      ...provider(async () => [address]),
+      request: async ({ method }: { method: string }) => {
+        methods.push(method)
+        if (method === 'wallet_requestPermissions') throw { code }
+        assert.equal(method, 'eth_requestAccounts')
+        return [address]
+      },
+    } as EIP1193Provider
+    assert.equal((await connectWallet(wallet)).address, address)
+    assert.deepEqual(methods, [
+      'wallet_requestPermissions',
+      'eth_requestAccounts',
+    ])
+  })
+}
+
+test('没有授予 eth_accounts 时停止连接，不把空权限当成同意', async () => {
+  const methods: string[] = []
+  const wallet = {
+    ...provider(async () => [address]),
+    request: async ({ method }: { method: string }) => {
+      methods.push(method)
+      return []
+    },
+  } as EIP1193Provider
+  await assert.rejects(() => connectWallet(wallet), /账户访问权限/)
+  assert.deepEqual(methods, ['wallet_requestPermissions'])
 })

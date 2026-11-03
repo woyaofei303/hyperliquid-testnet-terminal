@@ -1,5 +1,6 @@
 import { FlatSelect, Input, Slider } from '@fameex/ui'
 import { t, useLocale } from '@/i18n'
+import { HelpLabel } from './help-label'
 
 /** 沿用 FameEX Amount / Slider 的输入框内单位选择和百分比刻度。 */
 export function OrderAmount({
@@ -31,9 +32,16 @@ export function OrderAmount({
     <div className="flex min-w-0 flex-col gap-2">
       <Input
         label={
-          unit === 'base'
-            ? t('数量（') + base + t('）')
-            : t('金额（') + quote + t('）')
+          <HelpLabel
+            label={
+              unit === 'base'
+                ? t('数量（') + base + t('）')
+                : t('金额（') + quote + t('）')
+            }
+            description={t(
+              '按所选单位输入数量或订单金额；金额会按参考价格换算并向下取整到市场允许精度。',
+            )}
+          />
         }
         size="md"
         value={amount}
@@ -63,7 +71,7 @@ export function OrderAmount({
           />
         }
       />
-      <div className="relative h-10 w-full pt-1">
+      <div className="relative h-8 w-full pt-1">
         <Slider
           label={t('下单比例')}
           minValue={0}

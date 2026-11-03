@@ -1,11 +1,13 @@
-import { Input, SmartPopover, Tab, Tabs } from '@fameex/ui'
+import { Button, Input, SmartPopover, Tab, Tabs } from '@fameex/ui'
 import { useReducedMotion } from 'framer-motion'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { TerminalModel } from '@/hooks/use-terminal'
 import { t, useLocale } from '@/i18n'
 import { display } from '@/lib/display'
-import { marketLabel, pricePrecision } from '@/lib/market-catalog'
+import { baseName, marketLabel, pricePrecision } from '@/lib/market-catalog'
 import { marketSummary } from '@/lib/market-summary'
+import { notify } from '../notifications'
+import { CoinIcon } from './coin-icon'
 
 export function MarketSelector({ model }: { model: TerminalModel }) {
   useLocale()
@@ -43,6 +45,16 @@ export function MarketSelector({ model }: { model: TerminalModel }) {
     >
       {({ isOpen }) => (
         <span className="flex max-w-60 items-center gap-2 py-2 text-lg font-semibold">
+          <CoinIcon
+            coin={
+              model.market?.kind === 'outcome'
+                ? ''
+                : model.market
+                  ? baseName(model.market)
+                  : model.coin
+            }
+            className="size-7"
+          />
           <span className="truncate">
             {model.market ? marketLabel(model.market) : model.coin}
           </span>
@@ -138,6 +150,33 @@ function MarketList({
     model.selectMarket(name)
     close()
   }
+  function saveFavorites(next: string[]) {
+    try {
+      localStorage.setItem('hl-favorite-markets', JSON.stringify(next))
+      setFavorites(next)
+      reset()
+    } catch {
+      notify('error', t('无法保存自选，请允许浏览器本地存储后重试。'))
+    }
+  }
+  const hasFavorites = model.markets.some((m) => favorites.includes(m.name))
+  const popularMarkets = model.markets.filter(
+    (m) =>
+      m.kind === 'perp' &&
+      !m.dex &&
+      [
+        'BTC',
+        'ETH',
+        'SOL',
+        'HYPE',
+        'BNB',
+        'XRP',
+        'DOGE',
+        'AVAX',
+        'LINK',
+        'SUI',
+      ].includes(m.name),
+  )
   const start = Math.max(0, Math.floor(offset / 40) - 3)
   return (
     <section
@@ -191,6 +230,30 @@ function MarketList({
           <Tab key={key} title={t(label)} />
         ))}
       </Tabs>
+      {!hasFavorites && popularMarkets.length > 0 && (
+        <div className="flex items-center justify-between gap-2 border-b border-edge px-3 py-2">
+          <span className="text-xs text-muted">{t('暂无自选')}</span>
+          <Button
+            size="sm"
+            variant="light"
+            className="h-7 text-xs text-accent"
+            onPress={() => {
+              saveFavorites(
+                [
+                  ...new Set([
+                    ...favorites,
+                    ...popularMarkets.map((m) => m.name),
+                  ]),
+                ].slice(-500),
+              )
+              setCategory('favorites')
+              setQuery('')
+            }}
+          >
+            {t('一键自选主流币对')}
+          </Button>
+        </div>
+      )}
       {model.catalogError && (
         <p role="alert" className="px-3 py-2 text-xs text-loss">
           {t('扩展市场加载失败：')}
@@ -237,16 +300,13 @@ function MarketList({
               <button
                 type="button"
                 aria-label={`${t(favorites.includes(m.name) ? '取消收藏' : '收藏')} ${marketLabel(m)}`}
-                className="mr-2 w-3 shrink-0 text-muted hover:text-accent"
+                aria-pressed={favorites.includes(m.name)}
+                className={`mr-2 w-3 shrink-0 hover:text-accent ${favorites.includes(m.name) ? 'text-accent' : 'text-muted'}`}
                 onClick={() => {
                   const next = favorites.includes(m.name)
                     ? favorites.filter((v) => v !== m.name)
                     : [...favorites, m.name].slice(-500)
-                  setFavorites(next)
-                  localStorage.setItem(
-                    'hl-favorite-markets',
-                    JSON.stringify(next),
-                  )
+                  saveFavorites(next)
                 }}
               >
                 {favorites.includes(m.name) ? '★' : '☆'}
@@ -259,15 +319,21 @@ function MarketList({
                 onClick={() => select(m.name)}
                 className="grid h-full min-w-0 flex-1 grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] items-center gap-2 text-right text-xs tabular-nums focus-visible:outline focus-visible:outline-accent"
               >
-                <span className="truncate text-left" title={marketLabel(m)}>
-                  {marketLabel(m)}
-                  <small className="ml-1 text-accent">
-                    {m.kind === 'perp'
-                      ? `${m.maxLeverage}x${m.dex ? ` · ${m.dex}` : ''}`
-                      : m.kind === 'spot'
-                        ? t('现货')
-                        : t('预测')}
-                  </small>
+                <span
+                  className="flex min-w-0 items-center gap-2 text-left"
+                  title={marketLabel(m)}
+                >
+                  <CoinIcon coin={m.kind === 'outcome' ? '' : baseName(m)} />
+                  <span className="truncate">
+                    {marketLabel(m)}
+                    <small className="ml-1 text-accent">
+                      {m.kind === 'perp'
+                        ? `${m.maxLeverage}x${m.dex ? ` · ${m.dex}` : ''}`
+                        : m.kind === 'spot'
+                          ? t('现货')
+                          : t('预测')}
+                    </small>
+                  </span>
                 </span>
                 <span className="truncate">
                   {m.context.markPx

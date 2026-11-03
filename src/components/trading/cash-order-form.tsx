@@ -6,6 +6,7 @@ import { display } from '@/lib/display'
 import type { MarketContext } from '@/lib/hyperliquid'
 import { baseName, quoteName } from '@/lib/market-catalog'
 import { AccountTypeSetting } from './account-type-setting'
+import { HelpLabel } from './help-label'
 import { OrderAmount } from './order-amount'
 import { OrderOptions } from './order-options'
 import { OrderTypeSelector } from './order-type-selector'
@@ -97,7 +98,9 @@ export function CashOrderForm({
         <Tab key="sell" title={t('卖出')} />
       </Tabs>
       <div className="flex justify-between text-xs text-muted">
-        <span>{t('可用')}</span>
+        <span>
+          <HelpLabel label="可用" />
+        </span>
         <span className="text-ink">
           {form.balances
             ? display(
@@ -110,7 +113,18 @@ export function CashOrderForm({
       </div>
       {['limit', 'scale', 'chase'].includes(f.kind) && (
         <Input
-          label={`${t(f.kind === 'scale' ? '最低价格' : f.kind === 'chase' ? (f.side === 'buy' ? '最高买入价' : '最低卖出价') : '价格')}${t('（')}${quote}${t('）')}`}
+          label={
+            <HelpLabel
+              helpKey={
+                f.kind === 'scale'
+                  ? '最低价格'
+                  : f.kind === 'chase'
+                    ? '追价边界'
+                    : '价格'
+              }
+              label={`${t(f.kind === 'scale' ? '最低价格' : f.kind === 'chase' ? (f.side === 'buy' ? '最高买入价' : '最低卖出价') : '价格')}${t('（')}${quote}${t('）')}`}
+            />
+          }
           value={f.price}
           onChange={(v) => change('price', v)}
           placeholder={outcome ? '0.00001 – 0.99999' : t('输入价格')}
@@ -130,7 +144,9 @@ export function CashOrderForm({
         onPercent={form.setPercent}
       />
       <p className="flex justify-between text-xs text-muted">
-        <span>{t('最大可下')}</span>
+        <span>
+          <HelpLabel label="最大可下" />
+        </span>
         <span>
           {form.max} {base}
         </span>
@@ -169,23 +185,26 @@ export function CashOrderForm({
           onboarding
             ? !model.wallet
               ? model.connect()
-              : model.previewApproval()
+              : model.continueConnection()
             : void form.preview()
         }
       >
-        {onboarding ??
-          (form.previewing
+        {onboarding
+          ? t(onboarding)
+          : form.previewing
             ? t('核对可用余额…')
             : model.canTrade
               ? t('下单')
-              : t('等待账户数据 / 核对未确认订单'))}
+              : t('等待账户数据 / 核对未确认订单')}
       </Button>
       <dl
         aria-label={t('订单摘要')}
         className="space-y-2 border-t border-edge pt-3 text-xs"
       >
         <div className="flex justify-between gap-2">
-          <dt className="text-muted">{t('订单金额')}</dt>
+          <dt className="text-muted">
+            <HelpLabel label="订单金额" />
+          </dt>
           <dd>
             {form.notional} {quote}
           </dd>
@@ -197,7 +216,9 @@ export function CashOrderForm({
           />
         )}
         <div className="flex justify-between gap-2">
-          <dt className="text-muted">{t('预计手续费上限')}</dt>
+          <dt className="text-muted">
+            <HelpLabel label="预计手续费上限" />
+          </dt>
           <dd>
             {form.estimatedFee} {quote}
           </dd>

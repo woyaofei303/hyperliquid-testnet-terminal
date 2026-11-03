@@ -1,4 +1,5 @@
 import { isAddress } from 'viem'
+import { tradePreferences } from './trade-preferences.ts'
 
 export const tradingConnectionKey = 'hl-testnet-trading-connection-v1'
 export interface TradingConnection {
@@ -9,6 +10,7 @@ export interface TradingConnection {
   expiresAt: number
   providerId: string
   providerName: string
+  disconnected?: boolean
 }
 export function parseTradingConnection(
   raw: string | null,
@@ -29,7 +31,9 @@ export function parseTradingConnection(
       value.providerId.length <= 256 &&
       typeof value.providerName === 'string' &&
       value.providerName.length > 0 &&
-      value.providerName.length <= 60
+      value.providerName.length <= 60 &&
+      (value.disconnected === undefined ||
+        typeof value.disconnected === 'boolean')
     )
       return value
   } catch {
@@ -59,13 +63,42 @@ export function clearTradingConnection() {
     }
   }
 }
+export function setTradingConnectionDisconnected(
+  account: string,
+  disconnected: boolean,
+) {
+  let saved = false
+  for (const kind of ['sessionStorage', 'localStorage'] as const) {
+    try {
+      const storage = window[kind]
+      const value = parseTradingConnection(
+        storage.getItem(tradingConnectionKey),
+      )
+      if (value?.account.toLowerCase() !== account.toLowerCase()) continue
+      try {
+        if (!!value.disconnected !== disconnected)
+          storage.setItem(
+            tradingConnectionKey,
+            JSON.stringify({ ...value, disconnected }),
+          )
+        saved = true
+      } catch {
+        // 无法保存断开状态时删除缓存，避免刷新后自动恢复。
+        storage.removeItem(tradingConnectionKey)
+      }
+    } catch {
+      /* 禁用存储不会阻止内存会话断开。 */
+    }
+  }
+  return saved
+}
 export function saveTradingConnection(
   saved: TradingConnection,
   persist: boolean,
 ) {
   clearTradingConnection()
   try {
-    const storage = persist ? localStorage : sessionStorage
+    const storage = window[persist ? 'localStorage' : 'sessionStorage']
     storage.setItem(tradingConnectionKey, JSON.stringify(saved))
     return true
   } catch {
@@ -91,23 +124,8 @@ export async function nextTradingNonce(agent: string) {
 }
 
 export function skipOrderConfirmation(close: boolean) {
-  try {
-    return (
-      localStorage.getItem(
-        close ? 'hl-skip-close-confirm' : 'hl-skip-order-confirm',
-      ) === 'true'
-    )
-  } catch {
-    return false
-  }
+  return (close ? tradePreferences.skipClose : tradePreferences.skipOrder).get()
 }
 export function rememberOrderConfirmation(close: boolean, skip: boolean) {
-  try {
-    localStorage.setItem(
-      close ? 'hl-skip-close-confirm' : 'hl-skip-order-confirm',
-      String(skip),
-    )
-  } catch {
-    /* 存储不可用时下次继续确认。 */
-  }
+  ;(close ? tradePreferences.skipClose : tradePreferences.skipOrder).set(skip)
 }

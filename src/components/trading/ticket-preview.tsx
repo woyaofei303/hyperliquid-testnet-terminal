@@ -30,7 +30,11 @@ export function TicketPreview({ ticket }: { ticket: Ticket }) {
                     · {order.b ? t('买') : t('卖')}
                     {order.r && ` · ${t('只减仓')}`}
                   </td>
-                  <td className="font-mono">{order.s}</td>
+                  <td className="font-mono">
+                    {ticket.grouping === 'positionTpsl' && order.s === '0'
+                      ? t('全部仓位')
+                      : order.s}
+                  </td>
                   <td className="font-mono">
                     {order.p}
                     {'trigger' in order.t && (
@@ -47,7 +51,7 @@ export function TicketPreview({ ticket }: { ticket: Ticket }) {
         {ticket.grouping === 'positionTpsl' && (
           <p className="text-xs text-muted">
             {t(
-              '仅保护此次确认的仓位数量；两侧均为只减仓。请在当前委托核对既有保护单，避免重复设置。',
+              '两侧均为只减仓。整仓保护按触发时仓位执行，指定数量不随加仓扩大；已有保护单请在当前委托核对。',
             )}
           </p>
         )}

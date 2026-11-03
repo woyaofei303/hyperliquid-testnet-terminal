@@ -3,10 +3,7 @@ import { baseName, isCash, quoteName } from './market-catalog.ts'
 import { type Market, Money } from './orders.ts'
 import type { ConfirmationAction } from './trading.ts'
 
-export function orderConfirmation(
-  action: Exclude<ConfirmationAction, { kind: 'approve' }>,
-  market?: Market,
-) {
+export function orderConfirmation(action: ConfirmationAction, market?: Market) {
   const ticket = action.kind === 'ticket' ? action.ticket : null
   const selected = ticket?.market ?? market
   const order =

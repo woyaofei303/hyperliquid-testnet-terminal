@@ -17,56 +17,11 @@ export function ConfirmDialog({
   action: ConfirmationAction
   market?: Market
   onClose: () => void
-  onConfirm: (skip: boolean, persist: boolean) => void
+  onConfirm: (skip: boolean) => void
 }) {
   useLocale()
 
   const [skip, setSkip] = useState(false)
-  const [persist, setPersist] = useState(false)
-  if (action.kind === 'approve')
-    return (
-      <Modal
-        closeLabel={t('关闭')}
-        title={t('启用交易')}
-        onClose={onClose}
-        footer={
-          <Button className="w-full" onPress={() => onConfirm(false, persist)}>
-            {t('建立连接')}
-          </Button>
-        }
-      >
-        <p className="text-sm leading-6 text-muted">
-          {t(
-            '在钱包中签署一次消息以建立交易连接，即可在 Hyperliquid 测试网交易。此签名不转移资金，也不收取 Gas。',
-          )}
-        </p>
-        <div className="rounded-[8px] bg-panel p-3 text-xs leading-5">
-          <span className="text-muted">{t('连接账户')}</span>
-          <p className="mt-1 break-all font-mono">{action.account}</p>
-        </div>
-        <p className="text-xs leading-5 text-muted">
-          {t(
-            '这是为当前浏览器建立连接，与账户是否曾交易无关。默认在当前标签页保留，刷新可恢复；勾选保持连接后可在重启浏览器后恢复。存款、划转和提款仍需主钱包确认。',
-          )}
-        </p>
-        <Checkbox isSelected={persist} onValueChange={setPersist}>
-          {t('保持连接')}
-        </Checkbox>
-        <p className="text-xs text-muted">
-          {t(
-            '仅在自己的设备保持连接。交易密钥保存在此浏览器，不会读取或保存主钱包私钥。',
-          )}
-        </p>
-        <details className="text-xs leading-5 text-muted">
-          <summary className="cursor-pointer">{t('授权详情')}</summary>
-          <p className="mt-2">
-            {t(
-              '授权 JulianTerminal API 钱包代签交易，会替换同名旧会话。断开会清除本地连接；交易所端需在官方 API 钱包页撤销。',
-            )}
-          </p>
-        </details>
-      </Modal>
-    )
   const details = orderConfirmation(action, market)
   const tone = details.protection
     ? 'text-ink'
@@ -138,10 +93,10 @@ export function ConfirmDialog({
       <Button
         color={details.buy || details.protection ? 'primary' : 'danger'}
         type="button"
-        onPress={() => onConfirm(skip, false)}
+        onPress={() => onConfirm(skip)}
         className="mt-2 h-10 w-full shrink-0 rounded-md text-sm"
       >
-        {details.buttonLabel}
+        {t(details.buttonLabel)}
       </Button>
     </Modal>
   )

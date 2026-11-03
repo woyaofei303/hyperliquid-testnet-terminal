@@ -1,84 +1,213 @@
-import { Button, Input } from '@fameex/ui'
-import { useEffect, useRef, useState } from 'react'
+import { Button, Checkbox, Input, Modal } from '@fameex/ui'
+import { useState } from 'react'
+import type { TerminalModel } from '@/hooks/use-terminal'
 import { t, useLocale } from '@/i18n'
-import { errorText } from '@/lib/hyperliquid'
+import type { ProtectionKind } from '@/lib/chart-trading'
+import type { OpenOrder } from '@/lib/hyperliquid'
+import { baseName, quoteName } from '@/lib/market-catalog'
+import { Money } from '@/lib/orders'
+import { HelpLabel } from './help-label'
+import { OrderAmount } from './order-amount'
+import { type Position, PositionSummary } from './position-close'
+import { ProtectionFields } from './protection-fields'
+
 export function PositionProtection({
-  coin,
+  position,
+  model,
   onClose,
-  onPreview,
+  initial,
 }: {
-  coin: string
+  initial?: { kind: ProtectionKind; value: string; order?: OpenOrder }
+  position: Position
+  model: TerminalModel
   onClose: () => void
-  onPreview: (coin: string, tp: string, sl: string) => Promise<void>
 }) {
   useLocale()
-
-  const dialog = useRef<HTMLDialogElement>(null)
-  const [tp, setTp] = useState('')
-  const [sl, setSl] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  useEffect(() => {
-    dialog.current?.showModal()
-  }, [])
-  async function preview() {
-    setBusy(true)
+  const [expected] = useState(position)
+  const [protectionValid, setProtectionValid] = useState(true)
+  const [tp, setTp] = useState(initial?.kind === 'tp' ? initial.value : ''),
+    [sl, setSl] = useState(initial?.kind === 'sl' ? initial.value : '')
+  const [tpLimit, setTpLimit] = useState(
+      initial?.kind === 'tp' ? (initial.order?.limitPx ?? '') : '',
+    ),
+    [slLimit, setSlLimit] = useState(
+      initial?.kind === 'sl' ? (initial.order?.limitPx ?? '') : '',
+    )
+  const [custom, setCustom] = useState(
+      !!initial?.order && Number(initial.order.origSz) !== 0,
+    ),
+    [limit, setLimit] = useState(!!initial?.order?.orderType.includes('Limit'))
+  const [unit, setUnit] = useState<'base' | 'usdc'>('base')
+  const [amount, setAmount] = useState(
+    initial?.order && Number(initial.order.origSz) !== 0
+      ? initial.order.sz
+      : new Money(position.szi).abs().toFixed(),
+  )
+  const [pending, setPending] = useState(false)
+  const market = model.markets.find((m) => m.name === position.coin)
+  if (!market) return null
+  const mark = new Money(position.positionValue).div(
+    new Money(position.szi).abs(),
+  )
+  let size = ''
+  try {
+    size = custom
+      ? (unit === 'base'
+          ? new Money(amount)
+          : new Money(amount)
+              .div(mark)
+              .toDecimalPlaces(market.szDecimals, Money.ROUND_DOWN)
+        ).toFixed()
+      : new Money(position.szi).abs().toFixed()
+  } catch {
+    /* 等待输入完整。 */
+  }
+  const signedSize = Number(position.szi) < 0 ? `-${size}` : size
+  const changed = position.szi !== expected.szi
+  const valid =
+    !changed &&
+    protectionValid &&
+    (tp || sl) &&
+    Number(size) > 0 &&
+    Number(size) <= Math.abs(Number(position.szi)) &&
+    (!limit || ((!tp || Number(tpLimit) > 0) && (!sl || Number(slLimit) > 0)))
+  async function submit() {
+    setPending(true)
     try {
-      await onPreview(coin, tp, sl)
-      onClose()
-    } catch (error) {
-      setError(errorText(error))
+      if (
+        await model.submitProtection(
+          expected,
+          tp,
+          sl,
+          {
+            ...(custom ? { size } : {}),
+            ...(limit
+              ? { takeProfitLimit: tpLimit, stopLossLimit: slLimit }
+              : {}),
+          },
+          initial?.order,
+        )
+      )
+        onClose()
     } finally {
-      setBusy(false)
+      setPending(false)
     }
   }
   return (
-    <dialog
-      ref={dialog}
-      onCancel={onClose}
-      aria-label={t('仓位保护')}
-      className="m-auto w-[calc(100%-32px)] max-w-sm space-y-5 rounded-lg border border-edge bg-panel p-5 text-ink backdrop:bg-black/70"
+    <Modal
+      closeLabel={t('关闭')}
+      title={t(initial?.order ? '修改止盈 / 止损' : '仓位的止盈/止损')}
+      onClose={onClose}
+      busy={pending}
+      className="max-w-[520px] [&_header]:text-center"
+      footer={
+        <Button
+          className="w-full"
+          isDisabled={!valid || pending || model.busy}
+          onPress={() => void submit()}
+        >
+          {t('确认')}
+        </Button>
+      }
     >
-      <h2 className="font-semibold">
-        {coin} {t('仓位止盈 / 止损')}
-      </h2>
-      <Input
-        label={t('止盈触发价（可选）')}
-        aria-label={t('仓位止盈价')}
-        value={tp}
-        onChange={setTp}
-        inputMode="decimal"
+      <PositionSummary position={position} />
+      <ProtectionFields
+        only={initial?.kind}
+        onValidityChange={setProtectionValid}
+        market={market}
+        entry={position.entryPx}
+        size={signedSize}
+        leverage={position.leverage.value}
+        takeProfit={tp}
+        stopLoss={sl}
+        onTakeProfit={setTp}
+        onStopLoss={setSl}
       />
-      <Input
-        label={t('止损触发价（可选）')}
-        aria-label={t('仓位止损价')}
-        value={sl}
-        onChange={setSl}
-        inputMode="decimal"
-      />
+      {!initial?.order && (
+        <div className="flex gap-6">
+          <Checkbox isSelected={custom} onValueChange={setCustom}>
+            <HelpLabel label="配置金额" />
+          </Checkbox>
+          <Checkbox isSelected={limit} onValueChange={setLimit}>
+            <HelpLabel label="限价保护" />
+          </Checkbox>
+        </div>
+      )}
+      {custom && !initial?.order && (
+        <OrderAmount
+          base={baseName(market)}
+          quote={quoteName(market)}
+          precision={market.szDecimals}
+          unit={unit}
+          amount={amount}
+          percent={Math.min(
+            100,
+            Math.max(
+              0,
+              (Number(size) / Math.abs(Number(position.szi))) * 100 || 0,
+            ),
+          )}
+          disabled={pending}
+          onAmount={setAmount}
+          onUnit={(value) => {
+            setUnit(value)
+            setAmount('')
+          }}
+          onPercent={(value) =>
+            setAmount(
+              new Money(position.szi)
+                .abs()
+                .times(value)
+                .div(100)
+                .times(unit === 'usdc' ? mark : 1)
+                .toDecimalPlaces(
+                  unit === 'base' ? market.szDecimals : 2,
+                  Money.ROUND_DOWN,
+                )
+                .toFixed(),
+            )
+          }
+        />
+      )}
+      {limit && (
+        <div className="grid grid-cols-2 gap-2">
+          {initial?.kind !== 'sl' && (
+            <Input
+              label={t('止盈限价')}
+              value={tpLimit}
+              onChange={setTpLimit}
+              inputMode="decimal"
+            />
+          )}
+          {initial?.kind !== 'tp' && (
+            <Input
+              label={t('止损限价')}
+              value={slLimit}
+              onChange={setSlLimit}
+              inputMode="decimal"
+            />
+          )}
+        </div>
+      )}
       <p className="text-xs leading-5 text-muted">
         {t(
-          '按最新仓位数量设置只减仓市价保护单，触发后价格保护为 10%。新增仓位不会自动扩大本次保护数量；已有保护单可在当前委托撤销。',
+          custom
+            ? '仅保护指定数量，不会随新增仓位扩大。'
+            : '默认保护触发时的全部仓位，仓位全部平仓后自动取消。',
         )}
       </p>
-      {error && (
+      <p className="text-xs leading-5 text-muted">
+        {t(
+          limit
+            ? '触发后提交限价单，不能保证成交。'
+            : '按标记价触发只减仓市价单，价格保护为 10%，不保证全部成交。',
+        )}
+      </p>
+      {changed && (
         <p role="alert" className="text-xs text-loss">
-          {t(error)}
+          {t('仓位数量或方向已变化，请关闭后重新确认。')}
         </p>
       )}
-      <div className="flex justify-end gap-3">
-        <Button
-          variant="bordered"
-          size="sm"
-          onPress={onClose}
-          isDisabled={busy}
-        >
-          {t('返回')}
-        </Button>
-        <Button size="sm" onPress={() => void preview()} isDisabled={busy}>
-          {t('预览保护单')}
-        </Button>
-      </div>
-    </dialog>
+    </Modal>
   )
 }

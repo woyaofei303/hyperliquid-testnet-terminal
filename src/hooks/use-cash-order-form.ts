@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import {
   cashBalances,
   cashTicketValue,
@@ -7,10 +7,11 @@ import {
 } from '@/lib/cash-order'
 import { errorText, info, type MarketContext } from '@/lib/hyperliquid'
 import {
+  type BookPriceSelection,
   defaultOrderFields,
   type OrderFormFields,
 } from '@/lib/order-form-fields'
-import { sizeFromAmount } from '@/lib/order-sizing'
+import { amountFromPercent, sizeFromAmount } from '@/lib/order-sizing'
 import {
   type OrderKind,
   prepareTicket,
@@ -23,6 +24,8 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
   const [fields, setFields] = useState(() => defaultOrderFields(market))
   const [fee, setFee] = useState<{ user: string; rate: string } | null>(null)
   const [error, setError] = useState('')
+  const selectedPercent = useRef<number | null>(null)
+  const appliedBookPrice = useRef(model.bookPrice)
   const [previewing, setPreviewing] = useState(false)
   const context = useRef({ model, active: true })
   context.current.model = model
@@ -60,7 +63,47 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
     key: K,
     value: OrderFormFields[K],
   ) {
-    setFields((previous) => ({ ...previous, [key]: value }))
+    if (key === 'amount' || key === 'side' || key === 'kind')
+      selectedPercent.current = null
+    if (
+      key === 'price' &&
+      typeof value === 'string' &&
+      fields.kind === 'limit'
+    ) {
+      let amount = fields.amount
+      try {
+        if (
+          balances &&
+          rate != null &&
+          amount &&
+          (selectedPercent.current != null ||
+            (new Money(max).gt(0) && new Money(size).lte(max)))
+        ) {
+          const price = positiveDecimal(value, '价格')
+          const maximum = (
+            fields.side === 'sell'
+              ? new Money(balances.base)
+              : new Money(balances.quote).div(
+                  price.times(new Money(1).plus(rate)),
+                )
+          )
+            .toDecimalPlaces(market.szDecimals, Money.ROUND_DOWN)
+            .toFixed()
+          amount = amountFromPercent(
+            maximum,
+            selectedPercent.current ?? percent,
+            fields.unit,
+            value,
+            market.szDecimals,
+          )
+        }
+      } catch {
+        // 价格还未输入完整时保留原数量。
+      }
+      setFields((previous) => ({ ...previous, price: value, amount }))
+    } else {
+      setFields((previous) => ({ ...previous, [key]: value }))
+    }
     setError('')
   }
   function setKind(kind: OrderKind) {
@@ -140,6 +183,18 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
     size && new Money(max).gt(0)
       ? Math.min(100, new Money(size).div(max).times(100).toNumber())
       : 0
+  const applyBookPrice = useEffectEvent(
+    (selection: BookPriceSelection | null) => {
+      if (selection?.coin === market.name && fields.kind === 'limit')
+        change('price', selection.price)
+    },
+  )
+  useEffect(() => {
+    if (appliedBookPrice.current === model.bookPrice) return
+    appliedBookPrice.current = model.bookPrice
+    applyBookPrice(model.bookPrice)
+  }, [model.bookPrice])
+
   function setUnit(unit: 'base' | 'usdc') {
     try {
       const amount = size
@@ -198,18 +253,17 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
     setPercent: (value: number) => {
       if (!Number.isFinite(value) || value < 0 || value > 100) return
       try {
-        const quantity = new Money(max)
-          .times(value)
-          .div(100)
-          .toDecimalPlaces(market.szDecimals, Money.ROUND_DOWN)
         change(
           'amount',
-          fields.unit === 'base'
-            ? quantity.toFixed()
-            : quantity
-                .times(positiveDecimal(sizePrice, '价格'))
-                .toFixed(6, Money.ROUND_DOWN),
+          amountFromPercent(
+            max,
+            value,
+            fields.unit,
+            sizePrice,
+            market.szDecimals,
+          ),
         )
+        selectedPercent.current = value
       } catch (e) {
         setError(errorText(e))
       }

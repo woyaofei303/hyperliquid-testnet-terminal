@@ -1,5 +1,27 @@
 import { Money, positiveDecimal } from './orders.ts'
 
+export function amountFromPercent(
+  maximum: string,
+  percent: number,
+  unit: 'base' | 'usdc',
+  price: string,
+  precision: number,
+) {
+  if (!Number.isFinite(percent) || percent < 0 || percent > 100)
+    throw new Error('下单比例须在 0% 至 100% 之间')
+  const max = new Money(maximum)
+  if (!max.isFinite() || max.lt(0)) throw new Error('最大可下数量无效')
+  const quantity = max
+    .times(percent)
+    .div(100)
+    .toDecimalPlaces(precision, Money.ROUND_DOWN)
+  return unit === 'base'
+    ? quantity.toFixed()
+    : quantity
+        .times(positiveDecimal(price, '价格'))
+        .toFixed(6, Money.ROUND_DOWN)
+}
+
 export function sizeFromAmount(
   amount: string,
   unit: 'base' | 'usdc',

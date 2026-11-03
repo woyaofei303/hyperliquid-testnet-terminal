@@ -27,6 +27,7 @@ import {
   loadTradingConnection,
   nextTradingNonce,
   saveTradingConnection,
+  setTradingConnectionDisconnected,
 } from './trading-connection.ts'
 
 export const API_URL = 'https://api.hyperliquid-testnet.xyz'
@@ -161,9 +162,31 @@ export async function connectWallet(
   provider: EIP1193Provider,
   silent = false,
 ): Promise<WalletSession> {
-  const accounts = await provider.request({
-    method: silent ? 'eth_accounts' : 'eth_requestAccounts',
-  })
+  let accountMethod: 'eth_accounts' | 'eth_requestAccounts' = 'eth_accounts'
+  if (!silent) {
+    try {
+      // 主动重连也展示钱包原生权限页，不能直接复用扩展已允许的地址。
+      const permissions = await provider.request({
+        method: 'wallet_requestPermissions',
+        params: [{ eth_accounts: {} }],
+      })
+      if (
+        !Array.isArray(permissions) ||
+        !permissions.some((item) => item?.parentCapability === 'eth_accounts')
+      )
+        throw new Error('钱包未授予账户访问权限')
+    } catch (error) {
+      if (
+        !error ||
+        typeof error !== 'object' ||
+        !('code' in error) ||
+        (error.code !== 4200 && error.code !== -32601)
+      )
+        throw error
+      accountMethod = 'eth_requestAccounts'
+    }
+  }
+  const accounts = await provider.request({ method: accountMethod })
   if (!accounts[0]) throw new Error('钱包没有返回账户')
   const address = addressOf(accounts[0])
   return {
@@ -213,7 +236,7 @@ export function masterExchange(session: WalletSession, nonce?: number) {
 }
 
 export const DEPOSIT_REQUIRED_MESSAGE =
-  'Hyperliquid 测试网账户尚未激活。请先存入测试 USDC 并等待到账，再启用交易。'
+  'Hyperliquid 测试网账户尚未激活。请先存入测试 USDC 并等待到账，再完成钱包连接。'
 
 export function isDepositRequired(error: unknown) {
   const text = errorText(error)
@@ -261,6 +284,7 @@ export async function authorizeTrading(
 
 export async function restoreTrading(
   session: WalletSession,
+  persist = false,
 ): Promise<WalletSession> {
   const saved = loadTradingConnection()
   if (!saved || saved.account.toLowerCase() !== session.address.toLowerCase())
@@ -286,7 +310,12 @@ export async function restoreTrading(
     return session
   }
   return tradingSession(
-    { ...session, connectionSaved: true },
+    {
+      ...session,
+      connectionSaved: persist
+        ? saveTradingConnection({ ...saved, disconnected: false }, true)
+        : setTradingConnectionDisconnected(session.address, false),
+    },
     saved.privateKey,
     Math.min(expiresAt, saved.expiresAt),
   )
@@ -302,7 +331,7 @@ function tradingSession(
     address: agent.address,
     async signTypedData(params) {
       if (Date.now() >= expiresAt)
-        throw new Error('交易连接已过期，请重新启用交易')
+        throw new Error('交易连接已过期，请重新连接钱包')
       await assertSession(session)
       return agent.signTypedData(params)
     },

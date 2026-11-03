@@ -80,11 +80,16 @@ export function useFunding(
     }
   }, [owner])
   const save = useCallback((next: FundingRecord) => {
-    // 先持久化，存储失败时不能继续发送资金请求。
-    const stored = parseFundingRecord(
-      localStorage.getItem(fundingKey(next.account)),
-      next.account,
-    )
+    // 本地记录只用于展示进度，不作为后续资金操作的锁。
+    let stored: FundingRecord | null = null
+    try {
+      stored = parseFundingRecord(
+        localStorage.getItem(fundingKey(next.account)),
+        next.account,
+      )
+    } catch {
+      // 损坏的历史记录不能阻止用户发起新的钱包操作。
+    }
     if (
       stored &&
       (stored.at > next.at ||
@@ -95,7 +100,11 @@ export function useFunding(
     localStorage.setItem(fundingKey(next.account), JSON.stringify(next))
     if (current.current?.address === next.account) {
       // 仅新提交或核对后发生变化的记录触发通知，读取历史记录保持静默。
-      setNotification(next)
+      if (
+        next.status === 'credited' ||
+        (next.kind === 'transfer' && next.status === 'confirmed')
+      )
+        setNotification(next)
       setRecord((previous) =>
         JSON.stringify(previous) === JSON.stringify(next) ? previous : next,
       )
@@ -221,27 +230,22 @@ export function useFunding(
   }, [record, refresh, refreshAccount, save])
   useEffect(() => {
     if (
-      !visible ||
       !record ||
-      (!record.hash && record.kind !== 'withdraw') ||
-      ![
-        'submitted',
-        'confirmed',
-        ...(record.kind === 'withdraw' ? ['unknown'] : []),
-      ].includes(record.status) ||
-      (record.kind === 'approve' && record.status === 'confirmed')
+      !isFundingPending(record) ||
+      (!record.hash && record.kind !== 'withdraw')
     )
       return
     void check()
     const timer = setInterval(() => void check(), 10000)
     return () => clearInterval(timer)
-  }, [visible, record, check])
+  }, [record, check])
 
   async function run(action: () => Promise<void>) {
     if (lock.current || !wallet) return
     lock.current = true
     setBusy(true)
     setError('')
+    setNotification(null)
     try {
       await action()
       return true
@@ -256,17 +260,8 @@ export function useFunding(
       setBusy(false)
     }
   }
-  const pending = isFundingPending(record)
-  function ensureIdle(account: string) {
-    const stored = parseFundingRecord(
-      localStorage.getItem(fundingKey(account)),
-      account,
-    )
-    if (isFundingPending(stored))
-      throw new Error('资金请求尚未确认，请先核对，不能重复提交')
-  }
   async function deposit(amount: string) {
-    if (!wallet || pending) return
+    if (!wallet) return
     const completed = await run(async () => {
       const units = fundingAmount(amount)
       const fresh = await depositBalances(wallet.address)
@@ -283,7 +278,6 @@ export function useFunding(
         let submitted = false
         try {
           const hash = await sendDeposit(wallet, amount, kind, () => {
-            ensureIdle(wallet.address)
             save(next)
             submitted = true
           })
@@ -317,7 +311,7 @@ export function useFunding(
     if (completed) void refresh()
   }
   async function transfer(amount: string, toPerp: boolean) {
-    if (!wallet || pending) return
+    if (!wallet) return
     return run(async () => {
       let next: FundingRecord | null = null
       try {
@@ -341,7 +335,6 @@ export function useFunding(
           at: Date.now(),
           status: 'unknown',
         }
-        ensureIdle(wallet.address)
         save(next)
         await masterExchange(wallet).usdClassTransfer({ amount: value, toPerp })
         save({ ...next, status: 'confirmed' })
@@ -381,7 +374,7 @@ export function useFunding(
     }
   }, [wallet])
   async function withdraw(value: string) {
-    if (!wallet || pending || !withdrawQuote) return
+    if (!wallet || !withdrawQuote) return
     const preview = withdrawQuote
     await run(async () => {
       let next: FundingRecord | null = null
@@ -400,7 +393,6 @@ export function useFunding(
         ) {
           throw new Error('费用已更新，请重新核对后确认提款')
         }
-        ensureIdle(wallet.address)
         const nonce = Date.now()
         next = {
           account: wallet.address,
@@ -426,13 +418,6 @@ export function useFunding(
       }
     })
   }
-  function acknowledge() {
-    if (!record || busy) return
-    localStorage.removeItem(fundingKey(record.account))
-    setRecord(null)
-    setNotification(null)
-    setError('已按人工核对解除本地保护；没有重新发送资金请求。')
-  }
   return {
     balances,
     core,
@@ -447,12 +432,10 @@ export function useFunding(
     error,
     busy,
     loading,
-    pending,
     refresh,
     check,
     deposit,
     transfer,
-    acknowledge,
     switchChain: () =>
       run(async () => {
         if (wallet) {

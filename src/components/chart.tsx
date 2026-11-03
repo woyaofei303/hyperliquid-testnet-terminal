@@ -10,9 +10,11 @@ import type { createChartFeed } from '@/lib/chart-feed'
 import { type ChartInterval, chartPeriods } from '@/lib/chart-periods'
 import type { Candle } from '@/lib/market-data'
 import type { IChartingLibraryWidget } from '../../public/lib/charting_library/charting_library'
+import { ChartDrawingTools } from './trading/chart-drawing-tools'
+import { ChartIndicators } from './trading/chart-indicators'
 import { type ChartEngine, ChartToolbar } from './trading/chart-toolbar'
+import { ChartTradeLines } from './trading/chart-trade-lines'
 
-const klineOptions = { timezone: 'Etc/UTC' }
 type Props = {
   coin: string
   label?: string
@@ -51,7 +53,7 @@ export const Chart = memo(function Chart(props: Props) {
   const locale = useLocale()
 
   const [engine, setEngine] = useState<ChartEngine>('kline')
-  const controls = useChartControls(engine, props.onIntervalChange)
+  const controls = useChartControls(engine, props.onIntervalChange, props.coin)
   const [tvMounted, setTvMounted] = useState(false)
   const { source, count, error, loaded } = useChartFeed(props)
   useEffect(() => source.setVisibleEngine(engine), [source, engine])
@@ -82,11 +84,21 @@ export const Chart = memo(function Chart(props: Props) {
           hidden={engine !== 'kline'}
           className="absolute inset-0"
           aria-label={
-            t('基础版 K 线图，已加载 ') + count + t(' 根蜡烛，时间使用 UTC')
+            t('基础版 K 线图，已加载 ') + count + t(' 根蜡烛，时间使用本地时区')
           }
         >
           <BaseKlineChart
             onChartReady={controls.onKlineReady}
+            leftSlot={
+              <ChartDrawingTools
+                key={controls.drawingReset}
+                chart={controls.kline}
+                coin={props.coin}
+                visible={engine === 'kline'}
+                expanded={controls.drawing}
+                onExpandedChange={controls.setDrawing}
+              />
+            }
             visible={engine === 'kline'}
             dataLoader={source.kline}
             symbolInfo={symbol}
@@ -94,9 +106,16 @@ export const Chart = memo(function Chart(props: Props) {
             klinePriceType="trade"
             locale={locale}
             theme="dark"
-            options={klineOptions}
             className="absolute inset-0 flex"
-          />
+          >
+            {(result) => (
+              <ChartTradeLines
+                chart={result}
+                visibility={controls.tradeLines}
+                visible={engine === 'kline'}
+              />
+            )}
+          </BaseKlineChart>
         </section>
         {tvMounted && (
           <section
@@ -105,7 +124,7 @@ export const Chart = memo(function Chart(props: Props) {
             aria-label={
               t('TradingView K 线图，已加载 ') +
               count +
-              t(' 根蜡烛，时间使用 UTC')
+              t(' 根蜡烛，时间使用本地时区')
             }
           >
             <TradingView
@@ -132,9 +151,15 @@ export const Chart = memo(function Chart(props: Props) {
           </p>
         )}
       </div>
+      {engine === 'kline' && controls.indicatorsOpen && controls.kline && (
+        <ChartIndicators
+          chart={controls.kline}
+          onClose={() => controls.setIndicatorsOpen(false)}
+        />
+      )}
       {controls.error && (
         <p role="alert" className="p-2 text-xs text-loss">
-          {controls.error}
+          {t(controls.error)}
         </p>
       )}
     </div>

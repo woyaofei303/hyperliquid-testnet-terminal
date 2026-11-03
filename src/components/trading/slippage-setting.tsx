@@ -4,6 +4,7 @@ import { Button, Input, Modal } from '@fameex/ui'
 import { useState } from 'react'
 import { t, useLocale } from '@/i18n'
 import { slippageBps } from '@/lib/orders'
+import { HelpLabel } from './help-label'
 
 export function SlippageSetting({
   value,
@@ -27,7 +28,9 @@ export function SlippageSetting({
   return (
     <>
       <div className="flex items-center justify-between gap-2">
-        <dt className="text-muted">{t('滑点')}</dt>
+        <dt className="text-muted">
+          <HelpLabel label="最大滑点" />
+        </dt>
         <dd>
           <Button
             type="button"

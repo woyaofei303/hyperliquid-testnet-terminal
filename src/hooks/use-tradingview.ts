@@ -9,6 +9,7 @@ import { type ChartInterval, chartResolutions } from '@/lib/chart-periods'
 import type {
   IChartingLibraryWidget,
   ResolutionString,
+  Timezone,
 } from '../../public/lib/charting_library/charting_library'
 
 export function useTradingView({
@@ -78,7 +79,8 @@ export function useTradingView({
           symbol: coin,
           interval: chartResolutions[interval] as ResolutionString,
           locale: locale === 'en-US' ? 'en' : 'zh',
-          timezone: 'Etc/UTC',
+          timezone: Intl.DateTimeFormat().resolvedOptions()
+            .timeZone as Timezone,
           theme: 'dark',
           autosize: true,
           disabled_features: [

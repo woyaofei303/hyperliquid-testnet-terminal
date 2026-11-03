@@ -150,7 +150,7 @@ test('移动止损生成原生 trailingStop，追价不会跨过对手价或用�
   )
 })
 
-test('仓位保护按最新仓位数量反向只减仓，拒绝空仓与错误触发方向', async () => {
+test('整仓保护发送零数量动态覆盖仓位，拒绝空仓与错误触发方向', async () => {
   const { preparePositionProtection } = await import('./order-ticket.ts')
   const ticket = preparePositionProtection(
     input.market,
@@ -163,7 +163,7 @@ test('仓位保护按最新仓位数量反向只减仓，拒绝空仓与错误�
   if (ticket.kind !== 'orders') throw new Error('类型错误')
   assert.equal(ticket.grouping, 'positionTpsl')
   assert.ok(
-    ticket.orders.every((order) => !order.b && order.r && order.s === '0.01'),
+    ticket.orders.every((order) => !order.b && order.r && order.s === '0'),
   )
   assert.throws(
     () => preparePositionProtection(input.market, '70000', '0', '72000', ''),
@@ -172,5 +172,30 @@ test('仓位保护按最新仓位数量反向只减仓，拒绝空仓与错误�
   assert.throws(
     () => preparePositionProtection(input.market, '70000', '0.01', '69000', ''),
     /高于/,
+  )
+})
+
+test('自定义保护数量使用固定数量，允许限价保护但拒绝超仓', async () => {
+  const { preparePositionProtection } = await import('./order-ticket.ts')
+  const ticket = preparePositionProtection(
+    input.market,
+    '70000',
+    '-0.01',
+    '68000',
+    '72000',
+    { size: '0.004', takeProfitLimit: '68100', stopLossLimit: '72200' },
+  )
+  if (ticket.kind !== 'orders') throw new Error('类型错误')
+  assert.ok(ticket.orders.every((o) => o.b && o.r && o.s === '0.004'))
+  assert.deepEqual(ticket.orders[0].t, {
+    trigger: { isMarket: false, triggerPx: '68000', tpsl: 'tp' },
+  })
+  assert.equal(ticket.orders[0].p, '68100')
+  assert.throws(
+    () =>
+      preparePositionProtection(input.market, '70000', '0.01', '72000', '', {
+        size: '0.02',
+      }),
+    /超过/,
   )
 })

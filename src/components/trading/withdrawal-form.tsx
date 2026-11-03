@@ -4,6 +4,7 @@ import { Button, Input } from '@fameex/ui'
 import { useEffect, useState } from 'react'
 import type { TerminalModel } from '@/hooks/use-terminal'
 import { t, useLocale } from '@/i18n'
+import { sharedAccount } from '@/lib/account-types'
 import { display } from '@/lib/display'
 import { WITHDRAWAL_FEE, withdrawalAmount } from '@/lib/funding'
 import { Money } from '@/lib/orders'
@@ -71,13 +72,16 @@ export function WithdrawalForm({ model }: { model: TerminalModel }) {
   const { loadWithdrawalQuote, cancelWithdrawal } = f
   useEffect(() => {
     void loadWithdrawalQuote()
-    return cancelWithdrawal
+    const timer = setInterval(() => void loadWithdrawalQuote(), 15000)
+    return () => {
+      clearInterval(timer)
+      cancelWithdrawal()
+    }
   }, [loadWithdrawalQuote, cancelWithdrawal])
   if (!wallet) return null
   const quote = f.withdrawQuote
-  const shared = ['unifiedAccount', 'portfolioMargin'].includes(
-    f.core?.mode ?? '',
-  )
+  const mode = model.account.snapshot?.mode
+  const canTransfer = !!mode && !sharedAccount(mode)
   let validation = ''
   let received = '—'
   if (amount && quote) {
@@ -101,13 +105,13 @@ export function WithdrawalForm({ model }: { model: TerminalModel }) {
         onChange={setAmount}
         inputMode="decimal"
         placeholder={t('至少 0.4 USDC')}
-        isDisabled={busy || f.pending}
+        isDisabled={busy}
         endContent={
           <Button
             variant="light"
             size="sm"
             className="whitespace-nowrap px-0 text-accent"
-            isDisabled={busy || f.pending || !quote || f.quoteLoading}
+            isDisabled={busy || !quote || f.quoteLoading}
             onPress={() => {
               if (quote) setAmount(quote.available)
             }}
@@ -133,13 +137,9 @@ export function WithdrawalForm({ model }: { model: TerminalModel }) {
         <div className="flex justify-between gap-4">
           <dt className="text-muted">{t('预计 HyperEVM Gas')}</dt>
           <dd className="text-right">
-            {display(quote?.gasHype, 8)} HYPE
-            <br />
-            <span className="text-muted">
-              {t('约')}
-              {display(quote?.gasUsdc, 6)} USDC ·{' '}
-              {quote?.gasInHype ? t('从现货 HYPE 扣除') : t('从 USDC 预留')}
-            </span>
+            {quote?.gasInHype === false
+              ? `${display(quote.gasUsdc, 6)} USDC`
+              : `${display(quote?.gasHype, 8)} HYPE`}
           </dd>
         </div>
         {quote && new Money(quote.activationFee).gt(0) && (
@@ -164,47 +164,29 @@ export function WithdrawalForm({ model }: { model: TerminalModel }) {
       )}
       <Button
         className="w-full"
-        isDisabled={
-          busy ||
-          f.pending ||
-          f.quoteLoading ||
-          !quote ||
-          !amount ||
-          !!validation
-        }
+        isDisabled={busy || f.quoteLoading || !quote || !amount || !!validation}
         onPress={() => void f.withdraw(amount)}
       >
-        {f.pending
-          ? t('资金请求待确认')
-          : busy
-            ? t('等待钱包确认…')
-            : f.quoteLoading
-              ? t('正在查询费用…')
-              : t('提现至 Arbitrum Sepolia')}
+        {busy
+          ? t('等待钱包确认…')
+          : f.quoteLoading
+            ? t('正在查询费用…')
+            : t('提现至 Arbitrum Sepolia')}
       </Button>
-      <p className="text-xs leading-5 text-muted">
-        {shared ? (
-          t('使用统一账户的共享余额，已扣除维护保证金限制。')
-        ) : (
-          <>
-            {t('提款使用合约可提余额。如 USDC 在现货账户，请先')}
-            <Button
-              variant="light"
-              size="sm"
-              className="inline h-auto min-w-0 px-1 py-0 text-xs text-accent"
-              isDisabled={busy || f.pending}
-              onPress={() => {
-                model.setTransferToPerp(true)
-                model.setWeb3Panel('transfer')
-              }}
-            >
-              {t('现货转入合约')}
-            </Button>
-            。
-          </>
-        )}
-        {t('通常约 5 分钟到账，实际以链上结果为准。')}
-      </p>
+      {canTransfer && (
+        <Button
+          variant="light"
+          size="sm"
+          className="w-full text-xs text-accent"
+          isDisabled={busy}
+          onPress={() => {
+            model.setTransferToPerp(true)
+            model.setWeb3Panel('transfer')
+          }}
+        >
+          {t('现货转入合约')}
+        </Button>
+      )}
     </div>
   )
 }

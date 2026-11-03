@@ -4,6 +4,7 @@ import { t, useLocale } from '@/i18n'
 import { display } from '@/lib/display'
 import { isCash, pricePrecision, quoteName } from '@/lib/market-catalog'
 import { fundingCountdown, marketSummary } from '@/lib/market-summary'
+import { HelpLabel } from './help-label'
 import { MarketSelector } from './market-selector'
 export function MarketHeader({ model }: { model: TerminalModel }) {
   useLocale()
@@ -18,12 +19,6 @@ export function MarketHeader({ model }: { model: TerminalModel }) {
       className="flex h-16 shrink-0 items-center gap-5 overflow-x-auto border-b border-edge px-3"
     >
       <div className="flex shrink-0 items-center gap-2">
-        <span
-          aria-hidden="true"
-          className="flex size-7 shrink-0 items-center justify-center rounded-full border border-accent/25 bg-brand/15 text-base font-semibold text-accent"
-        >
-          {coin.slice(0, 1)}
-        </span>
         <MarketSelector model={model} />
       </div>
       <Metric
@@ -136,14 +131,14 @@ function Metric({
   useLocale()
 
   return (
-    <dl
-      className="shrink-0 whitespace-nowrap"
-      title={description ? t(description) : undefined}
-    >
+    <dl className="shrink-0 whitespace-nowrap">
       <dt
         className={`mb-1 text-[11px] text-muted ${description ? 'cursor-help decoration-muted/40 underline decoration-dotted underline-offset-4' : ''}`}
       >
-        {t(label)}
+        <HelpLabel
+          label={label}
+          description={description ? t(description) : undefined}
+        />
       </dt>
       <dd className={`text-xs font-medium tabular-nums ${tone}`}>{value}</dd>
     </dl>
