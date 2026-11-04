@@ -1780,7 +1780,6 @@ test('网络恢复后重新校准当前显示的 KLineChart 和 TradingView', as
   releaseHistory()
   await expect(syncing).toHaveCount(0)
   await expect(tradingViewRegion).toBeVisible()
-  await page.waitForLoadState('networkidle')
   releaseHistory = exchange.pauseCandleHistory()
   before = exchange.candleHistoryRequests()
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
