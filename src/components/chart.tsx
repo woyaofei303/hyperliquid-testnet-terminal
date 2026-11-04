@@ -330,6 +330,7 @@ export const Chart = memo(function Chart(props: Props) {
     }),
     [props.coin, props.szDecimals, props.priceDecimals],
   )
+  const displayEngine = preservedEngine ?? engine
   return (
     <div
       ref={controls.container}
@@ -343,7 +344,7 @@ export const Chart = memo(function Chart(props: Props) {
       />
       <div className="relative min-h-[400px] flex-1 md:min-h-[460px] lg:min-h-0">
         <section
-          hidden={engine !== 'kline' && preservedEngine !== 'kline'}
+          hidden={displayEngine !== 'kline'}
           aria-hidden={engine !== 'kline' && preservedEngine !== 'kline'}
           inert={engine !== 'kline'}
           className={`absolute inset-0 ${preservedEngine === 'kline' ? 'z-20' : 'z-10'}`}
@@ -383,6 +384,7 @@ export const Chart = memo(function Chart(props: Props) {
         </section>
         {tvMounted && (
           <section
+            hidden={displayEngine !== 'tradingview'}
             aria-hidden={
               engine !== 'tradingview' || preservedEngine === 'kline'
             }
