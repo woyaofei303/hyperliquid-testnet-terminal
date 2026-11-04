@@ -97,6 +97,12 @@ export const en: Record<string, string> = {
 
   '）': ')',
   '图表加载失败：': 'Chart failed: ',
+  'K 线历史同步中': 'Synchronizing candle history',
+  '部分历史超出交易所留存范围，无法校准':
+    'Some history is outside the exchange retention range and cannot be reconciled',
+  'K 线历史同步失败：': 'Candle history sync failed: ',
+  '网络不可用，等待恢复后重试': 'Offline; will retry when the network returns',
+  重试同步: 'Retry sync',
   此市场暂无历史成交: 'No historical trades for this market',
   '行情加载失败：': 'Market data failed: ',
   暂时无法显示: 'Currently unavailable',

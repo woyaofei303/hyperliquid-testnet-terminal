@@ -68,6 +68,7 @@ export function Terminal() {
                     }
                     priceDecimals={market ? pricePrecision(market) : 1}
                     interval={interval}
+                    candleReconnectVersion={feed.candleReconnectVersion}
                     onIntervalChange={setIntervalValue}
                     candles={feed.candles}
                     szDecimals={market?.szDecimals ?? 5}

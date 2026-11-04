@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
+import type { KLineData } from 'klinecharts'
 import type {
   Bar,
   ResolutionString,
 } from '../../public/lib/charting_library/charting_library'
 import { chartBars, chartPeriods, createChartFeed } from './chart-feed.ts'
+import { candleHistoryStart } from './chart-periods.ts'
 import type { Candle } from './market-data.ts'
 
 const time = Math.floor(Date.now() / 300000) * 300000 - 300000
@@ -277,5 +279,142 @@ test('TradingView 历史请求按 300 根窗口分页，满足 countBack 且不�
   assert.equal(bars.length, 900)
   assert.equal(new Set(bars.map((b) => b.time)).size, bars.length)
   assert.equal(bars.at(-1)?.time, time)
+  feed.dispose()
+})
+
+test('恢复历史时缓冲实时更新，并让图表重载复用校准后的蜡烛', async () => {
+  const pending = Promise.withResolvers<Candle[]>()
+  let requests = 0
+  const feed = source(() => {
+    requests++
+    return pending.promise
+  })
+  const recovery = feed.recover(time - 300000, time + 600000)
+  assert.equal(feed.recover(time - 300000, time + 600000), recovery)
+  feed.update([{ ...candle(time, '104'), h: '104' }])
+  pending.resolve([candle(time - 300000), { ...candle(time, '103'), h: '103' }])
+
+  const result = await recovery
+  assert.equal(result.complete, true)
+  const requestCount = requests
+  const barsPromise = Promise.withResolvers<Bar[]>()
+  feed.tradingView.getBars(
+    feed.symbolInfo,
+    '5' as ResolutionString,
+    {
+      from: (time - 300000) / 1000,
+      to: (time + 600000) / 1000,
+      countBack: 300,
+      firstDataRequest: true,
+    },
+    barsPromise.resolve,
+    barsPromise.reject,
+  )
+
+  const bars = await barsPromise.promise
+  assert.equal(requests, requestCount)
+  assert.equal(bars.find((bar) => bar.time === time)?.close, 104)
+  feed.dispose()
+})
+
+test('TradingView 历史重载先清缓存，再等新的 getBars 完成', async () => {
+  const feed = source(async () => [candle(time)])
+  feed.setVisibleEngine('tradingview')
+  await feed.recover(time - 300000, time + 300000)
+  const order: string[] = []
+  feed.tradingView.subscribeBars(
+    feed.symbolInfo,
+    '5' as ResolutionString,
+    () => {},
+    'tv',
+    () => order.push('clear'),
+  )
+
+  await feed.refreshEngine('tradingview', () => {
+    order.push('reset')
+    feed.tradingView.getBars(
+      feed.symbolInfo,
+      '5' as ResolutionString,
+      {
+        from: (time - 300000) / 1000,
+        to: (time + 300000) / 1000,
+        countBack: 300,
+        firstDataRequest: true,
+      },
+      () => order.push('loaded'),
+      (error) => assert.fail(error),
+    )
+  })
+
+  assert.deepEqual(order, ['clear', 'reset', 'loaded'])
+  feed.dispose()
+})
+
+test('KLineChart 重载后从校准缓存读取历史，不重复请求 REST', async () => {
+  let requests = 0
+  const feed = source(async () => {
+    requests++
+    return [candle(time - 300000), candle(time)]
+  })
+  feed.setVisibleEngine('kline')
+  await feed.recover(time - 300000, time + 600000)
+  const requestCount = requests
+  const barsPromise = Promise.withResolvers<KLineData[]>()
+  await feed.refreshEngine('kline', () => {
+    void feed.kline.getBars({
+      type: 'init',
+      timestamp: null,
+      symbol: { ticker: 'BTC', pricePrecision: 1, volumePrecision: 5 },
+      period: chartPeriods['5m'],
+      callback(bars) {
+        barsPromise.resolve(bars)
+      },
+    })
+  })
+
+  assert.equal(requests, requestCount)
+  assert.equal((await barsPromise.promise).length, 2)
+  feed.dispose()
+})
+
+test('历史接口留存范围之外的恢复结果标记为不完整', async () => {
+  const feed = source(async () => [])
+  const end = Date.now()
+  const oldest = candleHistoryStart(end, 5000, '5m')
+  const result = await feed.recover(oldest - 300000, end)
+
+  assert.equal(result.fromTime, oldest)
+  assert.equal(result.complete, false)
+  feed.dispose()
+})
+
+test('恢复失败后保留同步期间的实时更新供重试合并', async () => {
+  let calls = 0
+  const feed = source(async () => {
+    calls++
+    if (calls === 1) throw new Error('offline')
+    return [candle(time - 300000), { ...candle(time, '103'), h: '103' }]
+  })
+  await assert.rejects(feed.recover(time - 300000, time + 600000), /offline/)
+  feed.update([{ ...candle(time, '104'), h: '104' }])
+  await feed.recover(time - 300000, time + 600000)
+  const barsPromise = Promise.withResolvers<Bar[]>()
+  feed.tradingView.getBars(
+    feed.symbolInfo,
+    '5' as ResolutionString,
+    {
+      from: (time - 300000) / 1000,
+      to: (time + 600000) / 1000,
+      countBack: 300,
+      firstDataRequest: true,
+    },
+    barsPromise.resolve,
+    barsPromise.reject,
+  )
+
+  assert.equal(
+    (await barsPromise.promise).find((bar) => bar.time === time)?.close,
+    104,
+  )
   feed.dispose()
 })

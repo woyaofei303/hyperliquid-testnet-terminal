@@ -56,6 +56,8 @@ async function mockExchange(
   let nextOid = 100
   let bookOffset = 0
   let spotBookPrice = 20
+  let candleHistoryRequests = 0
+  let candleSnapshotGate: Promise<void> | null = null
   let cashReadGate: Promise<void> | null = null
   let cashReads = 0
   const cashBalances = [
@@ -423,6 +425,10 @@ async function mockExchange(
               : Array.from({ length: 30 }, (_, i) => trade(request.coin, i + 1))
           break
         case 'candleSnapshot':
+          if (request.req.endTime !== undefined) {
+            candleHistoryRequests++
+            if (candleSnapshotGate) await candleSnapshotGate
+          }
           if (mode === 'slow-history')
             await new Promise((resolve) => setTimeout(resolve, 900))
           if (mode === 'delayed-history') await historyReady
@@ -872,6 +878,15 @@ async function mockExchange(
       if (item) item.sz = remaining
     },
     writes,
+    candleHistoryRequests: () => candleHistoryRequests,
+    pauseCandleHistory() {
+      const gate = Promise.withResolvers<void>()
+      candleSnapshotGate = gate.promise
+      return () => {
+        candleSnapshotGate = null
+        gate.resolve()
+      }
+    },
     agentRegistrations: () => agentRegistrations,
     expireAgent: () => {
       agentValidUntil = Date.now() - 1
@@ -1729,6 +1744,52 @@ test('实际图表引擎可切换，切币和切周期继续使用 Hyperliquid �
   ).toBeVisible()
   expect(errors).toEqual([])
   expect(writes).toEqual([])
+})
+
+test('网络恢复后重新校准当前显示的 KLineChart 和 TradingView', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  await page.goto('/')
+  await expect(
+    page.getByRole('region', { name: /基础版 K 线图，已加载 40 根/ }),
+  ).toBeVisible()
+
+  const syncing = page.getByText('K 线历史同步中', { exact: true })
+  let releaseHistory = exchange.pauseCandleHistory()
+  let before = exchange.candleHistoryRequests()
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await expect
+    .poll(() => exchange.candleHistoryRequests())
+    .toBeGreaterThan(before)
+  await expect(syncing).toBeVisible()
+  releaseHistory()
+  await expect(syncing).toHaveCount(0)
+
+  releaseHistory = exchange.pauseCandleHistory()
+  await page.getByRole('button', { name: 'TradingView', exact: true }).click()
+  await expect(syncing).toBeVisible()
+  const tradingViewRegion = page.getByRole('region', {
+    name: /TradingView K 线图，已加载 [1-9]\d* 根/,
+  })
+  const klineRegion = page.getByRole('region', {
+    name: /基础版 K 线图，已加载 40 根/,
+  })
+  await expect(klineRegion).toBeVisible()
+  await expect(tradingViewRegion).toBeHidden()
+  releaseHistory()
+  await expect(syncing).toHaveCount(0)
+  await expect(tradingViewRegion).toBeVisible()
+  await page.waitForLoadState('networkidle')
+  releaseHistory = exchange.pauseCandleHistory()
+  before = exchange.candleHistoryRequests()
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await expect
+    .poll(() => exchange.candleHistoryRequests())
+    .toBeGreaterThan(before)
+  await expect(syncing).toBeVisible()
+  releaseHistory()
+  await expect(syncing).toHaveCount(0)
 })
 
 test('切币与周期复用图表和行情连接，切换引擎保留实例', async ({ page }) => {

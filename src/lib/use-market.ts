@@ -94,6 +94,7 @@ export function useMarket(coin: string, interval: Interval) {
   const [error, setError] = useState('')
   const [receivedAt, setReceivedAt] = useState(0)
   const [now, setNow] = useState(0)
+  const [candleReconnectVersion, setCandleReconnectVersion] = useState(0)
   const [connection, setConnection] = useState<{
     transport: WebSocketTransport
     sub: SubscriptionClient
@@ -126,6 +127,7 @@ export function useMarket(coin: string, interval: Interval) {
     let active = true
     let generation = 0
     const buffer = new Map<number, Candle>()
+    let didOpen = false
     const pendingCandles = new Map<number, Candle>()
     let pendingBook: Book | null = null
     const bookFrame = createFrameBatch('book', () => {
@@ -185,6 +187,8 @@ export function useMarket(coin: string, interval: Interval) {
     }
     const opened = () => {
       if (active) {
+        if (didOpen) setCandleReconnectVersion((version) => version + 1)
+        didOpen = true
         setStatus('实时连接')
         void snapshots()
       }
@@ -381,6 +385,7 @@ export function useMarket(coin: string, interval: Interval) {
     error,
     stale,
     receivedAt,
+    candleReconnectVersion,
   }
 }
 

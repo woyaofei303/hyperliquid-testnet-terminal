@@ -130,6 +130,7 @@ export function useChartControls(
       setShape(value)
     },
     kline,
+    tradingView,
     drawing,
     setDrawing,
     drawingReset,
