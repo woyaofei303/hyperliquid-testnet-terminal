@@ -52,10 +52,34 @@ export function useChartControls(
   }, [kline, tradingView, shape])
   useEffect(() => {
     const changed = () =>
-      setFullscreen(document.fullscreenElement === container.current)
+      setFullscreen(document.fullscreenElement === document.documentElement)
     document.addEventListener('fullscreenchange', changed)
-    return () => document.removeEventListener('fullscreenchange', changed)
+    return () => {
+      document.removeEventListener('fullscreenchange', changed)
+      if (document.fullscreenElement === document.documentElement)
+        void document.exitFullscreen().catch(() => undefined)
+    }
   }, [])
+  useEffect(() => {
+    if (!fullscreen) return
+    const siblings: [HTMLElement, boolean][] = []
+    // 全屏保留 body 弹层，只禁用图表所在应用分支之外的背景控件。
+    for (
+      let branch: HTMLElement | null = container.current;
+      branch?.parentElement && branch.parentElement !== document.body;
+      branch = branch.parentElement
+    ) {
+      for (const sibling of branch.parentElement.children) {
+        if (sibling instanceof HTMLElement && sibling !== branch) {
+          siblings.push([sibling, sibling.inert])
+          sibling.inert = true
+        }
+      }
+    }
+    return () => {
+      for (const [sibling, inert] of siblings) sibling.inert = inert
+    }
+  }, [fullscreen])
   function selectPeriod(value: ChartInterval | 'time') {
     setTimeline(value === 'time')
     setShape(value === 'time' ? 'area' : 'candle_solid')
@@ -112,7 +136,8 @@ export function useChartControls(
   async function toggleFullscreen() {
     try {
       if (document.fullscreenElement) await document.exitFullscreen()
-      else await container.current?.requestFullscreen()
+      // body 中的菜单、弹窗和提示必须与图表处于同一个浏览器全屏层。
+      else await document.documentElement.requestFullscreen()
       setError('')
     } catch {
       setError('浏览器未允许全屏，可使用窗口最大化查看图表。')

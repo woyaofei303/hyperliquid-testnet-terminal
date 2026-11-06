@@ -365,7 +365,7 @@ export const Chart = memo(function Chart(props: Props) {
   return (
     <div
       ref={controls.container}
-      className="flex min-h-0 flex-1 flex-col bg-panel fullscreen:h-dvh fullscreen:w-dvw"
+      className={`flex min-h-0 flex-1 flex-col bg-panel ${controls.fullscreen ? 'fixed inset-0 z-50 h-dvh w-dvw' : ''}`}
     >
       <ChartToolbar
         interval={props.interval}

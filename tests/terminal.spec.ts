@@ -2463,6 +2463,105 @@ test('基础版完整周期、真实工具图标、指标和全屏可操作', as
   expect(writes).toEqual([])
 })
 
+test('图表全屏时菜单和弹窗可操作，退出后保留输入与焦点', async ({ page }) => {
+  test.setTimeout(60000)
+  const { writes, socketConnections } = await mockExchange(page)
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: '重置图表' })).toBeEnabled()
+  await page.getByRole('button', { name: '全屏图表' }).click()
+  await expect
+    .poll(() => page.evaluate(() => !!document.fullscreenElement))
+    .toBe(true)
+  const marketPicker = page.getByRole('button', {
+    name: '交易市场',
+    exact: true,
+  })
+  await marketPicker.focus()
+  await expect(marketPicker).not.toBeFocused()
+
+  await page.getByRole('button', { name: '更多时间周期' }).click()
+  // 普通 visible 断言无法识别被浏览器全屏层遮住的 body 弹层，必须实际命中按钮。
+  await page.getByRole('button', { name: '3分', exact: true }).click()
+  await page.getByRole('button', { name: '图表类型', exact: true }).click()
+  await page.getByRole('button', { name: '空心蜡烛', exact: true }).click()
+  await page.getByRole('button', { name: '交易线', exact: true }).click()
+  await page.getByRole('checkbox', { name: '订单线', exact: true }).uncheck()
+  await expect(
+    page.getByRole('checkbox', { name: '订单线', exact: true }),
+  ).not.toBeChecked()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: '线段工具', exact: true }).click()
+  await page.getByRole('button', { name: '垂直射线', exact: true }).click()
+  await page.getByRole('button', { name: '光标', exact: true }).click()
+
+  const indicators = page.getByRole('button', { name: '指标', exact: true })
+  await indicators.click()
+  const dialog = page.getByRole('dialog', { name: '指标', exact: true })
+  await dialog.getByRole('tab', { name: '副图指标' }).click()
+  await dialog.getByRole('textbox', { name: '搜索指标' }).fill('rsi')
+  await dialog.getByRole('checkbox', { name: 'RSI', exact: true }).check()
+  await page.screenshot({
+    path: 'output-tdd/playwright/chart-fullscreen/indicators.png',
+  })
+  // 模拟浏览器退出全屏，弹窗仍打开，草稿和焦点应随弹层一起恢复。
+  await page.evaluate(() => document.exitFullscreen())
+  await expect
+    .poll(() => page.evaluate(() => !!document.fullscreenElement))
+    .toBe(false)
+  await expect(dialog.getByRole('textbox', { name: '搜索指标' })).toHaveValue(
+    'rsi',
+  )
+  await expect(
+    dialog.getByRole('checkbox', { name: 'RSI', exact: true }),
+  ).toBeChecked()
+  await dialog.getByRole('textbox', { name: '搜索指标' }).fill('macd')
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(indicators).toBeFocused()
+  await expect(
+    page.getByRole('button', { name: '交易市场', exact: true }),
+  ).toBeVisible()
+
+  await page.getByRole('button', { name: '全屏图表' }).click()
+  await page.getByRole('button', { name: 'TradingView', exact: true }).click()
+  await expect(
+    page.frameLocator('iframe').locator('canvas').first(),
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: '重置图表' })).toBeEnabled()
+  await page.getByRole('button', { name: '更多时间周期' }).click()
+  await page.getByRole('button', { name: '2时', exact: true }).click()
+  await page.getByRole('button', { name: '图表类型', exact: true }).click()
+  await page.getByRole('button', { name: '面积图', exact: true }).click()
+  await page.getByRole('button', { name: '退出全屏' }).click()
+  await expect
+    .poll(() => page.evaluate(() => !!document.fullscreenElement))
+    .toBe(false)
+  await page.getByRole('button', { name: '更多时间周期' }).click()
+  await expect(
+    page.getByRole('button', { name: '2时', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: '3分', exact: true }).click()
+  expect(socketConnections).toHaveLength(2)
+  await page.getByRole('link', { name: '预测', exact: true }).click()
+  await expect(page).toHaveURL(/\/outcomes$/)
+  await page.getByRole('link', { name: '交易', exact: true }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByRole('button', { name: '重置图表' })).toBeEnabled()
+  await page.getByRole('button', { name: '全屏图表' }).click()
+  await page.goBack()
+  await expect(page).toHaveURL(/\/outcomes$/)
+  await expect
+    .poll(() => page.evaluate(() => !!document.fullscreenElement))
+    .toBe(false)
+  await page.getByRole('link', { name: '交易', exact: true }).click()
+  await expect(page.getByRole('button', { name: '全屏图表' })).toBeVisible()
+  expect(errors).toEqual([])
+  expect(writes).toEqual([])
+})
+
 for (const mode of ['normal', 'sparse-depth'] as const) {
   test(`盘口满深度铺满、稀疏深度保持行高且贴近价差：${mode}`, async ({
     page,
