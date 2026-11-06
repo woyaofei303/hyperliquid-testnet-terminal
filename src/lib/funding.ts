@@ -13,6 +13,7 @@ import {
   parseUnits,
   stringToHex,
   toHex,
+  zeroAddress,
 } from 'viem'
 import { arbitrumSepolia } from 'viem/chains'
 import { assertSession, info, type WalletSession } from './hyperliquid.ts'
@@ -274,35 +275,8 @@ export function parseFundingRecord(
   return record
 }
 
-// 只有源链哈希、跨链 nonce 和 HyperCore 收款流水均匹配，才认为到账。
-export function creditedDeposit(
-  transfers: unknown,
-  ledger: unknown,
-  record: FundingRecord,
-) {
-  if (!record.hash || !Array.isArray(transfers) || !Array.isArray(ledger))
-    return false
-  const transfer = transfers.find(
-    (item) =>
-      item?.depositTxnRef?.toLowerCase() === record.hash?.toLowerCase() &&
-      item.originChainId === DEPOSIT_CHAIN.id,
-  )
-  return (
-    transfer?.nonce != null &&
-    ledger.some(
-      (item) =>
-        item?.delta?.type === 'send' &&
-        item.delta.destination?.toLowerCase() ===
-          record.account.toLowerCase() &&
-        String(item.delta.nonce) === String(transfer.nonce) &&
-        typeof item.delta.token === 'string' &&
-        item.delta.token.startsWith('USDC:'),
-    )
-  )
-}
-
 export const WITHDRAWAL_FEE = '0.2'
-const evmClient = createPublicClient({
+export const evmClient = createPublicClient({
   transport: http('https://rpc.hyperliquid-testnet.xyz/evm', {
     retryCount: 0,
     timeout: 15000,
@@ -367,18 +341,29 @@ export async function withdrawalQuote(
   address: `0x${string}`,
   sourceDex?: '' | 'spot',
 ) {
-  const [mode, perp, spot, gas, mids, activation, routing] = await Promise.all([
-    info.userAbstraction({ user: address }),
-    info.clearinghouseState({ user: address }),
-    info.spotClearinghouseState({ user: address }),
-    evmClient.getGasPrice(),
-    info.allMids(),
-    info.preTransferCheck({
-      user: '0x2000000000000000000000000000000000000000',
-      source: address,
-    }),
-    info.usdcRouting(),
-  ])
+  const [mode, perp, spot, gas, mids, activation, routing, bridgeFee] =
+    await Promise.all([
+      info.userAbstraction({ user: address }),
+      info.clearinghouseState({ user: address }),
+      info.spotClearinghouseState({ user: address }),
+      evmClient.getGasPrice(),
+      info.allMids(),
+      info.preTransferCheck({
+        user: '0x2000000000000000000000000000000000000000',
+        source: address,
+      }),
+      info.usdcRouting(),
+      evmClient.readContract({
+        address: '0x0b80659a4076e9e93c7dbe0f10675a16a3e5c206',
+        abi: parseAbi([
+          'function calculateCrossChainWithdrawalFee(bool,uint32) view returns (uint256)',
+        ]),
+        functionName: 'calculateCrossChainWithdrawalFee',
+        args: [true, 3],
+      }),
+    ])
+  if (bridgeFee !== parseUnits(WITHDRAWAL_FEE, 6))
+    throw new Error('CCTP 转发费已变化，请先在官方页面核对')
   if (routing.withdrawalRoute !== 'cctp')
     throw new Error('当前官方提款通道已变化，请前往官方资金管理核对')
   if (activation.isSanctioned) throw new Error('当前通道无法接收资金')
@@ -420,32 +405,34 @@ export function withdrawalTransaction(
     record.nonce == null
   )
     return null
-  const transfer = transfers.find(
+  const matches = transfers.filter(
     (item) =>
       String(item?.nonce) === String(record.nonce) &&
+      item.originChainId === 998 &&
       item.destinationChainId === DEPOSIT_CHAIN.id,
   )
-  return typeof transfer?.fillTxnRef === 'string' &&
-    /^0x[0-9a-fA-F]{64}$/.test(transfer.fillTxnRef)
-    ? transfer.fillTxnRef
+  const hash = matches.length === 1 ? matches[0].fillTxnRef : null
+  return typeof hash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(hash)
+    ? (hash as `0x${string}`)
     : null
 }
 export function receivedWithdrawal(
   logs: Pick<Log, 'address' | 'data' | 'topics'>[],
   record: FundingRecord,
-) {
-  const expected = parseUnits(
+  expected = parseUnits(
     new Money(record.amount).minus(WITHDRAWAL_FEE).toFixed(),
     6,
-  )
+  ),
+) {
   return logs.some((log) => {
     if (log.address.toLowerCase() !== DEPOSIT_USDC.toLowerCase()) return false
     try {
       const event = decodeEventLog({ abi: erc20Abi, ...log })
       return (
         event.eventName === 'Transfer' &&
+        event.args.from === zeroAddress &&
         event.args.to.toLowerCase() === record.account.toLowerCase() &&
-        event.args.value >= expected
+        event.args.value === expected
       )
     } catch {
       return false

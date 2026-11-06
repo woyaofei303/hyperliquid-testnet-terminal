@@ -3,9 +3,14 @@ import { ApiRequestError } from '@nktkas/hyperliquid/api/exchange'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   creditedDeposit,
+  readCctpMessage,
+  withdrawalMessageAmount,
+} from '@/lib/cctp'
+import {
   depositBalances,
   depositClient,
   depositRejectionMessage,
+  evmClient,
   type FundingRecord,
   type FundingWrite,
   fundingAmount,
@@ -166,7 +171,12 @@ export function useFunding(
   }, [visible, wallet, refresh])
 
   const check = useCallback(async () => {
-    if (checking.current || record?.account !== current.current?.address) return
+    if (
+      lock.current ||
+      checking.current ||
+      record?.account !== current.current?.address
+    )
+      return
     if (
       !record ||
       record.kind === 'transfer' ||
@@ -188,9 +198,11 @@ export function useFunding(
         const next: FundingRecord = { ...record, hash, status: 'confirmed' }
         save(next)
         const receipt = await depositClient.getTransactionReceipt({ hash })
+        const amount = withdrawalMessageAmount(receipt.logs, record)
         if (
           receipt.status === 'success' &&
-          receivedWithdrawal(receipt.logs, record)
+          amount != null &&
+          receivedWithdrawal(receipt.logs, record, amount)
         )
           save({ ...next, status: 'credited' })
         await refresh()
@@ -206,18 +218,32 @@ export function useFunding(
       }
       save(next)
       if (receipt.status === 'success' && record.kind === 'deposit') {
-        const response = await fetch(
-          `https://dev.indexer.api.across.to/hyperliquid-transfers?direction=in&user=${record.account.toLowerCase()}`,
-          { signal: AbortSignal.timeout(10000) },
-        )
-        if (!response.ok)
-          throw new Error('跨链状态暂不可用，源链已确认，仍需核对到账')
-        const ledger = await info.userNonFundingLedgerUpdates({
-          user: record.account,
-          startTime: record.at - 60000,
-        })
-        if (creditedDeposit(await response.json(), ledger, record))
-          next.status = 'credited'
+        const message = await readCctpMessage(record.hash, record)
+        if (message) {
+          const target = await evmClient.getTransactionReceipt({
+            hash: message.hash,
+          })
+          if (target.status === 'success') {
+            const block = await evmClient.getBlock({
+              blockNumber: target.blockNumber,
+            })
+            const ledger = await info.userNonFundingLedgerUpdates({
+              user: record.account,
+              startTime: Number(block.timestamp) * 1000,
+              endTime: Number(block.timestamp) * 1000 + 999,
+            })
+            if (
+              creditedDeposit(
+                target.logs,
+                block.timestamp,
+                message,
+                ledger,
+                record,
+              )
+            )
+              next.status = 'credited'
+          }
+        }
       }
       save(next)
       await refresh()

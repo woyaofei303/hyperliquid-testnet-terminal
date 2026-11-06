@@ -2,6 +2,241 @@ import { readFile } from 'node:fs/promises'
 import { createL1ActionHash } from '@nktkas/hyperliquid/signing'
 import { expect, type Page, test } from '@playwright/test'
 import { recoverTypedDataAddress, serializeSignature } from 'viem'
+import { cctpFixture, coreWallet } from './cctp-fixtures'
+
+test('持续高频行情、资源回收与连接复用 @benchmark', async ({
+  page,
+  browser,
+}, testInfo) => {
+  test.skip(process.env.PERF_CHECK !== '1', '仅在显式性能验收时运行')
+  test.setTimeout(180000)
+  const { pushMarket, pushTrade, socketConnections, writes } =
+    await mockExchange(page)
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto('/')
+  await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
+  await expect(
+    page.getByRole('region', { name: /基础版 K 线图/ }),
+  ).toHaveAttribute('aria-label', /已加载 40 根/)
+  await page.getByRole('button', { name: 'TradingView', exact: true }).click()
+  await expect(
+    page.frameLocator('iframe').locator('canvas').first(),
+  ).toBeVisible()
+  await page.getByRole('button', { name: '基础版', exact: true }).click()
+  const cdp = await page.context().newCDPSession(page)
+  const memory = async () => {
+    await cdp.send('HeapProfiler.collectGarbage')
+    return {
+      heap: await cdp.send('Runtime.getHeapUsage'),
+      dom: await cdp.send('Memory.getDOMCounters'),
+    }
+  }
+  await page.waitForTimeout(5000)
+  const baseline = await memory()
+  await page.getByRole('button', { name: /性能 ·/ }).click()
+  const capture = async () => {
+    const download = page.waitForEvent('download')
+    await page.getByRole('button', { name: '导出指标', exact: true }).click()
+    const path = await (await download).path()
+    if (!path) throw new Error('指标下载失败')
+    const data = JSON.parse(await readFile(path, 'utf8'))
+    return data as import('../src/lib/performance').PerformanceSnapshot
+  }
+  const initial = await capture()
+  const samples: (typeof initial)[] = []
+  let cycles = 0
+  const started = Date.now()
+  // 每 100ms 发送 25 组盘口、标记价、K 线和成交，共目标 1000 条消息/秒。
+  const pump = setInterval(() => {
+    for (let i = 0; i < 25; i++) {
+      cycles++
+      pushMarket('BTC', 70000 + (cycles % 100))
+      pushTrade('BTC', 1000 + cycles)
+    }
+  }, 100)
+  try {
+    while (Date.now() - started < 60000) {
+      await page.waitForTimeout(1000)
+      samples.push(await capture())
+    }
+  } finally {
+    clearInterval(pump)
+  }
+  const elapsedMs = Date.now() - started
+  const initialBook = initial.modules.find((row) => row.id === 'book')
+  let drained = initial
+  await expect
+    .poll(
+      async () => {
+        drained = await capture()
+        return (
+          (drained.modules.find((row) => row.id === 'book')?.totalInput ?? 0) -
+          (initialBook?.totalInput ?? 0)
+        )
+      },
+      { timeout: 15000 },
+    )
+    .toBeGreaterThanOrEqual(cycles)
+  const finalBook = drained.modules.find((row) => row.id === 'book')
+  if (!finalBook) throw new Error('缺少订单簿性能指标')
+  expect(finalBook.pending).toBeLessThanOrEqual(1)
+  expect(finalBook.retained).toBeLessThanOrEqual(40)
+  expect(
+    finalBook.totalUpdates - (initialBook?.totalUpdates ?? 0),
+  ).toBeLessThan(cycles)
+  for (const sample of samples) {
+    expect(sample.hidden).toBe(false)
+    expect(
+      sample.modules.find((row) => row.id === 'book')?.pending,
+    ).toBeLessThanOrEqual(1)
+    expect(
+      sample.modules.find((row) => row.id === 'trades')?.retained,
+    ).toBeLessThanOrEqual(100)
+    expect(
+      sample.modules.find((row) => row.id === 'candles')?.retained,
+    ).toBeLessThanOrEqual(500)
+  }
+  await page.screenshot({ path: testInfo.outputPath('metrics.png') })
+  const recovery: (typeof initial)[] = []
+  for (let i = 0; i < 5; i++) {
+    await page.waitForTimeout(5000)
+    recovery.push(await capture())
+  }
+  await page.getByRole('button', { name: '关闭', exact: true }).click()
+  const expectedPrice = 70001 + (cycles % 100)
+  await expect(
+    page.locator('[data-side="sell"] [data-price]').last(),
+  ).toHaveAttribute('data-price', String(expectedPrice))
+  const afterLoad = await memory()
+  for (let i = 0; i < 10; i++) {
+    await page.getByRole('button', { name: 'TradingView', exact: true }).click()
+    await page.getByRole('button', { name: '基础版', exact: true }).click()
+    await page
+      .getByRole('button', { name: i % 2 ? '5分' : '1分', exact: true })
+      .click()
+  }
+  await page.waitForTimeout(3000)
+  const afterSwitches = await memory()
+  expect(socketConnections).toHaveLength(2)
+  expect(errors).toEqual([])
+  expect(writes).toEqual([])
+  const result = {
+    capturedAt: new Date().toISOString(),
+    browser: browser.version(),
+    environment:
+      'local production build; synthetic WebSocket frames; 1440x1000',
+    buildId: (await readFile('.next/BUILD_ID', 'utf8')).trim(),
+    targetMessagesPerSecond: 1000,
+    elapsedMs,
+    cycles,
+    sentMessages: cycles * 4,
+    actualMessagesPerSecond: (cycles * 4000) / elapsedMs,
+    baseline,
+    afterLoad,
+    afterSwitches,
+    initial,
+    samples,
+    drained,
+    recovery,
+    socketConnections: socketConnections.length,
+    exchangeWrites: writes.length,
+    caveat:
+      '同步提交耗时不等于整帧渲染耗时；回收后堆数据是短时观察，不证明无内存泄漏',
+  }
+  await testInfo.attach('benchmark.json', {
+    body: JSON.stringify(result, null, 2),
+    contentType: 'application/json',
+  })
+})
+
+test('长任务故障注入触发降频并自动恢复 @benchmark', async ({
+  page,
+}, testInfo) => {
+  test.skip(process.env.PERF_CHECK !== '1', '仅在显式性能验收时运行')
+  test.setTimeout(90000)
+  const exchange = await mockExchange(page)
+  await page.goto('/')
+  await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: /性能 ·/ }).click()
+  const capture = async () => {
+    const download = page.waitForEvent('download')
+    await page.getByRole('button', { name: '导出指标', exact: true }).click()
+    const path = await (await download).path()
+    if (!path) throw new Error('指标下载失败')
+    return JSON.parse(
+      await readFile(path, 'utf8'),
+    ) as import('../src/lib/performance').PerformanceSnapshot
+  }
+  const snapshots: Awaited<ReturnType<typeof capture>>[] = []
+  let sent = 0
+  const started = Date.now()
+  const blocker = await page.evaluate(() =>
+    window.setInterval(() => {
+      const start = performance.now()
+      while (performance.now() - start < 80) {
+        /* 模拟外部脚本持续产生长任务。 */
+      }
+    }, 200),
+  )
+  const pump = setInterval(() => {
+    for (let i = 0; i < 100; i++) {
+      sent++
+      exchange.pushFastBook(70000 + (sent % 100))
+    }
+  }, 100)
+  let pressure: Awaited<ReturnType<typeof capture>> | undefined
+  try {
+    await expect
+      .poll(
+        async () => {
+          pressure = await capture()
+          snapshots.push(pressure)
+          return pressure.level
+        },
+        { timeout: 25000, intervals: [1000] },
+      )
+      .toBeGreaterThan(0)
+  } finally {
+    clearInterval(pump)
+    await page.evaluate((id) => window.clearInterval(id), blocker)
+  }
+  const injectionMs = Date.now() - started
+  const stopped = Date.now()
+  let recovered: Awaited<ReturnType<typeof capture>> | undefined
+  await expect
+    .poll(
+      async () => {
+        recovered = await capture()
+        snapshots.push(recovered)
+        return recovered.level
+      },
+      { timeout: 35000, intervals: [1000] },
+    )
+    .toBe(0)
+  if (!pressure || !recovered) throw new Error('缺少降频或恢复快照')
+  expect(recovered.modules.find((row) => row.id === 'book')?.pending).toBe(0)
+  expect(exchange.writes).toEqual([])
+  await testInfo.attach('pressure.json', {
+    body: JSON.stringify(
+      {
+        capturedAt: new Date().toISOString(),
+        injectionMs,
+        recoveryMs: Date.now() - stopped,
+        sent,
+        pressure,
+        recovered,
+        snapshots,
+        scope:
+          'synthetic fast-book messages plus injected 80ms long tasks; no exchange writes',
+      },
+      null,
+      2,
+    ),
+    contentType: 'application/json',
+  })
+})
 
 const address = '0x1111111111111111111111111111111111111111'
 interface WireOrder {
@@ -2117,11 +2352,11 @@ test('按钮 hover、禁用态和 Tab 键盘切换沿用共享组件', async ({ 
   await page.goto('/')
   const connect = page.getByRole('button', { name: '连接钱包', exact: true })
   await connect.hover()
-  await expect(connect).toHaveCSS('background-color', 'rgb(111, 222, 207)')
+  await expect(connect).toHaveCSS('background-color', 'rgb(141, 91, 246)')
   const onboarding = page.getByRole('button', { name: '连接钱包开始交易' })
   await expect(onboarding).toBeEnabled()
   await onboarding.hover()
-  await expect(onboarding).toHaveCSS('background-color', 'rgb(111, 222, 207)')
+  await expect(onboarding).toHaveCSS('background-color', 'rgb(141, 91, 246)')
   await expect(
     page.getByRole('button', { name: '5分', exact: true }),
   ).toHaveCSS('font-size', '14px')
@@ -2138,7 +2373,7 @@ test('按钮 hover、禁用态和 Tab 键盘切换沿用共享组件', async ({ 
   const cursor = page
     .getByRole('tablist', { name: '交易方向' })
     .locator('[data-slot="cursor"]')
-  await expect(cursor).toHaveCSS('background-color', 'rgb(242, 86, 104)')
+  await expect(cursor).toHaveCSS('background-color', 'rgb(235, 71, 71)')
   const box = await cursor.boundingBox()
   expect(box && box.width > 90 && box.height >= 27).toBeTruthy()
 })
@@ -2295,7 +2530,7 @@ test('最新成交合并晚到历史和推送，切周期保留数据、切币�
   await expect(trades.locator('tbody tr').first()).toContainText('70003.2')
   await expect(
     trades.locator('tbody tr').first().locator('td').first(),
-  ).toHaveCSS('color', 'rgb(242, 86, 104)')
+  ).toHaveCSS('color', 'rgb(235, 71, 71)')
   await page.getByRole('button', { name: '1分', exact: true }).click()
   await expect(
     page.getByRole('button', { name: '1分', exact: true }),
@@ -2793,9 +3028,9 @@ test('成交量在两套引擎均为 60% 不透明度，关闭再打开 VOL 不�
         const data = ctx.getImageData(0, 0, c.width, c.height).data
         for (let i = 0; i < data.length; i += 4)
           if (
-            Math.abs(data[i] - 33) < 2 &&
-            Math.abs(data[i + 1] - 193) < 2 &&
-            Math.abs(data[i + 2] - 166) < 2 &&
+            Math.abs(data[i] - 20) < 2 &&
+            Math.abs(data[i + 1] - 184) < 2 &&
+            Math.abs(data[i + 2] - 129) < 2 &&
             Math.abs(data[i + 3] - 153) < 2
           )
             sum++
@@ -2824,9 +3059,9 @@ test('成交量在两套引擎均为 60% 不透明度，关闭再打开 VOL 不�
           const data = ctx.getImageData(0, 0, c.width, c.height).data
           for (let i = 0; i < data.length; i += 4)
             if (
-              Math.abs(data[i] - 26) < 2 &&
-              Math.abs(data[i + 1] - 126) < 2 &&
-              Math.abs(data[i + 2] - 112) < 2 &&
+              Math.abs(data[i] - 21) < 2 &&
+              Math.abs(data[i + 1] - 120) < 2 &&
+              Math.abs(data[i + 2] - 89) < 2 &&
               data[i + 3] === 255
             )
               sum++
@@ -2860,7 +3095,7 @@ test('切回基础版恢复最新蜡烛、默认间距和右侧留白，保留�
         for (let y = 45; y < element.height - 20; y++) {
           const i = (y * element.width + x) * 4
           if (
-            data[i] < 20 &&
+            data[i] <= 20 &&
             data[i + 1] > 100 &&
             data[i + 2] > 60 &&
             data[i + 1] > data[i + 2] &&
@@ -3134,7 +3369,7 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
         panel
           .getByRole('tablist', { name: '交易方向' })
           .locator('[data-slot="cursor"]'),
-      ).toHaveCSS('background-color', 'rgb(242, 86, 104)')
+      ).toHaveCSS('background-color', 'rgb(235, 71, 71)')
     }
     const base = product === 'perp' ? 'BTC' : product === 'spot' ? 'HYPE' : '份'
     const px = product === 'perp' ? 70000 : product === 'spot' ? 20 : 0.5
@@ -3605,6 +3840,8 @@ async function mockFunding(
   const feeEstimates: bigint[] = []
   let credited = false
   let ledgerMatch = false
+  const mintTime = Math.floor(Date.now() / 1000)
+  const cctp = cctpFixture(address)
   const approvalHash = `0x${'aa'.repeat(32)}`
   const depositHash = `0x${'bb'.repeat(32)}`
   await page.exposeFunction(
@@ -3701,13 +3938,34 @@ async function mockFunding(
     } else throw new Error(`Unexpected deposit RPC ${request.method}`)
     await route.fulfill({ json: { jsonrpc: '2.0', id: request.id, result } })
   })
-  await page.route('https://dev.indexer.api.across.to/**', (route) =>
-    route.fulfill({
-      json: credited
-        ? [{ depositTxnRef: depositHash, originChainId: 421614, nonce: '123' }]
-        : [],
-    }),
+  await page.route(
+    'https://iris-api-sandbox.circle.com/v2/messages/3?*',
+    (route) =>
+      route.fulfill({ json: { messages: credited ? [cctp.message] : [] } }),
   )
+  await page.route('https://rpc.hyperliquid-testnet.xyz/evm', async (route) => {
+    const request = route.request().postDataJSON()
+    if (
+      !['eth_getTransactionReceipt', 'eth_getBlockByNumber'].includes(
+        request.method,
+      )
+    )
+      return route.fallback()
+    await route.fulfill({
+      json: {
+        jsonrpc: '2.0',
+        id: request.id,
+        result:
+          request.method === 'eth_getTransactionReceipt'
+            ? cctp.receipt
+            : {
+                number: '0x1',
+                timestamp: `0x${mintTime.toString(16)}`,
+                transactions: [],
+              },
+      },
+    })
+  })
   await page.route(
     'https://api.hyperliquid-testnet.xyz/info',
     async (route) => {
@@ -3718,14 +3976,16 @@ async function mockFunding(
         json: ledgerMatch
           ? [
               {
-                time: Date.now(),
+                time: mintTime * 1000 + 400,
                 hash: `0x${'dd'.repeat(32)}`,
                 delta: {
                   type: 'send',
                   destination: address,
-                  user: '0x2222222222222222222222222222222222222222',
+                  user: coreWallet,
+                  sourceDex: 'spot',
+                  destinationDex: '',
                   nonce: 123,
-                  token: 'USDC:0xabc',
+                  token: 'USDC',
                   amount: '9.8',
                   fee: '0',
                 },
@@ -4086,14 +4346,12 @@ async function mockWithdrawal(
   const hash = `0x${'ee'.repeat(32)}`
   await page.route('https://rpc.hyperliquid-testnet.xyz/evm', async (route) => {
     const request = route.request().postDataJSON()
-    expect(request.method).toBe('eth_gasPrice')
-    await route.fulfill({
-      json: {
-        jsonrpc: '2.0',
-        id: request.id,
-        result: `0x${gasPrice.toString(16)}`,
-      },
-    })
+    let result: unknown
+    if (request.method === 'eth_gasPrice') result = `0x${gasPrice.toString(16)}`
+    else if (request.method === 'eth_call')
+      result = `0x${200000n.toString(16).padStart(64, '0')}`
+    else return route.fallback()
+    await route.fulfill({ json: { jsonrpc: '2.0', id: request.id, result } })
   })
   await page.route(
     'https://api.hyperliquid-testnet.xyz/info',
@@ -4160,15 +4418,14 @@ async function mockWithdrawal(
     },
   )
   await page.route('https://dev.indexer.api.across.to/**', async (route) => {
-    if (!route.request().url().includes('direction=out'))
-      return route.fallback()
     await route.fulfill({
       json:
         indexed && writes[0]
           ? [
               {
-                nonce: String(writes[0].nonce),
+                originChainId: 998,
                 destinationChainId: 421614,
+                nonce: String(writes[0].nonce),
                 fillTxnRef: hash,
               },
             ]
@@ -4212,7 +4469,18 @@ async function mockWithdrawal(
           gasUsed: '0x5208',
           effectiveGasPrice: '0x1',
           contractAddress: null,
-          logs: received ? [log] : [],
+          logs:
+            received && writes[0]
+              ? [
+                  log,
+                  ...cctpFixture(
+                    address,
+                    true,
+                    writes[0].nonce,
+                    writes[0].amount,
+                  ).receipt.logs,
+                ]
+              : [],
           logsBloom: `0x${'00'.repeat(256)}`,
           status: '0x1',
           type: '0x2',
@@ -5769,8 +6037,8 @@ test('下单比例提示在暗色主题中保持清晰可读', async ({ page }) 
     return { color: style.color, background: style.backgroundColor }
   })
   expect(colors).toEqual({
-    color: 'rgb(225, 236, 236)',
-    background: 'rgb(35, 47, 53)',
+    color: 'rgb(255, 255, 255)',
+    background: 'rgb(34, 35, 43)',
   })
   await page.screenshot({
     path: 'output-tdd/playwright/slider-percent/dragging.png',
@@ -5791,7 +6059,7 @@ test('红色卖出按钮与方向选中文字为白色', async ({ page }) => {
   )
   const submit = panel.getByRole('button', { name: '下单', exact: true })
   await expect(submit).toHaveCSS('color', 'rgb(255, 255, 255)')
-  await expect(submit).toHaveCSS('background-color', 'rgb(242, 86, 104)')
+  await expect(submit).toHaveCSS('background-color', 'rgb(235, 71, 71)')
   await panel
     .getByRole('textbox', { name: '数量（BTC）', exact: true })
     .fill('0.001')
@@ -5804,7 +6072,7 @@ test('红色卖出按钮与方向选中文字为白色', async ({ page }) => {
     .getByRole('button', { name: '关闭', exact: true })
     .click()
   await panel.getByRole('tab', { name: '买入 / 做多', exact: true }).click()
-  await expect(submit).toHaveCSS('color', 'rgb(15, 26, 31)')
+  await expect(submit).toHaveCSS('color', 'rgb(255, 255, 255)')
   expect(writes).toHaveLength(0)
 })
 
@@ -6265,15 +6533,15 @@ test('仓位移动止损提交原生请求，反手使用双倍数量且不只�
   await expect(dialog.getByText('0.004 BTC', { exact: true })).toBeVisible()
   await expect(dialog.getByText('多头 → 空头', { exact: true })).toHaveCSS(
     'color',
-    'rgb(242, 86, 104)',
+    'rgb(235, 71, 71)',
   )
   await expect(dialog.getByText('0.004 BTC', { exact: true })).toHaveCSS(
     'color',
-    'rgb(242, 86, 104)',
+    'rgb(235, 71, 71)',
   )
   await expect(
     dialog.getByRole('button', { name: '卖出 / 做空', exact: true }),
-  ).toHaveCSS('background-color', 'rgb(242, 86, 104)')
+  ).toHaveCSS('background-color', 'rgb(235, 71, 71)')
   await page.screenshot({
     path: 'output-tdd/playwright/wallet-permissions/reverse-short.png',
     animations: 'disabled',
@@ -6292,15 +6560,15 @@ test('仓位移动止损提交原生请求，反手使用双倍数量且不只�
   dialog = page.getByRole('dialog', { name: '反向仓位' })
   await expect(dialog.getByText('空头 → 多头', { exact: true })).toHaveCSS(
     'color',
-    'rgb(0, 185, 150)',
+    'rgb(20, 184, 129)',
   )
   await expect(dialog.getByText('0.004 BTC', { exact: true })).toHaveCSS(
     'color',
-    'rgb(0, 185, 150)',
+    'rgb(20, 184, 129)',
   )
   await expect(
     dialog.getByRole('button', { name: '买入 / 做多', exact: true }),
-  ).toHaveCSS('background-color', 'rgb(0, 185, 150)')
+  ).toHaveCSS('background-color', 'rgb(20, 184, 129)')
 })
 
 test('仓位止盈止损支持固定数量限价保护，一次确认后提交', async ({ page }) => {
@@ -6877,7 +7145,7 @@ test('基础图表：侧边收起展开，重置清除绘图并恢复默认指�
       if (pixels)
         for (let x = 0; x < element.width; x++)
           if (
-            pixels[x * 4] < 20 &&
+            pixels[x * 4] <= 20 &&
             pixels[x * 4 + 1] > 100 &&
             pixels[x * 4 + 2] > 60 &&
             pixels[x * 4 + 3] > 250

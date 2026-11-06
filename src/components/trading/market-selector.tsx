@@ -1,4 +1,4 @@
-import { Button, Input, SmartPopover, Tab, Tabs } from '@fameex/ui'
+import { Button, ChartIcon, Input, SmartPopover, Tab, Tabs } from '@fameex/ui'
 import { useReducedMotion } from 'framer-motion'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { TerminalModel } from '@/hooks/use-terminal'
@@ -64,15 +64,10 @@ export function MarketSelector({ model }: { model: TerminalModel }) {
                 {model.market?.maxLeverage ?? '—'}x
               </span>
             )}
-          <svg
-            aria-hidden="true"
+          <ChartIcon
+            name="arrow-drop-down"
             className={`size-4 shrink-0 transition-transform duration-150 motion-reduce:transition-none ${isOpen ? 'rotate-180' : ''}`}
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-          >
-            <path d="m5 8 5 5 5-5" />
-          </svg>
+          />
         </span>
       )}
     </SmartPopover>

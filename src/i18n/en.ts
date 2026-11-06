@@ -1,5 +1,7 @@
 // 前端文案：简体中文为源文案，英文与同一交易状态共享，不通过切换路由重建会话。
 export const en: Record<string, string> = {
+  价格精度: 'Price increment',
+  订单簿价格精度: 'Order book price increment',
   收起画图工具: 'Collapse drawing tools',
   展开画图工具: 'Expand drawing tools',
   '无法清除本地绘图，请检查浏览器存储权限':

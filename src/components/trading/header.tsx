@@ -87,24 +87,15 @@ export function Header({ model }: { model: TerminalModel }) {
                   }}
                 >
                   {value === 'zh-CN' ? '简体中文' : 'English'}{' '}
-                  <span>{locale === value ? '✓' : ''}</span>
+                  {locale === value && (
+                    <ChartIcon name="check-2" className="size-4" />
+                  )}
                 </button>
               ))}
             </div>
           )}
         >
-          <svg
-            aria-hidden="true"
-            className="size-5 shrink-0"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <circle cx="12" cy="12" r="9" />
-            <ellipse cx="12" cy="12" rx="4" ry="9" />
-            <path d="M3 12h18" />
-          </svg>
+          <ChartIcon name="language" className="size-5 shrink-0" />
           <span className="hidden sm:inline">
             {locale === 'zh-CN' ? '中文' : 'EN'}
           </span>

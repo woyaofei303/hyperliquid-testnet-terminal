@@ -6,44 +6,23 @@
 @source "../../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
 @custom-variant dark (&:is(.dark *));
 
-/* Hyperliquid 交易页配色，沿用 FameEX 组件的语义 token 和交互状态。 */
+/* 复用 FameEX 暗色主题；终端别名直接映射同一组颜色令牌。 */
 :root {
-  --fx-bg-1: 27 38 43;
-  --fx-bg-2: 15 26 31;
-  --fx-bg-3: 35 47 53;
-  --fx-bg-b: 24 63 60;
-  --fx-cc-1: 49 65 72;
-  --fx-cc-2: 35 47 53;
-  --fx-cc-3: 25 38 44;
-  --fx-text-1: 225 236 236;
-  --fx-text-2: 180 194 195;
-  --fx-text-3: 145 162 164;
-  --fx-text-4: 88 110 115;
-  --fx-text-6: 15 26 31;
-  --fx-text-7: 80 210 193;
-  --fx-brand-1: 80 210 193;
-  --fx-primary: 80 210 193;
-  --fx-sem-g: 0 185 150;
-  --fx-sem-r: 242 86 104;
-  --fx-volume-up: 33 193 166;
-  --fx-volume-down: 227 100 118;
-  --fx-hover-b: 111 222 207;
-  --fx-hover-brand-1: 111 222 207;
-  --fx-hover-b2: 33 77 72;
-  --fx-hover-n: 46 62 69;
+  --fx-volume-up: var(--fx-sem-g);
+  --fx-volume-down: var(--fx-sem-r);
 }
 
-@theme {
-  --color-canvas: #1b262b;
-  --color-ink: #e1ecec;
-  --color-muted: #91a2a4;
-  --color-panel: #0f1a1f;
-  --color-surface: #232f35;
-  --color-edge: #28373d;
-  --color-brand: #50d2c1;
-  --color-accent: #50d2c1;
-  --color-mint: #00b996;
-  --color-loss: #f25668;
+@theme inline {
+  --color-canvas: rgb(var(--fx-bg-1));
+  --color-ink: rgb(var(--fx-text-1));
+  --color-muted: rgb(var(--fx-text-3));
+  --color-panel: rgb(var(--fx-bg-2));
+  --color-surface: rgb(var(--fx-bg-3));
+  --color-edge: rgb(var(--fx-cc-3));
+  --color-brand: rgb(var(--fx-brand-1));
+  --color-accent: rgb(var(--fx-text-7));
+  --color-mint: rgb(var(--fx-sem-g));
+  --color-loss: rgb(var(--fx-sem-r));
 }
 
 @layer base {

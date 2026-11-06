@@ -1,7 +1,11 @@
 import type { Book } from './hyperliquid.ts'
 import { Money } from './orders.ts'
 
-export function orderBookData(book: Book | null) {
+export function orderBookData(book: Book | null, step?: string) {
+  const priceStep = step === undefined ? null : new Money(step)
+  if (priceStep && (!priceStep.isFinite() || priceStep.lte(0)))
+    throw new Error('价格精度必须为正数')
+  const best: (string | undefined)[] = []
   const side = (index: 0 | 1) => {
     const rows = (book?.levels[index] ?? [])
       .filter((row) => {
@@ -18,13 +22,49 @@ export function orderBookData(book: Book | null) {
       })
       .slice()
       .sort((a, b) => new Money(a.px).cmp(b.px) * (index === 0 ? -1 : 1))
+    best[index] = rows[0]?.px
+    const groups = new Map<
+      string,
+      {
+        px: string
+        sz: InstanceType<typeof Money>
+        n: number
+        quote: InstanceType<typeof Money>
+      }
+    >()
+    for (const row of rows) {
+      const price = new Money(row.px)
+      const px = priceStep
+        ? price
+            .div(priceStep)
+            .toDecimalPlaces(
+              0,
+              index === 0 ? Money.ROUND_FLOOR : Money.ROUND_CEIL,
+            )
+            .times(priceStep)
+            .toFixed()
+        : row.px
+      const group = groups.get(px) ?? {
+        px,
+        sz: new Money(0),
+        n: 0,
+        quote: new Money(0),
+      }
+      group.sz = group.sz.plus(row.sz)
+      group.n += row.n
+      // 累计金额保留原始报价，不能按合并后的档位价格重算。
+      group.quote = group.quote.plus(price.times(row.sz))
+      groups.set(px, group)
+    }
     let total = new Money(0)
     let totalQuote = new Money(0)
-    return rows.map((row) => {
+    return [...groups.values()].map((row) => {
       total = total.plus(row.sz)
-      totalQuote = totalQuote.plus(new Money(row.px).times(row.sz))
+      totalQuote = totalQuote.plus(row.quote)
       return {
-        ...row,
+        px: row.px,
+        sz: row.sz.toFixed(),
+        n: row.n,
         total: total.toFixed(),
         totalQuote: totalQuote.toFixed(),
         average: totalQuote.div(total).toFixed(),
@@ -33,8 +73,7 @@ export function orderBookData(book: Book | null) {
   }
   const bids = side(0)
   const asks = side(1)
-  const bestBid = bids[0]?.px
-  const bestAsk = asks[0]?.px
+  const [bestBid, bestAsk] = best
   const spread = bestBid && bestAsk ? new Money(bestAsk).minus(bestBid) : null
   const percent =
     spread && bestBid && bestAsk
