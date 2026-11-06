@@ -5953,7 +5953,7 @@ test('语言和动态元数据跟随币对，切换不刷新、不丢失下单�
   )
   await expect(page).toHaveTitle(/BTC \/ USDC.*永续/)
   const icon = page.locator('head link[rel="icon"][type="image/png"]')
-  await expect(icon).toHaveAttribute('sizes', '32x32')
+  await expect(icon).toHaveAttribute('sizes', '48x48')
   const iconPath = await icon.getAttribute('href')
   expect(iconPath).toMatch(/^\/icon\.png/)
   const iconResponse = await page.request.get(iconPath ?? '')

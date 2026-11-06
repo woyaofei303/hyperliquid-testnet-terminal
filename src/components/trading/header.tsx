@@ -1,4 +1,5 @@
 import { Button, ChartIcon, SmartPopover } from '@fameex/ui'
+import Image from 'next/image'
 import type { TerminalModel } from '@/hooks/use-terminal'
 import { setLocale, t, useLocale } from '@/i18n'
 import { TradeSettings } from './trade-settings'
@@ -9,20 +10,15 @@ export function Header({ model }: { model: TerminalModel }) {
   return (
     <header className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-edge bg-panel px-4 py-2">
       <div className="flex items-center gap-3">
-        <div
-          aria-hidden="true"
-          className="flex size-8 items-center justify-center rounded-lg bg-brand text-lg font-bold italic text-white"
-        >
-          H
-        </div>
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">
-            Hyperliquid{' '}
-            <span className="hidden font-normal text-muted sm:inline">
-              Terminal
-            </span>
-          </h1>
-        </div>
+        <h1 className="shrink-0">
+          <Image
+            src="/fameex-logo.svg"
+            alt="FameEX"
+            width={91}
+            height={20}
+            className="h-6 w-auto"
+          />
+        </h1>
         <span className="rounded border border-amber-300/20 bg-amber-300/5 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-200">
           TESTNET
         </span>
