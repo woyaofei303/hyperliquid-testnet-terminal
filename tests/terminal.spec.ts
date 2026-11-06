@@ -1394,7 +1394,10 @@ for (const [category, name, unit, size, asset, price] of [
     const { writes } = await mockExchange(page)
     await ready(page)
     await page.getByRole('button', { name: '交易市场', exact: true }).click()
-    await page.getByRole('tab', { name: category, exact: true }).click()
+    await page
+      .getByRole('region', { name: '市场选择器', exact: true })
+      .getByRole('tab', { name: category, exact: true })
+      .click()
     await page.getByRole('option', { name, exact: true }).click()
     const panel = page.getByRole('region', { name: '下单面板', exact: true })
     await panel.getByRole('tab', { name: '市价单', exact: true }).click()
@@ -2982,7 +2985,10 @@ test('分类下拉切换现货、预测和 HIP-3，使用各自资产 ID 与下�
   )
   async function choose(category: string, name: string) {
     await page.getByRole('button', { name: '交易市场', exact: true }).click()
-    await page.getByRole('tab', { name: category, exact: true }).click()
+    await page
+      .getByRole('region', { name: '市场选择器', exact: true })
+      .getByRole('tab', { name: category, exact: true })
+      .click()
     await page.getByRole('option', { name, exact: true }).click()
   }
   await choose('现货', 'HYPE / USDC')
