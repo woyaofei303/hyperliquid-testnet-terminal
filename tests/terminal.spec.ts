@@ -7730,17 +7730,23 @@ test('资金费多页查询不被账户轮询打断，边界区块不重复', as
 })
 
 async function predictionType(page: Page, name: string) {
+  await expect(
+    page.getByRole('region', { name: '市场选择器', exact: true }),
+  ).toHaveCount(0)
   await page.getByRole('button', { name: '预测订单类型', exact: true }).click()
   await page.getByRole('menuitemradio', { name, exact: true }).click()
   await expect(
     page.getByRole('menu', { name: '预测订单类型', exact: true }),
-  ).toBeHidden()
+  ).toHaveCount(0)
   if (name !== '转换')
     await expect(
       page.getByRole('button', { name: '预测订单类型', exact: true }),
     ).toBeFocused()
 }
 async function predictionUnit(page: Page, name: string) {
+  await expect(
+    page.getByRole('region', { name: '市场选择器', exact: true }),
+  ).toHaveCount(0)
   await page
     .getByRole('region', { name: '下单面板', exact: true })
     .getByRole('button', { name: '数量单位', exact: true })
@@ -7748,7 +7754,7 @@ async function predictionUnit(page: Page, name: string) {
   await page.getByRole('menuitemradio', { name, exact: true }).click()
   await expect(
     page.getByRole('menu', { name: '数量单位', exact: true }),
-  ).toBeHidden()
+  ).toHaveCount(0)
   await expect(
     page.getByRole('button', { name: '数量单位', exact: true }),
   ).toBeFocused()
