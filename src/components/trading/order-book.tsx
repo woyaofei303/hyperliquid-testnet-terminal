@@ -1,5 +1,5 @@
-import { Tab, Tabs } from '@fameex/ui'
-import { useId, useMemo } from 'react'
+import { ChartIcon, Select, Tab, Tabs } from '@fameex/ui'
+import { useId, useMemo, useState } from 'react'
 import { useBookRows } from '@/hooks/use-book-rows'
 import { useDepthHover } from '@/hooks/use-depth-hover'
 import type { TerminalModel } from '@/hooks/use-terminal'
@@ -16,12 +16,28 @@ export function OrderBook({ model }: { model: TerminalModel }) {
   useLocale()
 
   const { feed, coin, market } = model
-  const depth = useMemo(() => orderBookData(feed.book), [feed.book])
+  const rawDepth = useMemo(() => orderBookData(feed.book), [feed.book])
   const base =
     market?.kind === 'outcome' ? t('份') : market ? baseName(market) : coin
   const quote = quoteName(market)
   const priceDecimals = market ? pricePrecision(market) : 1
   const precision = market?.szDecimals ?? 5
+  const [selectedStep, setSelectedStep] = useState({ coin: '', value: '' })
+  const minimumPrice = rawDepth.bids.at(-1)?.px ?? rawDepth.asks[0]?.px
+  const steps = Array.from({ length: 5 }, (_, index) =>
+    new Money(10).pow(index - priceDecimals).toFixed(),
+  ).filter((value) => !minimumPrice || new Money(value).lte(minimumPrice))
+  const step =
+    selectedStep.coin === coin && steps.includes(selectedStep.value)
+      ? selectedStep.value
+      : steps[0]
+  // shortcut: 仅合并已接收的深度，需要更多流动性档位时再接入协议端聚合快照。
+  const depth = useMemo(
+    () =>
+      step && step !== steps[0] ? orderBookData(feed.book, step) : rawDepth,
+    [feed.book, step, steps[0], rawDepth],
+  )
+  const displayDecimals = step ? new Money(step).decimalPlaces() : priceDecimals
   const detail = useDepthHover(depth, coin)
   const tooltipId = useId()
   const hovered = (detail.hover?.side === 'buy' ? depth.bids : depth.asks).find(
@@ -46,6 +62,35 @@ export function OrderBook({ model }: { model: TerminalModel }) {
         }}
       >
         <Tab key="book" title={t('订单簿')}>
+          <div className="flex h-8 shrink-0 items-center justify-between gap-2 px-3">
+            <span className="text-[11px] text-muted">{t('价格精度')}</span>
+            <Select
+              aria-label={t('订单簿价格精度')}
+              items={steps.map((value) => ({ key: value, label: value }))}
+              selectedKeys={step ? [step] : []}
+              disallowEmptySelection
+              isDisabled={!steps.length || !feed.book}
+              selectorIcon={
+                <ChartIcon name="arrow-drop-down" className="size-3" />
+              }
+              onSelectionChange={(keys) => {
+                const value = steps.find(
+                  (item) => keys !== 'all' && keys.has(item),
+                )
+                if (value) {
+                  detail.close()
+                  setSelectedStep({ coin, value })
+                }
+              }}
+              className="w-28 shrink-0"
+              classNames={{
+                trigger: 'h-6 min-h-6 rounded px-2 !bg-surface',
+                value: 'text-right text-xs text-ink',
+                innerWrapper: 'pr-4',
+                selectorIcon: 'right-1',
+              }}
+            />
+          </div>
           <div className="grid h-8 shrink-0 grid-cols-3 items-center px-3 text-right text-[10px] text-muted">
             <span className="text-left">
               {t('价格 (')}
@@ -63,7 +108,7 @@ export function OrderBook({ model }: { model: TerminalModel }) {
             opposite={depth.bids}
             side="sell"
             precision={precision}
-            priceDecimals={priceDecimals}
+            priceDecimals={displayDecimals}
             hovered={detail.hover}
             tooltipId={tooltipId}
             onPrice={model.selectBookPrice}
@@ -86,7 +131,7 @@ export function OrderBook({ model }: { model: TerminalModel }) {
             opposite={depth.asks}
             side="buy"
             precision={precision}
-            priceDecimals={priceDecimals}
+            priceDecimals={displayDecimals}
             hovered={detail.hover}
             tooltipId={tooltipId}
             onPrice={model.selectBookPrice}
@@ -166,17 +211,7 @@ export function OrderBook({ model }: { model: TerminalModel }) {
                           className="inline-flex size-5 items-center justify-center rounded text-muted hover:text-accent focus-visible:outline focus-visible:outline-accent"
                         >
                           <span className="sr-only">{t('链上交易')}</span>
-                          <svg
-                            aria-hidden="true"
-                            width="13"
-                            height="13"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                          >
-                            <path d="M14 3h7v7m0-7L10 14M11 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6" />
-                          </svg>
+                          <ChartIcon name="link-light" className="size-3.5" />
                         </a>
                       )}
                     </td>

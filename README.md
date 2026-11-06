@@ -6,7 +6,7 @@
 
 技术栈是 Next.js、React、TypeScript、Tailwind CSS、FameEX UI、KLineChart、TradingView Charting Library，以及社区维护的 `@nktkas/hyperliquid` SDK。市场包含默认永续、HIP-3 独立合约、现货和 HIP-4 预测。合约下单区支持限价、市价、止损市价/限价、止盈市价/限价、阶梯单、TWAP、追价和原生移动止损；限价可选 GTC、IOC、ALO。
 
-布局以 [Hyperliquid 当前测试网交易页](https://app.hyperliquid-testnet.xyz/trade) 为参照：桌面左侧为市场信息和图表，中间为盘口，右侧为下单区；记录区位于左下，账户概览位于右下。平板和手机逐步改成两栏和纵向排列，桌面高度固定为一屏，订单输入和记录在各自面板内滚动；窄屏工作区可内部滚动，市场信息可横向滚动。基础组件、工具和图表继续复用本地 FameEX 源码，通过主题变量配置为深色与青绿色界面。源码来源和适配见 [packages/README.md](./packages/README.md)。
+布局以 [Hyperliquid 当前测试网交易页](https://app.hyperliquid-testnet.xyz/trade) 为参照：桌面左侧为市场信息和图表，中间为盘口，右侧为下单区；记录区位于左下，账户概览位于右下。平板和手机逐步改成两栏和纵向排列，桌面高度固定为一屏，订单输入和记录在各自面板内滚动；窄屏工作区可内部滚动，市场信息可横向滚动。基础组件、工具、图表、颜色与控件图标复用本地 FameEX 源码，使用其暗色背景、紫色品牌色及涨跌色。源码来源和适配见 [packages/README.md](./packages/README.md)。
 
 图表入口为“基础版”和“TradingView”。基础版仍使用 FameEX 的 `BaseKlineChart`，默认展示 MA 和独立成交量窗格。工具栏按 FameEX 展示分时、1分、5分、15分、30分、1时、4时、1日，其余周期放进下拉；完整范围为 Hyperliquid 支持的 1m、3m、5m、15m、30m、1h、2h、4h、8h、12h、1d、3d、1w、1M。“分时”使用交易所 1 分钟蜡烛的面积图，不生成秒级数据。
 
@@ -79,7 +79,7 @@ npm start
 1. 点击切换到 Arbitrum Sepolia；钱包不认识该网络时，页面请求添加固定的测试网配置。
 2. 点击“存款”，页面重新查询源链 USDC、ETH 和授权额度。额度不足时，先在钱包确认 ERC-20 `approve`，仅授权本次金额给固定 TokenMessenger 合约，不申请无限额度；已有足够额度则跳过授权。
 3. 源链授权确认后，页面接着请求钱包确认存款，不用再次点击页面按钮。这一步调用 `depositForBurnWithHook`，目标固定为 HyperEVM 测试网，再由官方 Forwarder 转入**当前钱包地址的默认合约账户**。不是向任意地址发送 USDC，也不是直接 ERC-20 转账到 HyperEVM 钱包。
-4. 源链确认后，页面显示“等待 Hyperliquid 到账”。只有源链哈希对应的跨链 nonce（请求编号）与主账户的 HyperCore 收款流水匹配，才显示“到账已核验”。余额增加本身不能作为这笔充值完成的证据。
+4. 源链确认后，页面显示“等待 Hyperliquid 到账”。页面用源链哈希查询 Circle CCTP 消息，核对网络、收款信息、金额和费用，再校验目标链成功回执中的消息、转发与入账事件，以及同秒唯一匹配的 HyperCore 收款流水，才显示“到账已核验”。CCTP nonce 与 HyperCore nonce 不是同一个编号；余额增加本身也不能作为这笔充值完成的证据。证据不全或同秒存在多笔同额流水时继续等待核对。
 5. 到账后关闭存款弹窗；已有会话可直接下单，尚未完成连接时通过下单区“完成钱包连接”继续签名。
 
 当前实现单笔至少 5 USDC、小于 10,000,000 USDC、最多 6 位小数。跨链费用上限为 0.20 USDC，另付源链 Gas；新 HyperCore 账户还可能扣除 1 USDC 激活费。实际费用和到账金额以链上及交易所回报为准。合约地址与流程依据 [Hyperliquid USDC 说明](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/usdc)、[Circle CCTP 合约列表](https://developers.circle.com/cctp/references/contract-addresses)及 [Forwarder 数据格式](https://github.com/circlefin/hyperevm-circle-contracts/blob/master/src/messages/CctpForwarderHookData.sol)。旧 USDC Bridge 已标为弃用，因此未接入旧桥充值。
@@ -126,9 +126,9 @@ USDC 的 ERC-20 授权只用于源链存款额度，不能代替交易连接。�
 
 核对后点击“提现至 Arbitrum Sepolia”。`use-funding` 再查余额和费用；费用上升时留在当前页更新报价，必须再次点击才能请求签名。SDK 用主钱包签署 `sendToEvmWithData`，网络固定为 Testnet，CCTP 目标域固定为 3（Arbitrum），不是 EVM 链 ID 421614。普通账户使用合约可提余额，现货 USDC 可通过“现货转入合约”打开预置方向的划转弹窗；统一账户自动使用维护保证金限制后的共享现货余额。收款地址固定为当前钱包，不支持外部地址提款。
 
-请求接受后显示“等待跨链到账”。页面按持久化的 nonce 查询 Across 测试网索引，再检查 Arbitrum Sepolia 回执中的 USDC Transfer：币种、收款人和足额金额都匹配，才显示“到账已核验”。响应丢失时保留未知记录，刷新后继续查询，禁止重复提交；拒签或明确的交易所拒绝可重新操作。关闭弹窗不会撤回已发出的请求。
+请求接受后显示“等待跨链到账”。页面用原请求 nonce 和两侧链 ID 匹配 Across 测试网索引，再检查 Arbitrum Sepolia 成功回执：CCTP 消息必须对应原 nonce、当前收款人、金额和允许的费用，USDC 必须从零地址铸造给该收款人，净额与消息一致，才显示“到账已核验”。响应丢失时保留未知记录，刷新后只继续查询，不自动重发；主动发起新操作仍需重新校验和钱包确认。关闭弹窗不会撤回已发出的请求。
 
-本地存提仍只提供 USDC 的 Arbitrum Sepolia CCTP 通道；官方其他资产、旧桥和 HyperEVM 等路线未在本地接入。提款金额为 0.4 至 10,000,000 USDC、最多 6 位小数。官方 UI 和请求字段核对来源为 [测试网交易页](https://app.hyperliquid-testnet.xyz/trade)及 [Send to EVM with data 文档](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/exchange-endpoint#send-to-evm-with-data)。真实钱包签名和跨链到账仍需账户持有人逐笔验收，不能把模拟测试结果写成生产交易经历。
+本地存提仍只提供 USDC 的 Arbitrum Sepolia CCTP 通道；官方其他资产、旧桥和 HyperEVM 等路线未在本地接入。提款金额为 0.4 至 10,000,000 USDC、最多 6 位小数。官方 UI 和请求字段核对来源为 [测试网交易页](https://app.hyperliquid-testnet.xyz/trade)及 [Send to EVM with data 文档](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/exchange-endpoint#send-to-evm-with-data)。2026-11-06 已由账户持有人逐笔确认测试网签名，完成 10 USDC 存入（实收 9.8）、1 USDC 双向划转及 5 USDC 提款（实收 4.8），详见 VERIFICATION.md；该结果不代表主网或所有账户模式均已验收。
 
 ## 一次完整下单如何走通
 
@@ -141,6 +141,8 @@ USDC 的 ERC-20 授权只用于源链存款额度，不能代替交易连接。�
 下单区顶部的“保证金模式”和“杠杆”分别打开设置弹层。连接账户后，按钮读取 Hyperliquid `activeAssetData` 的已生效设置；弹层修改的是草稿，取消不会写入。点击弹窗确认后，先检查整数杠杆与该市场上限、是否仅允许逐仓，再提交一次请求。交易所接受 `updateLeverage` 后重新读取设置；拒绝时保留原值。界面展示资金费率；资金费率结算、撮合和清算由 Hyperliquid 完成，前端读取结果并管理交互状态。
 
 ## 行情、盘口与性能
+
+订单簿顶部可切换价格精度，例如 BTC 从 0.1 切到 100 后，买盘按 100 的整数倍向下合并，卖盘向上合并，数量相加；点击合并档位会把该价格填入下单输入框。累计金额与均价仍按原始报价计算，价差保持真实买一、卖一之差。切换币种恢复该市场默认精度。这里仅合并已接收的盘口数据，不会因此获得接口范围之外的深度。
 
 顶部市场栏读取实时 `activeAssetCtx`，展示标记价、预言机价、24 小时涨跌、成交额、按标记价折算的持仓量，以及每小时结算的资金费率倒计时。这里的倒计时是本机时钟到下一个整点，并不是已扣款回执。
 
@@ -233,6 +235,7 @@ npm run verify:read -- 0x替换为你的40位十六进制公开地址
 
 - `src/lib/hyperliquid.ts`：固定测试网连接、读取主账户数据、钱包连接和可恢复交易会话。浏览器扩展签交易授权及资金划转，订单使用已登记 API 钱包的 L1 签名，避免混淆两种协议；参见 [官方签名说明](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/signing)。
 - `src/lib/funding.ts`：固定测试链和 CCTP 合约、校验 USDC 金额、模拟合约调用、提交源链授权/充值，构造 CCTP 提款参数、预留 Gas/激活费，并匹配跨链到账证据。
+- `src/lib/cctp.ts`：查询和校验 CCTP 消息，解析目标链事件，将存款与 HyperCore 流水关联，并核对提款原 nonce、收款人和实际到账净额。
 - `src/hooks/use-wallet-providers.ts`、`use-funding.ts`：分别负责扩展发现，以及余额、待确认资金记录和轮询；`src/components/trading/web3-dialog.tsx` 与 `withdrawal-form.tsx` 渲染账户、存款、划转、提款及确认页，资金请求和记录由 hook 管理。
 - `src/lib/use-market.ts`：订阅订单簿和 K 线；重连后补 HTTP 快照，旧市场的异步结果不能写回新市场。订单簿消息按完整快照处理；K 线按时间去重合并。
 - `src/lib/orders.ts`：数量精度、价格有效数字、10 USDC 开仓门槛、IOC 滑点边界和回报解析。资产编号来自元数据索引，不把主网 BTC 编号搬到测试网；参见 [价格与数量精度规则](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/tick-and-lot-size)。

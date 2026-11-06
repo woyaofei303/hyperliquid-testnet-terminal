@@ -11,6 +11,10 @@ export function ChartIcon({
     | 'aspect-ratio-close2'
     | 'arrow-drop-down'
     | 'area'
+    | 'language'
+    | 'trade-settings'
+    | 'check-2'
+    | 'link-light'
   className?: string
 }) {
   return (

@@ -12,8 +12,10 @@
 - `utils`：复用 `classNames/cn`、`getColorByCssVar`、`createCssVar`、`withAlpha`。它们实际用于组件样式合并和图表颜色。类名合并保留默认字号组，再追加 FameEX 的自定义字号，修复 `text-xs` 被 `text-1` 覆盖的问题。没有引入 FameEX 的请求鉴权、密码处理或 CEX 签名工具。
 - `kline`：复用 `BaseKlineChart`、实例生命周期、加载遮罩、成交量窗格、日期格式、颜色、图例和覆盖物入口，使用原版本 KLineChart 10.1.0。修正 ahooks 泛型擦除问题；本项目不接入快捷下单覆盖物，因此恢复原生十字线价格标签。成交量使用独立颜色变量及 60% 不透明度，以便价格蜡烛保持原色。上游 store 是单例，本页面始终只挂载一个图表实例。
 - `public/lib/charting_library`：原样复制 `apps/web/public/lib/charting_library`，版本为 v27.006，约 15 MB；保留原始文件、标识和声明。该目录是第三方分发文件，Biome 不改写它；业务适配层仍接受 lint、类型和行为检查。
-- `src/app/fameex-theme.css`：从 `apps/web` 暗色 CSS 变量和 `packages/config/tailwind-preset.js` 提取所需令牌，转换为 Tailwind 4 主题及工具类。没有引入原工程的 Tailwind 3 或整套构建配置。`src/app/globals.css` 按用户要求覆盖为 Hyperliquid 交易页色彩，组件交互仍来自 FameEX。
-- `public/fameex-chart-icons.svg`：从 FameEX 原 Iconify 文件提取七个工具图标，`ChartIcon` 直接引用这些 SVG 路径，不以字符代替图标。
+- `src/app/fameex-theme.css`：从 `apps/web` 暗色 CSS 变量和 `packages/config/tailwind-preset.js` 提取所需令牌，转换为 Tailwind 4 主题及工具类。没有引入原工程的 Tailwind 3 或整套构建配置。`src/app/globals.css` 将终端颜色别名直接映射到这些令牌，复用 FameEX 暗色背景、紫色品牌色与涨跌色。
+- `public/fameex-chart-icons.svg`：从 FameEX 原 Iconify 文件提取 11 个图标，`ChartIcon` 直接引用这些 SVG 路径。语言、交易设置、选中状态、成交链接及市场和精度下拉均使用原图标。
+
+订单簿精度菜单复用 `@fameex/ui` 的 Select 和下拉箭头，沿用 FameEX 订单簿选择交互。聚合计算由本项目的 `orderBookData` 完成，以十进制运算合并已接收的深度；不复制 FameEX 的行情请求或 CEX 盘口协议。
 
 下单区的类型选择参考 `apps/web/src/apps/Futures/components/OrderPanel/OrderTypeTab.tsx` 和 `TriggerTypeDropdown.tsx`：复用已有 `dropdownStyle()`，通过 `@fameex/ui` 导出相同 HeroUI Dropdown 原语。公共组件 `OrderTypeSelector` 负责相邻 Tab、原箭头、选中回显和清晰的实色菜单；显示“专业”并取消入口悬停背景。各产品支持哪些类型、精度和余额校验仍由 Hyperliquid 业务层决定，没有复制 FameEX CEX 下单逻辑。
 

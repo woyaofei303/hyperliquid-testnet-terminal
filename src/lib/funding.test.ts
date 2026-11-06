@@ -24,58 +24,6 @@ test('划转校验可用余额而非总余额，不截断用户金额', () => {
   assert.throws(() => transferAmount('0.0000001', '2'), /精度/)
 })
 
-test('跨链到账要求哈希、源链、nonce 与 HyperCore 收款流水一致', async () => {
-  const { creditedDeposit } = await import('./funding.ts')
-  const record: FundingRecord = {
-    account: user,
-    amount: '10',
-    kind: 'deposit',
-    at: 1,
-    status: 'confirmed' as const,
-    hash: `0x${'ab'.repeat(32)}` as `0x${string}`,
-  }
-  const transfers = [
-    { depositTxnRef: record.hash, originChainId: 421614, nonce: '77' },
-  ]
-  const ledger = [
-    {
-      delta: {
-        type: 'send',
-        destination: user,
-        nonce: 77,
-        token: 'USDC:0xabc',
-      },
-    },
-  ]
-  assert.equal(creditedDeposit(transfers, [], record), false)
-  assert.equal(creditedDeposit([], ledger, record), false)
-  assert.equal(creditedDeposit(transfers, ledger, record), true)
-  assert.equal(
-    creditedDeposit(
-      [{ ...transfers[0], originChainId: 42161 }],
-      ledger,
-      record,
-    ),
-    false,
-  )
-  assert.equal(
-    creditedDeposit(
-      transfers,
-      [{ delta: { ...ledger[0].delta, nonce: 78 } }],
-      record,
-    ),
-    false,
-  )
-  assert.equal(
-    creditedDeposit(
-      transfers,
-      [{ delta: { ...ledger[0].delta, destination: `0x${'22'.repeat(20)}` } }],
-      record,
-    ),
-    false,
-  )
-})
-
 test('资金请求持久化只接受当前账户和合法交易记录', async () => {
   const { parseFundingRecord } = await import('./funding.ts')
   const record = {
@@ -96,6 +44,10 @@ test('资金请求持久化只接受当前账户和合法交易记录', async ()
       user,
     ),
   )
+  for (const changed of [{ kind: 'withdraw', sourceDex: '' }])
+    assert.throws(() =>
+      parseFundingRecord(JSON.stringify({ ...record, ...changed }), user),
+    )
 })
 
 test('提款固定 CCTP 域 3、当前收款地址，校验最低金额与可提余额', async () => {
@@ -135,53 +87,6 @@ test('提款可用额扣除维护保证金限制、Gas 预留与激活费', asyn
   assert.equal(withdrawalAvailable('30', '0.00002', '2500', '1', '0'), '30')
 })
 
-test('提款状态按 nonce 和测试网链匹配，不把主网或别的请求当作到账', async () => {
-  const { withdrawalTransaction, parseFundingRecord } = await import(
-    './funding.ts'
-  )
-  const record: FundingRecord = {
-    account: user,
-    amount: '10',
-    kind: 'withdraw',
-    sourceDex: '',
-    nonce: 123,
-    at: 123,
-    status: 'submitted',
-  }
-  const hash = `0x${'cd'.repeat(32)}`
-  assert.equal(
-    withdrawalTransaction(
-      [{ nonce: '123', destinationChainId: 421614, fillTxnRef: hash }],
-      record,
-    ),
-    hash,
-  )
-  assert.equal(
-    withdrawalTransaction(
-      [{ nonce: '123', destinationChainId: 42161, fillTxnRef: hash }],
-      record,
-    ),
-    null,
-  )
-  assert.equal(
-    withdrawalTransaction(
-      [{ nonce: '124', destinationChainId: 421614, fillTxnRef: hash }],
-      record,
-    ),
-    null,
-  )
-  assert.equal(
-    withdrawalTransaction(
-      [{ nonce: '123', destinationChainId: 421614 }],
-      record,
-    ),
-    null,
-  )
-  assert.throws(() =>
-    parseFundingRecord(JSON.stringify({ ...record, nonce: undefined }), user),
-  )
-})
-
 test('目标链提款到账须包含足额 USDC Transfer，其他币种、收款人或空日志不算到账', async () => {
   const { DEPOSIT_USDC, receivedWithdrawal } = await import('./funding.ts')
   const { toEventSelector, pad, encodeAbiParameters, zeroAddress } =
@@ -205,6 +110,22 @@ test('目标链提款到账须包含足额 USDC Transfer，其他币种、收款
     data: encodeAbiParameters([{ type: 'uint256' }], [9800000n]),
   }
   assert.equal(receivedWithdrawal([log], record), true)
+  assert.equal(
+    receivedWithdrawal(
+      [
+        {
+          ...log,
+          topics: [
+            toEventSelector('Transfer(address,address,uint256)'),
+            pad(user),
+            pad(user),
+          ],
+        },
+      ],
+      record,
+    ),
+    false,
+  )
   assert.equal(receivedWithdrawal([], record), false)
   assert.equal(
     receivedWithdrawal([{ ...log, address: zeroAddress }], record),

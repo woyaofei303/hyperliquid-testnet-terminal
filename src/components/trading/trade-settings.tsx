@@ -1,5 +1,5 @@
 'use client'
-import { SmartPopover, Switch, Tooltip } from '@fameex/ui'
+import { ChartIcon, SmartPopover, Switch, Tooltip } from '@fameex/ui'
 import { t, useLocale } from '@/i18n'
 import { tradePreferences } from '@/lib/trade-preferences'
 import { HelpLabel } from './help-label'
@@ -54,19 +54,7 @@ export function TradeSettings() {
       <span className="flex size-full items-center justify-center">
         <Tooltip content={t('交易设置')}>
           <span className="flex items-center" aria-hidden="true">
-            <svg
-              aria-hidden="true"
-              className="size-5 shrink-0"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="m9 3-.6 2.3-2 .9L4.3 6l-2 3.5L4 11v2l-1.7 1.5 2 3.5 2.1-.2 2 .9L9 21h6l.6-2.3 2-.9 2.1.2 2-3.5L20 13v-2l1.7-1.5-2-3.5-2.1.2-2-.9L15 3Z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
+            <ChartIcon name="trade-settings" className="size-5 shrink-0" />
           </span>
         </Tooltip>
       </span>
