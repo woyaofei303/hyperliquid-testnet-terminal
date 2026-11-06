@@ -8,8 +8,10 @@ import { HelpLabel } from './help-label'
 
 export function SlippageSetting({
   value,
+  estimate,
   onChange,
 }: {
+  estimate?: string
   value: string
   onChange: (value: string) => void
 }) {
@@ -29,7 +31,10 @@ export function SlippageSetting({
     <>
       <div className="flex items-center justify-between gap-2">
         <dt className="text-muted">
-          <HelpLabel label="最大滑点" />
+          <HelpLabel
+            label={estimate === undefined ? '最大滑点' : '滑点'}
+            helpKey="最大滑点"
+          />
         </dt>
         <dd>
           <Button
@@ -42,7 +47,7 @@ export function SlippageSetting({
               setError('')
             }}
           >
-            {t('最大：')}
+            {estimate === undefined ? t('最大：') : `Est: ${estimate} / Max: `}
             {Number(value).toFixed(2)}%
           </Button>
         </dd>

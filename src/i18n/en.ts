@@ -1,5 +1,32 @@
 // 前端文案：简体中文为源文案，英文与同一交易状态共享，不通过切换路由重建会话。
 export const en: Record<string, string> = {
+  预测订单类型: 'Prediction order type',
+  预测方向: 'Outcome side',
+  下单百分比: 'Order percentage',
+  '开始价格（USDC）': 'Start price (USDC)',
+  '结束价格（USDC）': 'End price (USDC)',
+  '总订单数（2–50）': 'Total orders (2–50)',
+  数量偏差: 'Size skew',
+  分段订单: 'Scale orders',
+  转换: 'Convert',
+  若为: 'Payout if',
+  的派付: 'wins',
+  不适用: 'N/A',
+  '1 表示等量；2 表示最后一单的目标数量为第一单的 2 倍，份额按整数取整。':
+    '1 means equal size; 2 targets twice the first order size in the last order. Shares are rounded to whole numbers.',
+  '吃单 / 挂单费率。买入预测份额不收费；卖出和结算按市场及账户费率扣费。派付显示扣除结算费用前的金额。':
+    'Taker / maker rates. Buying outcome shares is free; selling and settlement use market and account fees. Payout is shown before settlement fees.',
+  预测市场费率无效: 'Invalid outcome market fee rate',
+  账户费率无效: 'Invalid account fee rate',
+  开始价格和结束价格不能相同: 'Start and end prices must differ',
+  '总订单数为 2 至 50 的整数':
+    'Total orders must be an integer between 2 and 50',
+  '预测价格必须小于 1': 'Outcome price must be less than 1',
+  '预测价格最多 5 位小数': 'Outcome prices allow at most 5 decimals',
+  开始价格: 'Start price',
+  结束价格: 'End price',
+  请选择预测市场: 'Select a prediction market',
+
   价格精度: 'Price increment',
   订单簿价格精度: 'Order book price increment',
   收起画图工具: 'Collapse drawing tools',

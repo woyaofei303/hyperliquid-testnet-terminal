@@ -1386,7 +1386,7 @@ test('市价滑点在下单摘要中设置，取消不修改，切换订单类�
 
 for (const [category, name, unit, size, asset, price] of [
   ['现货', 'HYPE / USDC', 'HYPE', '2', 10007, '20.41'],
-  ['预测', 'BTC 达到目标价？ · Yes', '份', '20', 100000120, '0.5202'],
+  ['预测', 'BTC 达到目标价？ · Yes', 'Yes', '20', 100000120, '0.5202'],
 ] as const) {
   test(`${category}市价共用滑点弹窗，设置实际限制成交价格`, async ({
     page,
@@ -1400,7 +1400,8 @@ for (const [category, name, unit, size, asset, price] of [
       .click()
     await page.getByRole('option', { name, exact: true }).click()
     const panel = page.getByRole('region', { name: '下单面板', exact: true })
-    await panel.getByRole('tab', { name: '市价单', exact: true }).click()
+    if (category === '预测') await predictionUnit(page, 'Yes')
+    else await panel.getByRole('tab', { name: '市价单', exact: true }).click()
     await expect(
       panel.getByRole('textbox', { name: '滑点上限（%）' }),
     ).toHaveCount(0)
@@ -3004,13 +3005,16 @@ test('分类下拉切换现货、预测和 HIP-3，使用各自资产 ID 与下�
   await panel.getByRole('button', { name: '下单', exact: true }).click()
   await expect(panel.getByRole('alert')).toContainText('持有量')
   await choose('预测', 'BTC 达到目标价？ · Yes')
-  await expect(panel.getByText('预测交易', { exact: true })).toBeVisible()
+  await predictionType(page, '限价')
+  await predictionUnit(page, 'Yes')
   await panel.getByRole('textbox', { name: '价格（USDC）' }).fill('0.5')
-  await panel.getByRole('textbox', { name: '数量（份）' }).fill('100')
+  await panel.getByRole('textbox', { name: '数量（Yes）' }).fill('100')
   await signPreview(page)
   await expect.poll(() => writes.at(-1)?.orders?.[0]?.a).toBe(100000120)
   await panel.getByRole('button', { name: 'No', exact: true }).click()
-  await expect(panel).toContainText('BTC 达到目标价？ · No')
+  await expect(
+    panel.getByRole('button', { name: 'No', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
   await choose('HIP-3', 'ABC / USDC')
   await expect(panel.getByRole('button', { name: '保证金模式' })).toBeVisible()
   await panel.getByRole('textbox', { name: '价格（USDC）' }).fill('70000')
@@ -3209,9 +3213,13 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
         })
         .click()
     }
-    if (product === 'outcome')
+    if (product === 'outcome') {
+      await predictionType(page, '限价')
+      await predictionUnit(page, 'Yes')
       await panel.getByRole('tab', { name: '卖出', exact: true }).click()
-    const base = product === 'perp' ? 'BTC' : product === 'spot' ? 'HYPE' : '份'
+    }
+    const base =
+      product === 'perp' ? 'BTC' : product === 'spot' ? 'HYPE' : 'Yes'
     const price = panel.getByRole('textbox', {
       name: '价格（USDC）',
       exact: true,
@@ -3246,7 +3254,7 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
     await panel.getByRole('button', { name: '数量单位', exact: true }).click()
     await page.getByRole('menuitemradio', { name: 'USDC', exact: true }).click()
     const amount = panel.getByRole('textbox', {
-      name: '金额（USDC）',
+      name: product === 'outcome' ? '数量（USDC）' : '金额（USDC）',
       exact: true,
     })
     await expect(amount).toHaveValue(
@@ -3380,13 +3388,19 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
         })
         .click()
       await panel.getByRole('tab', { name: '卖出', exact: true }).click()
-      await expect(
-        panel
-          .getByRole('tablist', { name: '交易方向' })
-          .locator('[data-slot="cursor"]'),
-      ).toHaveCSS('background-color', 'rgb(235, 71, 71)')
+      if (product === 'spot')
+        await expect(
+          panel
+            .getByRole('tablist', { name: '交易方向' })
+            .locator('[data-slot="cursor"]'),
+        ).toHaveCSS('background-color', 'rgb(235, 71, 71)')
     }
-    const base = product === 'perp' ? 'BTC' : product === 'spot' ? 'HYPE' : '份'
+    const base =
+      product === 'perp' ? 'BTC' : product === 'spot' ? 'HYPE' : 'Yes'
+    if (product === 'outcome') {
+      await predictionType(page, '限价')
+      await predictionUnit(page, 'Yes')
+    }
     const px = product === 'perp' ? 70000 : product === 'spot' ? 20 : 0.5
     const initial = product === 'perp' ? '0.5' : product === 'spot' ? '2' : '20'
     await panel
@@ -3431,7 +3445,9 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
     ).toBeHidden()
     await expect(trigger).toBeFocused()
     await selectUnit('USDC')
-    const amount = panel.getByRole('textbox', { name: '金额（USDC）' })
+    const amount = panel.getByRole('textbox', {
+      name: product === 'outcome' ? '数量（USDC）' : '金额（USDC）',
+    })
     await expect
       .poll(async () => Number(await amount.inputValue()))
       .toBe(Number(initial) * px)
@@ -3519,9 +3535,12 @@ async function chooseCashMarket(page: Page, outcome = false) {
       exact: true,
     })
     .click()
-  await expect(
-    page.getByRole('button', { name: '下单', exact: true }),
-  ).toBeEnabled()
+  if (outcome)
+    await expect(page.getByLabel('订单摘要')).toContainText('0.0000% / 0.0000%')
+  else
+    await expect(
+      page.getByRole('button', { name: '下单', exact: true }),
+    ).toBeEnabled()
 }
 
 for (const width of [1440, 375]) {
@@ -3594,11 +3613,14 @@ for (const width of [1440, 375]) {
     })
     await page.keyboard.press('Escape')
     await chooseCashMarket(page, true)
-    await trigger.click()
-    await expect(menu.getByRole('menuitemradio')).toHaveCount(1)
-    await expect(
-      menu.getByRole('menuitemradio', { name: '阶梯单', exact: true }),
-    ).toBeVisible()
+    await page.getByRole('button', { name: '预测订单类型' }).click()
+    const predictionMenu = page.getByRole('menu', { name: '预测订单类型' })
+    await expect(predictionMenu.getByRole('menuitemradio')).toHaveText([
+      '市价',
+      '限价',
+      '分段订单',
+      '转换',
+    ])
     await page.screenshot({
       path: `output-tdd/playwright/order-type-menu/outcome-menu-${width}.png`,
     })
@@ -3660,12 +3682,13 @@ test('预测高级订单：整数份额、价格范围、整批卖出余额与�
   const { writes } = await mockExchange(page)
   await ready(page)
   await chooseCashMarket(page, true)
-  await selectAdvanced(page, '阶梯单')
-  await page.getByRole('textbox', { name: '最低价格（USDC）' }).fill('0.33333')
-  const upper = page.getByRole('textbox', { name: '最高价格（USDC）' })
+  await predictionType(page, '分段订单')
+  await predictionUnit(page, 'Yes')
+  await page.getByRole('textbox', { name: '开始价格（USDC）' }).fill('0.33333')
+  const upper = page.getByRole('textbox', { name: '结束价格（USDC）' })
   await upper.fill('1')
-  await page.getByRole('textbox', { name: '阶梯档数（2–50）' }).fill('3')
-  const quantity = page.getByRole('textbox', { name: '数量（份）' })
+  await page.getByRole('textbox', { name: '总订单数（2–50）' }).fill('3')
+  const quantity = page.getByRole('textbox', { name: '数量（Yes）' })
   await quantity.fill('12')
   await page.getByRole('button', { name: '下单', exact: true }).click()
   await expect(
@@ -7510,7 +7533,7 @@ test('完整账户区：独立余额与预测、历史委托字段筛选、全�
     form.getByRole('tab', { name: '卖出', exact: true }),
   ).toHaveAttribute('aria-selected', 'true')
   await expect(
-    form.getByRole('textbox', { name: '数量（份）', exact: true }),
+    form.getByRole('textbox', { name: '数量（Yes）', exact: true }),
   ).toHaveValue('95')
   await records.getByRole('tab', { name: '历史委托', exact: true }).click()
   const history = records.getByRole('table', { name: '历史委托', exact: true })
@@ -7564,11 +7587,13 @@ test('预测落地页进入指定结果，转换确认重读余额并提交已�
     .getByRole('link', { name: 'BTC 达到目标价？ · No', exact: true })
     .click()
   const panel = page.getByRole('region', { name: '下单面板', exact: true })
-  await expect(panel).toContainText('BTC 达到目标价？ · No')
+  await expect(
+    panel.getByRole('button', { name: 'No', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
   await expect(
     panel.getByRole('button', { name: '下单', exact: true }),
-  ).toBeEnabled()
-  await panel.getByRole('button', { name: '转换结果', exact: true }).click()
+  ).toBeDisabled()
+  await predictionType(page, '转换')
   let dialog = page.getByRole('dialog', { name: '转换结果', exact: true })
   await dialog
     .getByRole('textbox', { name: '转换数量', exact: true })
@@ -7643,7 +7668,7 @@ test('预测转换回报丢失保留待确认状态，禁止自动重发', async
   )
   await ready(page)
   await chooseCashMarket(page, true)
-  await page.getByRole('button', { name: '转换结果', exact: true }).click()
+  await predictionType(page, '转换')
   await page.getByRole('textbox', { name: '转换数量', exact: true }).fill('2')
   await page.getByRole('button', { name: '预览转换', exact: true }).click()
   await page.getByRole('button', { name: '确认转换', exact: true }).click()
@@ -7702,4 +7727,98 @@ test('资金费多页查询不被账户轮询打断，边界区块不重复', as
   await expect(records).toContainText('1–25 / 1000')
   expect(queries).toBeGreaterThanOrEqual(3)
   expect(queries).toBeLessThanOrEqual(4)
+})
+
+async function predictionType(page: Page, name: string) {
+  await page.getByRole('button', { name: '预测订单类型', exact: true }).click()
+  await page.getByRole('menuitemradio', { name, exact: true }).click()
+  await expect(
+    page.getByRole('menu', { name: '预测订单类型', exact: true }),
+  ).toBeHidden()
+  if (name !== '转换')
+    await expect(
+      page.getByRole('button', { name: '预测订单类型', exact: true }),
+    ).toBeFocused()
+}
+async function predictionUnit(page: Page, name: string) {
+  await page
+    .getByRole('region', { name: '下单面板', exact: true })
+    .getByRole('button', { name: '数量单位', exact: true })
+    .click()
+  await page.getByRole('menuitemradio', { name, exact: true }).click()
+  await expect(
+    page.getByRole('menu', { name: '数量单位', exact: true }),
+  ).toBeHidden()
+  await expect(
+    page.getByRole('button', { name: '数量单位', exact: true }),
+  ).toBeFocused()
+}
+
+test('预测专用下单：默认市价 USDC、固定 Yes/No、保持草稿、费率与实际订单一致', async ({
+  page,
+}) => {
+  const { writes } = await mockExchange(page)
+  await ready(page)
+  await chooseCashMarket(page, true)
+  const panel = page.getByRole('region', { name: '下单面板', exact: true })
+  await expect
+    .poll(() => panel.evaluate((el) => el.scrollWidth - el.clientWidth))
+    .toBe(0)
+  await expect(panel.getByRole('button', { name: '预测订单类型' })).toHaveText(
+    '市价',
+  )
+  await expect(
+    panel.getByRole('button', { name: '调整最大滑点' }),
+  ).toContainText('Max: 8.00%')
+  await expect(
+    panel.getByRole('button', { name: '下单', exact: true }),
+  ).toBeDisabled()
+  await panel.getByRole('textbox', { name: '数量（USDC）' }).fill('10.2')
+  await expect(panel.getByLabel('订单摘要')).toContainText('20 USDC')
+  await expect(panel.getByLabel('订单摘要')).toContainText('0.0000% / 0.0000%')
+  await predictionUnit(page, 'Yes')
+  await expect(panel.getByRole('textbox', { name: '数量（Yes）' })).toHaveValue(
+    '20',
+  )
+  await panel.getByRole('button', { name: 'No', exact: true }).click()
+  await expect(panel.getByRole('textbox', { name: '数量（No）' })).toHaveValue(
+    '20',
+  )
+  await expect(
+    panel.getByRole('group', { name: '预测方向' }).getByRole('button').first(),
+  ).toHaveText(/Yes/)
+  await expect(
+    panel.getByRole('button', { name: 'No', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await predictionType(page, '限价')
+  await panel.getByRole('textbox', { name: '价格（USDC）' }).fill('0.4')
+  await expect(panel.getByRole('textbox', { name: '数量（No）' })).toHaveValue(
+    '20',
+  )
+  await expect(panel.getByLabel('订单摘要')).toContainText('8.0000 USDC')
+  await signPreview(page)
+  await expect.poll(() => writes.length).toBe(1)
+  expect(writes[0].orders?.[0]).toMatchObject({
+    a: 100000121,
+    b: true,
+    s: '20',
+    p: '0.4',
+    t: { limit: { tif: 'Gtc' } },
+  })
+  await panel.getByRole('tab', { name: '卖出', exact: true }).click()
+  await expect(panel.getByLabel('订单摘要')).toContainText('0.0700% / 0.0400%')
+  await expect(panel.getByLabel('订单摘要')).not.toContainText('的派付')
+  await predictionType(page, '转换')
+  const dialog = page.getByRole('dialog', { name: '转换结果', exact: true })
+  await expect(dialog.getByRole('tab')).toHaveCount(4)
+  await expect(dialog.getByRole('tab', { name: '合并问题' })).toBeDisabled()
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+  await panel.getByRole('button', { name: 'Yes', exact: true }).click()
+  await panel.getByRole('textbox', { name: '下单百分比' }).fill('50')
+  await expect(panel.getByRole('textbox', { name: '数量（Yes）' })).toHaveValue(
+    '47',
+  )
+  await page.screenshot({
+    path: 'output-tdd/playwright/prediction-order/limit.png',
+  })
 })

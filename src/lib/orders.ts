@@ -25,6 +25,8 @@ export interface Market {
   outcomeTitle?: string
   category?: string
   venue?: string
+  feeScale?: string
+  deployerFeeScale?: string
   question?: number
   questionOutcomes?: number[]
   fallback?: boolean

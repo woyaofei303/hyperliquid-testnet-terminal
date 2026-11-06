@@ -152,6 +152,15 @@ export function predictionMarkets(
         quote: item.quoteToken,
         label: `${title} · ${sideName}`,
         outcome: item.outcome,
+        feeScale:
+          'feeScale' in meta && typeof meta.feeScale === 'string'
+            ? meta.feeScale
+            : undefined,
+        deployerFeeScale:
+          'deployerFeeScale' in item &&
+          typeof item.deployerFeeScale === 'string'
+            ? item.deployerFeeScale
+            : undefined,
         eventTitle: question?.title ?? resolved.title,
         outcomeTitle: resolved.title,
         category,

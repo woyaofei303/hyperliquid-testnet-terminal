@@ -70,11 +70,10 @@ export async function loadCashFunds(market: Market, user: `0x${string}`) {
   ])
   return {
     balances: cashBalances(market, state.balances),
-    feeRate: Money.max(
-      0,
-      fees.userSpotCrossRate,
-      fees.userSpotAddRate,
-    ).toFixed(),
+    feeRate:
+      market.kind === 'outcome'
+        ? '0'
+        : Money.max(0, fees.userSpotCrossRate, fees.userSpotAddRate).toFixed(),
   }
 }
 

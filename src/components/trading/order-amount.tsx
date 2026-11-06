@@ -11,6 +11,7 @@ export function OrderAmount({
   amount,
   percent,
   disabled,
+  editablePercent = false,
   onAmount,
   onUnit,
   onPercent,
@@ -21,6 +22,7 @@ export function OrderAmount({
   unit: 'base' | 'usdc'
   amount: string
   percent: number
+  editablePercent?: boolean
   disabled: boolean
   onAmount: (value: string) => void
   onUnit: (value: 'base' | 'usdc') => void
@@ -36,7 +38,7 @@ export function OrderAmount({
             label={
               unit === 'base'
                 ? t('数量（') + base + t('）')
-                : t('金额（') + quote + t('）')
+                : t(editablePercent ? '数量（' : '金额（') + quote + t('）')
             }
             description={t(
               '按所选单位输入数量或订单金额；金额会按参考价格换算并向下取整到市场允许精度。',
@@ -71,24 +73,42 @@ export function OrderAmount({
           />
         }
       />
-      <div className="relative h-8 w-full pt-1">
-        <Slider
-          label={t('下单比例')}
-          minValue={0}
-          maxValue={100}
-          step={1}
-          value={percent}
-          onChange={(value) =>
-            onPercent(Array.isArray(value) ? value[0] : value)
-          }
-          isDisabled={disabled}
-          marks={[0, 25, 50, 75, 100].map((value) => ({
-            value,
-            label: value === 0 || value === 100 ? `${value}%` : '',
-          }))}
-          showTooltip
-          tooltipContentFormat={(value) => `${Math.round(value)}%`}
-        />
+      <div className="flex items-center gap-3">
+        <div className="relative h-8 min-w-0 flex-1 pt-1">
+          <Slider
+            label={t('下单比例')}
+            minValue={0}
+            maxValue={100}
+            step={1}
+            value={percent}
+            onChange={(value) =>
+              onPercent(Array.isArray(value) ? value[0] : value)
+            }
+            isDisabled={disabled}
+            marks={[0, 25, 50, 75, 100].map((value) => ({
+              value,
+              label: value === 0 || value === 100 ? `${value}%` : '',
+            }))}
+            showTooltip
+            tooltipContentFormat={(value) => `${Math.round(value)}%`}
+          />
+        </div>
+        {editablePercent && (
+          <div className="w-20 shrink-0">
+            <Input
+              aria-label={t('下单百分比')}
+              size="sm"
+              inputClassName="min-w-0"
+              value={String(Math.round(percent))}
+              onChange={(v) => {
+                if (/^\d{0,3}$/.test(v)) onPercent(Number(v))
+              }}
+              inputMode="numeric"
+              endContent="%"
+              isDisabled={disabled}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

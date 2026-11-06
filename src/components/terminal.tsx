@@ -25,6 +25,7 @@ import { MarketHeader } from './trading/market-header'
 import { MarketMetadata } from './trading/market-metadata'
 import { OrderBook } from './trading/order-book'
 import { PredictionMarkets } from './trading/prediction-markets'
+import { PredictionOrderForm } from './trading/prediction-order-form'
 import { TradingRecords } from './trading/records'
 import { Web3Dialog } from './trading/web3-dialog'
 export function Terminal({ view = 'trade' }: { view?: 'trade' | 'outcomes' }) {
@@ -139,7 +140,13 @@ export function Terminal({ view = 'trade' }: { view?: 'trade' | 'outcomes' }) {
               <ModuleBoundary name={t('下单面板')}>
                 {market ? (
                   <Profiler id="orderReact" onRender={recordReactRender}>
-                    {isCash(market) ? (
+                    {market.kind === 'outcome' ? (
+                      <PredictionOrderForm
+                        key={market.outcome}
+                        model={model}
+                        market={market}
+                      />
+                    ) : isCash(market) ? (
                       <CashOrderForm key={coin} model={model} market={market} />
                     ) : (
                       <OrderForm

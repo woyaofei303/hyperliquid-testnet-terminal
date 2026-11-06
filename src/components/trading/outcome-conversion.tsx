@@ -1,4 +1,4 @@
-import { Button, FlatSelect, Input, Modal } from '@fameex/ui'
+import { Button, Input, Modal, Tab, Tabs } from '@fameex/ui'
 import { useState } from 'react'
 import type { TerminalModel } from '@/hooks/use-terminal'
 import { t } from '@/i18n'
@@ -56,23 +56,26 @@ export function OutcomeConversion({
         <p className="text-xs text-muted">{market.outcomeTitle}</p>
       )}
       {!preview && (
-        <FlatSelect
+        <Tabs
           aria-label={t('转换类型')}
-          value={kind}
-          onChange={(value) => {
-            setKind(value as ConversionKind)
-            setError('')
-            setAmount('')
+          selectedKey={kind}
+          disabledKeys={
+            market.question == null ? ['mergeQuestion', 'negateOutcome'] : []
+          }
+          classNames={{ tabList: 'w-full gap-3', tab: 'text-xs' }}
+          onSelectionChange={(value) => {
+            const next = conversionKinds.find(([id]) => id === value)?.[0]
+            if (next) {
+              setKind(next)
+              setError('')
+              setAmount('')
+            }
           }}
-          items={conversionKinds
-            .filter(
-              ([id]) =>
-                market.question != null ||
-                id === 'splitOutcome' ||
-                id === 'mergeOutcome',
-            )
-            .map(([key, label]) => ({ key, label: t(label) }))}
-        />
+        >
+          {conversionKinds.map(([id, label]) => (
+            <Tab key={id} title={t(label)} />
+          ))}
+        </Tabs>
       )}
       <p className="text-sm leading-6 text-muted">
         {t(description).replace('{quote}', quote)}
