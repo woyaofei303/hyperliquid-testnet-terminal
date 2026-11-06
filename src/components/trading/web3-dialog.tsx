@@ -12,10 +12,27 @@ import { DEPOSIT_CHAIN, fundingAmount, transferAmount } from '@/lib/funding'
 import { Money } from '@/lib/orders'
 import { FundingRoute, WithdrawalForm } from './withdrawal-form'
 
+const walletDownloads = [
+  {
+    name: 'MetaMask',
+    rdns: 'io.metamask',
+    url: 'https://metamask.com/download',
+  },
+  { name: 'Rabby', rdns: 'io.rabby', url: 'https://rabby.io/' },
+]
+
 export function Web3Dialog({ model }: { model: TerminalModel }) {
   useLocale()
 
   const providers = model.providers
+  const missingWallets = walletDownloads.filter(
+    (wallet) =>
+      !providers.some(
+        (provider) =>
+          provider.rdns === wallet.rdns ||
+          provider.name.toLowerCase() === wallet.name.toLowerCase(),
+      ),
+  )
   const [amount, setAmount] = useState('')
   const [copied, setCopied] = useState(false)
   const [persist, setPersist] = useState(false)
@@ -138,13 +155,27 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 )}
               </Button>
             ))}
+            {missingWallets.map((item) => (
+              <a
+                key={item.rdns}
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${item.name} ${t('未安装，前往官网安装')}`}
+                className="flex h-[54px] w-full items-center gap-3 rounded-lg bg-surface px-5 text-sm font-medium text-ink hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <span>{item.name}</span>
+                <span className="ml-auto text-xs text-muted">
+                  {t('未安装')}
+                </span>
+                <span className="text-xs text-accent">{t('安装 ↗')}</span>
+              </a>
+            ))}
           </div>
-          {providers.length === 0 && (
-            <output className="block rounded-[8px] bg-panel p-3 text-sm leading-6">
-              {t(
-                '未检测到浏览器钱包。请在已安装 MetaMask、Rabby 等扩展的浏览器打开本页。',
-              )}
-            </output>
+          {missingWallets.length > 0 && (
+            <p className="text-xs leading-5 text-muted">
+              {t('安装并启用扩展后，刷新本页即可连接。')}
+            </p>
           )}
           {model.connecting && (
             <output className="block rounded-[8px] border border-edge bg-panel p-4 text-sm leading-6">

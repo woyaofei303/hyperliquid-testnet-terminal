@@ -4156,6 +4156,94 @@ test('Web3 划转使用主钱包确认，精度和可用余额校验在签名前
   })
 })
 
+test('Web3 未安装钱包仍显示列表，点击进入对应官方安装页', async ({ page }) => {
+  const exchange = await mockExchange(page)
+  await page.addInitScript(() => {
+    const provider = window.ethereum
+    delete window.ethereum
+    window.addEventListener('test-wallet-installed', () =>
+      window.dispatchEvent(
+        new CustomEvent('eip6963:announceProvider', {
+          detail: {
+            info: {
+              uuid: 'late-metamask',
+              name: 'MetaMask Extension',
+              rdns: 'io.metamask',
+            },
+            provider,
+          },
+        }),
+      ),
+    )
+  })
+  const downloads = [
+    ['MetaMask', 'https://metamask.com/download'],
+    ['Rabby', 'https://rabby.io/'],
+  ]
+  for (const [, url] of downloads) {
+    await page.context().route(url, (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<p>Wallet download</p>',
+      }),
+    )
+  }
+  await page.goto('/')
+  await page.getByRole('button', { name: '连接钱包', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  for (const [name, url] of downloads) {
+    const link = dialog.getByRole('link', {
+      name: `${name} 未安装，前往官网安装`,
+    })
+    await expect(link).toBeVisible()
+    await expect(link).toContainText('未安装')
+    await expect(link).toHaveAttribute('href', url)
+    const popup = page.waitForEvent('popup')
+    await link.click()
+    const installPage = await popup
+    await expect(installPage).toHaveURL(url)
+    await expect(installPage.getByText('Wallet download')).toBeVisible()
+    await installPage.close()
+    await expect(dialog).toBeVisible()
+  }
+  await expect(dialog.getByRole('button', { name: /连接 →/ })).toHaveCount(0)
+  expect(exchange.agentRegistrations()).toBe(0)
+  expect(exchange.writes).toEqual([])
+  await expect(
+    dialog.getByText('安装并启用扩展后，刷新本页即可连接。'),
+  ).toBeVisible()
+  await dialog.getByRole('button', { name: '关闭钱包面板' }).click()
+  await page.getByRole('button', { name: '语言', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'English' }).click()
+  await page
+    .getByRole('button', { name: 'Connect wallet', exact: true })
+    .click()
+  await expect(
+    dialog.getByRole('link', {
+      name: 'MetaMask Not installed, install from the official website',
+    }),
+  ).toBeVisible()
+  await expect(
+    dialog.getByText(
+      'Install and enable the extension, then refresh this page to connect.',
+    ),
+  ).toBeVisible()
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event('test-wallet-installed')),
+  )
+  await expect(
+    dialog.getByRole('button', { name: 'MetaMask Extension Connect →' }),
+  ).toBeEnabled()
+  await expect(dialog.getByRole('link', { name: /MetaMask/ })).toHaveCount(0)
+  await expect(
+    dialog.getByRole('link', {
+      name: 'Rabby Not installed, install from the official website',
+    }),
+  ).toBeVisible()
+  expect(exchange.agentRegistrations()).toBe(0)
+  expect(exchange.writes).toEqual([])
+})
+
 test('Web3 多钱包发现与断开：主动弹出连接列表，重新选择前不发起授权', async ({
   page,
 }) => {
@@ -4190,6 +4278,7 @@ test('Web3 多钱包发现与断开：主动弹出连接列表，重新选择前
     page.getByRole('button', { name: 'MetaMask 连接 →' }),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Rabby 连接 →' })).toBeVisible()
+  await expect(page.getByRole('dialog').getByRole('link')).toHaveCount(0)
   expect(
     await page.evaluate(() => localStorage.getItem('test-selected-wallet')),
   ).toBeNull()

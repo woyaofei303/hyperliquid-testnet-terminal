@@ -554,8 +554,11 @@ export const en: Record<string, string> = {
   '选择钱包后，在钱包扩展中允许本站连接。已允许连接的钱包可能直接返回账户。':
     'Choose a wallet, then allow this site to connect in its extension. Previously connected wallets may return an account immediately.',
   '连接 →': 'Connect →',
-  '未检测到浏览器钱包。请在已安装 MetaMask、Rabby 等扩展的浏览器打开本页。':
-    'No wallet detected. Open this page in a browser with MetaMask, Rabby or another compatible wallet.',
+  未安装: 'Not installed',
+  '安装 ↗': 'Install ↗',
+  '未安装，前往官网安装': 'Not installed, install from the official website',
+  '安装并启用扩展后，刷新本页即可连接。':
+    'Install and enable the extension, then refresh this page to connect.',
   请在: 'Confirm in ',
   '若未弹出窗口，请打开浏览器工具栏中的钱包扩展。取消连接请在钱包中操作。':
     'If no popup appears, open the wallet extension from the browser toolbar. Cancel the connection in your wallet.',
