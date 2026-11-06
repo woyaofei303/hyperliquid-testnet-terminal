@@ -4,10 +4,48 @@ import { availableBalance, prepareCashOrder } from './cash-order.ts'
 import {
   builderMarkets,
   cashMarkets,
+  predictionEvents,
   predictionMarkets,
   pricePrecision,
 } from './market-catalog.ts'
 import { type Market, prepareOrder } from './orders.ts'
+
+test('预测事件归并选项、保留问题和后备编码，并关联实际行情与分类', () => {
+  const markets = predictionMarkets(
+    {
+      outcomes: [1, 2, 3].map((outcome) => ({
+        outcome,
+        name: `选项${outcome}`,
+        description: '规则',
+        quoteToken: 'USDC',
+        sideSpecs: [{ name: 'Yes' }, { name: 'No' }],
+      })),
+      questions: [
+        {
+          question: 8,
+          name: '世界杯冠军',
+          description: '规则 metadata=category:sports',
+          fallbackOutcome: 3,
+          namedOutcomes: [1, 2],
+          settledNamedOutcomes: [],
+        },
+      ],
+    },
+    [],
+    [{ coin: '#10', markPx: '0.25', prevDayPx: '0.2', dayNtlVlm: '100' }],
+  )
+  const events = predictionEvents(markets)
+  assert.equal(events.length, 1)
+  assert.equal(events[0].title, '世界杯冠军')
+  assert.equal(events[0].category, 'sports')
+  assert.deepEqual(
+    events[0].markets.map((m) => m.name),
+    ['#10', '#20'],
+  )
+  assert.equal(markets[0].context.markPx, '0.25')
+  assert.deepEqual(markets[0].questionOutcomes, [1, 2, 3])
+  assert.equal(markets[0].question, 8)
+})
 
 test('市场 ID 用交易对索引、DEX 索引和 outcome side 编码，展示名不参与 API 请求', () => {
   const spot = cashMarkets(
@@ -62,6 +100,28 @@ const spot: Market = {
   maxLeverage: 1,
   quote: 'USDC',
 }
+
+test('旧版价格模板仍可区分传统金融，并把结算时间展开为可读的 UTC 时间', () => {
+  const rows = predictionMarkets(
+    {
+      outcomes: [
+        {
+          outcome: 1,
+          name: 'template:binaryPrice',
+          description: 'perp:xyz:AAPL|time:20261106-1900',
+          quoteToken: 'USDC',
+          sideSpecs: [{ name: 'Yes' }, { name: 'No' }],
+        },
+      ],
+      questions: [],
+    },
+    JSON.parse(
+      '[{"id":"binaryPrice","name":"{perp} at {time}","description":"Rules","keywords":[["perp","hlPerp"],["time","dateTime"]]}]',
+    ),
+  )
+  assert.equal(rows[0].category, 'tradfi')
+  assert.match(rows[0].eventTitle ?? '', /2026-11-06 19:00 UTC/)
+})
 const input = {
   market: spot,
   side: 'buy' as const,

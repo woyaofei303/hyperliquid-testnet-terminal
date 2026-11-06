@@ -1,9 +1,15 @@
 import type { TerminalModel } from '@/hooks/use-terminal'
-import { useLocale } from '@/i18n'
+import { t, useLocale } from '@/i18n'
 import { marketLabel } from '@/lib/market-catalog'
 import { marketMetadata } from '@/lib/market-metadata'
 
-export function MarketMetadata({ model }: { model: TerminalModel }) {
+export function MarketMetadata({
+  model,
+  outcomes = false,
+}: {
+  model: TerminalModel
+  outcomes?: boolean
+}) {
   const locale = useLocale()
   const { market, feed } = model
   const pair = market ? marketLabel(market) : 'BTC / USDC'
@@ -11,6 +17,10 @@ export function MarketMetadata({ model }: { model: TerminalModel }) {
     ? undefined
     : (feed.trades[0]?.px ?? market?.context.markPx)
   const meta = marketMetadata(pair, market?.kind ?? 'perp', price, locale)
+  if (outcomes) {
+    meta.title = `${t('预测市场')} | FameEX Testnet`
+    meta.description = t('选择事件与结果，使用测试网资产参与预测。')
+  }
   // React 19 将标签提升到 head；只保留一个所有者，避免与异步注入的 Next 元数据重复。
   return (
     <>

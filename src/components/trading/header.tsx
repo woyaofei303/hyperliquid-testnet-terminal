@@ -1,9 +1,16 @@
 import { Button, ChartIcon, SmartPopover } from '@fameex/ui'
 import Image from 'next/image'
+import Link from 'next/link'
 import type { TerminalModel } from '@/hooks/use-terminal'
 import { setLocale, t, useLocale } from '@/i18n'
 import { TradeSettings } from './trade-settings'
-export function Header({ model }: { model: TerminalModel }) {
+export function Header({
+  model,
+  view = 'trade',
+}: {
+  model: TerminalModel
+  view?: 'trade' | 'outcomes'
+}) {
   const locale = useLocale()
 
   const { wallet, busy, connect } = model
@@ -22,6 +29,25 @@ export function Header({ model }: { model: TerminalModel }) {
         <span className="rounded border border-amber-300/20 bg-amber-300/5 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-200">
           TESTNET
         </span>
+        <nav
+          aria-label={t('产品导航')}
+          className="flex items-center gap-4 text-sm"
+        >
+          <Link
+            href="/"
+            aria-current={view === 'trade' ? 'page' : undefined}
+            className="text-muted hover:text-ink aria-[current=page]:text-accent"
+          >
+            {t('交易')}
+          </Link>
+          <Link
+            href="/outcomes"
+            aria-current={view === 'outcomes' ? 'page' : undefined}
+            className="text-muted hover:text-ink aria-[current=page]:text-accent"
+          >
+            {t('预测')}
+          </Link>
+        </nav>
         <a
           href="https://app.hyperliquid-testnet.xyz/drip"
           target="_blank"

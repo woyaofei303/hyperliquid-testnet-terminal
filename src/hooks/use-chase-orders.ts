@@ -10,6 +10,7 @@ import { loadPending, type PendingOrder } from '@/lib/trading'
 type ChaseTicket = Extract<Ticket, { kind: 'chase' }>
 type Chase = {
   id: string
+  createdAt: number
   account: `0x${string}`
   ticket: ChaseTicket
   oid: number
@@ -65,6 +66,15 @@ export function useChaseOrders(
             if (!valid()) continue
             if (current.status !== 'order')
               throw new Error('订单状态不明，停止追价')
+            const remaining = new Money(current.order.order.sz)
+            if (
+              !remaining.isFinite() ||
+              remaining.lt(0) ||
+              remaining.gt(entry.remaining)
+            )
+              throw new Error('剩余数量异常，停止追价')
+            entry.remaining =
+              current.order.status === 'filled' ? '0' : remaining.toFixed()
             if (current.order.status !== 'open') {
               entry.active = false
               entry.status = `已结束：${current.order.status}`
@@ -185,6 +195,7 @@ export function useChaseOrders(
           ...entries.current.slice(-49),
           {
             id: crypto.randomUUID(),
+            createdAt: Date.now(),
             account: wallet.address,
             ticket,
             oid: result.oid,

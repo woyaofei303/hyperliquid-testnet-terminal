@@ -72,8 +72,26 @@ import { useFunding } from './use-funding'
 import { useWalletProviders } from './use-wallet-providers'
 
 export function useTerminal() {
-  const { markets, error: marketsError, catalogError } = useMarkets()
+  const {
+    markets,
+    error: marketsError,
+    catalogError,
+    catalogLoading,
+  } = useMarkets()
   const [coin, setCoin] = useState('BTC')
+  const initialMarketApplied = useRef(false)
+  useEffect(() => {
+    if (initialMarketApplied.current) return
+    const requested = new URLSearchParams(window.location.search).get('market')
+    if (!requested) {
+      initialMarketApplied.current = true
+      return
+    }
+    if (markets.some((m) => m.name === requested)) {
+      initialMarketApplied.current = true
+      setCoin(requested)
+    }
+  }, [markets])
   const [interval, setIntervalValue] = useState<Interval>('5m')
   const selectedMarket = markets.find((m) => m.name === coin)
   const feed = useMarket(coin, interval)
@@ -91,6 +109,11 @@ export function useTerminal() {
     'wallet' | 'deposit' | 'transfer' | 'withdraw' | null
   >(null)
   const [transferToPerp, setTransferToPerp] = useState(false)
+  const [cashOrderIntent, setCashOrderIntent] = useState<{
+    coin: string
+    amount: string
+    at: number
+  } | null>(null)
   const [bookPrice, setBookPrice] = useState<{
     coin: string
     price: string
@@ -150,6 +173,7 @@ export function useTerminal() {
 
   useEffect(() => {
     setPending(address ? loadPending(address) : null)
+    setCashOrderIntent(null)
   }, [address])
   useEffect(() => {
     if (!wallet) return
@@ -343,7 +367,9 @@ export function useTerminal() {
       if (unresolved.native) {
         account.refresh()
         setMessage(
-          '此请求没有客户端订单 ID。请在仓位、TWAP、当前委托及官方测试网页核对实际状态；不会自动重发。',
+          unresolved.native === 'outcome'
+            ? '预测转换没有客户端订单 ID。请在余额、预测持仓及官方测试网页核对实际变化；不会自动重发。'
+            : '此请求没有客户端订单 ID。请在仓位、TWAP、当前委托及官方测试网页核对实际状态；不会自动重发。',
           'warning',
         )
         return
@@ -748,6 +774,11 @@ export function useTerminal() {
   function selectMarket(name: string) {
     if (!markets.some((m) => m.name === name)) return
     setCoin(name)
+    window.history.replaceState(
+      null,
+      '',
+      `/?market=${encodeURIComponent(name)}`,
+    )
     setAction(null)
   }
   function disconnect() {
@@ -864,6 +895,7 @@ export function useTerminal() {
     markets,
     marketsError,
     catalogError,
+    catalogLoading,
     coin,
     interval,
     setIntervalValue,
@@ -890,6 +922,13 @@ export function useTerminal() {
     needsDeposit,
     previewOrder,
     previewTicket,
+    cashOrderIntent,
+    sellCashBalance: (name: string, amount: string) => {
+      selectMarket(name)
+      setCashOrderIntent({ coin: name, amount, at: Date.now() })
+    },
+    convertOutcome: (next: Extract<Action, { kind: 'outcome' }>) =>
+      execute(next),
     previewCancel,
     submitPosition,
     submitIsolatedMargin,

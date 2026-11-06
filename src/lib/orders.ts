@@ -21,6 +21,14 @@ export interface Market {
   balanceCoin?: string
   canonical?: boolean
   outcome?: number
+  eventTitle?: string
+  outcomeTitle?: string
+  category?: string
+  venue?: string
+  question?: number
+  questionOutcomes?: number[]
+  fallback?: boolean
+  settled?: boolean
   paired?: string
   description?: string
   asset: number

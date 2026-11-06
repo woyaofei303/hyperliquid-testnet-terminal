@@ -23,6 +23,17 @@ import type { TerminalModel } from './use-terminal'
 export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
   const [fields, setFields] = useState(() => defaultOrderFields(market))
   const [fee, setFee] = useState<{ user: string; rate: string } | null>(null)
+  useEffect(() => {
+    const intent = model.cashOrderIntent
+    if (intent?.coin === market.name)
+      setFields((previous) => ({
+        ...previous,
+        side: 'sell',
+        kind: 'market',
+        unit: 'base',
+        amount: intent.amount,
+      }))
+  }, [model.cashOrderIntent, market.name])
   const [error, setError] = useState('')
   const selectedPercent = useRef<number | null>(null)
   const appliedBookPrice = useRef(model.bookPrice)
@@ -238,6 +249,7 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
   }
   return {
     fields,
+    size,
     change,
     setKind,
     setUnit,

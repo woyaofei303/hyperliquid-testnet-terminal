@@ -634,6 +634,11 @@ async function mockExchange(
         case 'userNonFundingLedgerUpdates':
           data = []
           break
+        case 'historicalOrders':
+        case 'userFunding':
+        case 'userTwapSliceFills':
+          data = []
+          break
         case 'outcomeTemplates':
           data = []
           break
@@ -919,6 +924,8 @@ async function mockExchange(
           status: 'ok',
           response: { type: 'twapCancel', data: { status: 'success' } },
         }
+      } else if (action.type === 'userOutcome') {
+        data = { status: 'ok', response: { type: 'default' } }
       } else if (action.type === 'trailingStop') {
         data = {
           status: 'ok',
@@ -3183,6 +3190,7 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
     if (product !== 'perp') {
       await page.getByRole('button', { name: '交易市场', exact: true }).click()
       await page
+        .getByRole('region', { name: '市场选择器', exact: true })
         .getByRole('tab', {
           name: product === 'spot' ? '现货' : '预测',
           exact: true,
@@ -3353,6 +3361,7 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
     if (product !== 'perp') {
       await page.getByRole('button', { name: '交易市场', exact: true }).click()
       await page
+        .getByRole('region', { name: '市场选择器', exact: true })
         .getByRole('tab', {
           name: product === 'spot' ? '现货' : '预测',
           exact: true,
@@ -3495,6 +3504,7 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
 async function chooseCashMarket(page: Page, outcome = false) {
   await page.getByRole('button', { name: '交易市场', exact: true }).click()
   await page
+    .getByRole('region', { name: '市场选择器', exact: true })
     .getByRole('tab', { name: outcome ? '预测' : '现货', exact: true })
     .click()
   await page
@@ -3744,6 +3754,11 @@ test('现货高级订单：追价保持精度、只重挂剩余量，余额不�
     t: { limit: { tif: 'Alo' } },
   })
   partialFill(100, '1.25')
+  await page.getByRole('tab', { name: '追价策略', exact: true }).click()
+  await expect(page.getByRole('region', { name: '交易记录' })).toContainText(
+    '37.50%',
+    { timeout: 10000 },
+  )
   setSpotBookPrice(21)
   await expect
     .poll(() => writes.filter((w) => w.type === 'order').length, {
@@ -7400,4 +7415,285 @@ test('基础图表：侧边收起展开，重置清除绘图并恢复默认指�
   }
   expect(errors).toEqual([])
   expect(writes).toEqual([])
+})
+
+test('完整账户区：独立余额与预测、历史委托字段筛选、全部记录和导出', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  const now = Date.now()
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/info',
+    async (route) => {
+      const request = route.request().postDataJSON()
+      if (request.type === 'historicalOrders')
+        return route.fulfill({
+          json: Array.from({ length: 130 }, (_, i) => ({
+            order: {
+              coin: i % 2 ? 'ETH' : 'BTC',
+              side: 'B',
+              oid: i < 2 ? 900 : 900 + i,
+              timestamp: now - i * 1000,
+              limitPx: '100',
+              sz: i === 0 ? '0' : '2',
+              origSz: '2',
+              isTrigger: false,
+              triggerCondition: 'N/A',
+              triggerPx: '0',
+              children: [],
+              reduceOnly: false,
+              orderType: 'Limit',
+              isPositionTpsl: false,
+            },
+            status: i === 0 ? 'filled' : 'open',
+            statusTimestamp: now - i * 1000,
+          })),
+        })
+      if (request.type === 'userFunding')
+        return route.fulfill({
+          json: [
+            {
+              time: now,
+              hash: '0xabc',
+              delta: {
+                coin: 'BTC',
+                szi: '0.5',
+                usdc: '-0.25',
+                fundingRate: '0.0001',
+                type: 'funding',
+                nSamples: 1,
+              },
+            },
+          ],
+        })
+      return route.fallback()
+    },
+  )
+  await ready(page)
+  const records = page.getByRole('region', { name: '交易记录', exact: true })
+  for (const label of [
+    '余额',
+    '仓位',
+    '预测',
+    '当前委托',
+    'TWAP',
+    '追价策略',
+    '历史成交',
+    '资金费历史',
+    '历史委托',
+  ])
+    await expect(
+      records.getByRole('tab', { name: label, exact: true }),
+    ).toBeVisible()
+  await records.getByRole('tab', { name: '余额', exact: true }).click()
+  await expect(
+    records.getByRole('table', { name: '余额', exact: true }),
+  ).toContainText('HYPE')
+  await expect(
+    records.getByRole('table', { name: '余额', exact: true }),
+  ).not.toContainText('BTC 达到目标价')
+  await records.getByRole('tab', { name: '预测', exact: true }).click()
+  const holdings = records.getByRole('table', { name: '预测持仓', exact: true })
+  await expect(holdings.locator('tbody tr')).toHaveCount(2)
+  await holdings
+    .getByRole('button', { name: '卖出', exact: true })
+    .first()
+    .click()
+  const form = page.getByRole('region', { name: '下单面板', exact: true })
+  await expect(
+    form.getByRole('tab', { name: '卖出', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true')
+  await expect(
+    form.getByRole('textbox', { name: '数量（份）', exact: true }),
+  ).toHaveValue('95')
+  await records.getByRole('tab', { name: '历史委托', exact: true }).click()
+  const history = records.getByRole('table', { name: '历史委托', exact: true })
+  await expect(history.locator('tbody tr')).toHaveCount(25)
+  await expect(
+    history.getByRole('columnheader', { name: '成交大小', exact: true }),
+  ).toBeVisible()
+  await records.getByRole('button', { name: '查看全部', exact: true }).click()
+  await expect(history.locator('tbody tr')).toHaveCount(100)
+  await records.getByRole('button', { name: '下一页', exact: true }).click()
+  await expect(history.locator('tbody tr')).toHaveCount(30)
+  const download = page.waitForEvent('download')
+  await records.getByRole('button', { name: '导出为 CSV', exact: true }).click()
+  const path = await (await download).path()
+  expect(path && (await readFile(path, 'utf8'))).toContain('已成交')
+  await records
+    .getByRole('button', { name: '历史市场筛选', exact: true })
+    .click()
+  await page
+    .getByRole('menuitemradio', { name: 'ETH / USDC', exact: true })
+    .click()
+  await expect(history.locator('tbody tr')).toHaveCount(25)
+  await records.getByRole('button', { name: '查看全部', exact: true }).click()
+  await expect(history.locator('tbody tr')).toHaveCount(65)
+  await records.getByRole('tab', { name: '资金费历史', exact: true }).click()
+  await expect(
+    records.getByRole('table', { name: '资金费历史', exact: true }),
+  ).toContainText('-0.25 USDC')
+  await expect(
+    records.getByRole('table', { name: '资金费历史', exact: true }),
+  ).toContainText('0.01%')
+  expect(exchange.writes).toHaveLength(0)
+})
+
+test('预测落地页进入指定结果，转换确认重读余额并提交已校验的原生动作', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  await ready(page)
+  await page.getByRole('link', { name: '预测', exact: true }).click()
+  await expect(page).toHaveURL(/\/outcomes$/)
+  const response = await page.reload()
+  expect(response?.status()).toBe(200)
+  await expect(
+    page.getByRole('heading', { name: '预测市场', exact: true }),
+  ).toBeVisible()
+  await page
+    .getByRole('textbox', { name: '搜索预测市场', exact: true })
+    .fill('BTC')
+  await page
+    .getByRole('link', { name: 'BTC 达到目标价？ · No', exact: true })
+    .click()
+  const panel = page.getByRole('region', { name: '下单面板', exact: true })
+  await expect(panel).toContainText('BTC 达到目标价？ · No')
+  await expect(
+    panel.getByRole('button', { name: '下单', exact: true }),
+  ).toBeEnabled()
+  await panel.getByRole('button', { name: '转换结果', exact: true }).click()
+  let dialog = page.getByRole('dialog', { name: '转换结果', exact: true })
+  await dialog
+    .getByRole('textbox', { name: '转换数量', exact: true })
+    .fill('1.5')
+  await dialog.getByRole('button', { name: '预览转换', exact: true }).click()
+  await expect(dialog.getByRole('alert')).toContainText('整数')
+  await dialog
+    .getByRole('textbox', { name: '转换数量', exact: true })
+    .fill('20')
+  await dialog.getByRole('button', { name: '预览转换', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: '确认预测转换', exact: true })
+  exchange.setCashBalance('USDC', '15', '10')
+  await dialog.getByRole('button', { name: '确认转换', exact: true }).click()
+  await expect(
+    page.locator('output').filter({ hasText: '转换数量超过可用' }),
+  ).toBeVisible()
+  expect(exchange.writes).toHaveLength(0)
+  dialog = page.getByRole('dialog', { name: '转换结果', exact: true })
+  await dialog.getByRole('textbox', { name: '转换数量', exact: true }).fill('2')
+  await dialog.getByRole('button', { name: '预览转换', exact: true }).click()
+  await page
+    .getByRole('dialog', { name: '确认预测转换', exact: true })
+    .getByRole('button', { name: '确认转换', exact: true })
+    .click()
+  await expect(
+    page.locator('output').filter({ hasText: '拆分结果已完成' }),
+  ).toBeVisible()
+  expect(exchange.writes).toEqual([
+    { type: 'userOutcome', splitOutcome: { outcome: 12, amount: '2' } },
+  ])
+})
+
+test('历史查询失败独立重试，不影响实时行情与交易就绪', async ({ page }) => {
+  const exchange = await mockExchange(page)
+  let failing = true
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/info',
+    async (route) => {
+      if (route.request().postDataJSON().type !== 'historicalOrders')
+        return route.fallback()
+      return failing
+        ? route.fulfill({ status: 503, json: { error: 'history unavailable' } })
+        : route.fulfill({ json: [] })
+    },
+  )
+  await ready(page)
+  const records = page.getByRole('region', { name: '交易记录', exact: true })
+  await records.getByRole('tab', { name: '历史委托', exact: true }).click()
+  await expect(records.getByRole('alert')).toContainText('记录加载失败')
+  await expect(
+    page.getByRole('button', { name: '下单', exact: true }),
+  ).toBeEnabled()
+  await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
+  failing = false
+  await records.getByRole('button', { name: '重试', exact: true }).click()
+  await expect(records.getByRole('alert')).toHaveCount(0)
+  await expect(records.getByText('暂无记录', { exact: true })).toBeVisible()
+  expect(exchange.writes).toHaveLength(0)
+})
+
+test('预测转换回报丢失保留待确认状态，禁止自动重发', async ({ page }) => {
+  await mockExchange(page)
+  let sent = 0
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/exchange',
+    async (route) => {
+      if (route.request().postDataJSON().action.type !== 'userOutcome')
+        return route.fallback()
+      sent++
+      return route.abort('failed')
+    },
+  )
+  await ready(page)
+  await chooseCashMarket(page, true)
+  await page.getByRole('button', { name: '转换结果', exact: true }).click()
+  await page.getByRole('textbox', { name: '转换数量', exact: true }).fill('2')
+  await page.getByRole('button', { name: '预览转换', exact: true }).click()
+  await page.getByRole('button', { name: '确认转换', exact: true }).click()
+  await expect(
+    page.locator('output').filter({ hasText: '结果待确认' }),
+  ).toBeVisible()
+  const dialog = page.getByRole('dialog', { name: '转换结果', exact: true })
+  await expect(
+    dialog.getByRole('button', { name: '预览转换', exact: true }),
+  ).toBeDisabled()
+  expect(sent).toBe(1)
+  expect(
+    await page.evaluate(() =>
+      Object.entries(localStorage)
+        .filter(([key]) => key.startsWith('hl-testnet-pending-order:'))
+        .map(([, value]) => JSON.parse(value).native),
+    ),
+  ).toEqual(['outcome'])
+})
+
+test('资金费多页查询不被账户轮询打断，边界区块不重复', async ({ page }) => {
+  test.setTimeout(40000)
+  await mockExchange(page)
+  const base = Date.now() - 2000
+  let queries = 0
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/info',
+    async (route) => {
+      const request = route.request().postDataJSON()
+      if (request.type !== 'userFunding') return route.fallback()
+      queries++
+      const first = request.startTime <= base ? 0 : request.startTime - base
+      if (first < 998) await new Promise((resolve) => setTimeout(resolve, 8000))
+      return route.fulfill({
+        json: Array.from({ length: first < 998 ? 500 : 2 }, (_, i) => ({
+          time: base + first + i,
+          hash: `0x${first + i}`,
+          delta: {
+            coin: 'BTC',
+            szi: '1',
+            usdc: '-0.01',
+            fundingRate: '0.001',
+            type: 'funding',
+            nSamples: 1,
+          },
+        })),
+      })
+    },
+  )
+  await ready(page)
+  const records = page.getByRole('region', { name: '交易记录', exact: true })
+  await records.getByRole('tab', { name: '资金费历史', exact: true }).click()
+  await expect(
+    records.getByRole('table', { name: '资金费历史' }).locator('tbody tr'),
+  ).toHaveCount(25, { timeout: 23000 })
+  await expect(records).toContainText('1–25 / 1000')
+  expect(queries).toBeGreaterThanOrEqual(3)
+  expect(queries).toBeLessThanOrEqual(4)
 })

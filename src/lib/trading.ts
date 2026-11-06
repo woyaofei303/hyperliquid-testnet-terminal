@@ -1,6 +1,12 @@
-import { addressOf } from './hyperliquid.ts'
+import { addressOf, assertSession, info } from './hyperliquid.ts'
 import type { Ticket } from './order-ticket.ts'
+import type { Market } from './orders.ts'
 import { orderResult, type prepareOrder } from './orders.ts'
+import {
+  type ConversionKind,
+  conversionKinds,
+  prepareConversion,
+} from './outcome-conversion.ts'
 import { submitOrderTicket } from './submit-ticket.ts'
 export type PreparedOrder = ReturnType<typeof prepareOrder>
 export type Action = {
@@ -10,6 +16,12 @@ export type Action = {
 } & (
   | { kind: 'order'; order: PreparedOrder; orderKind: 'limit' | 'market' }
   | { kind: 'ticket'; ticket: Ticket }
+  | {
+      kind: 'outcome'
+      market: Market
+      conversion: ConversionKind
+      amount: string
+    }
   | { kind: 'twapCancel'; asset: number; twapId: number }
   | { kind: 'cancel'; asset: number; oid: number }
   | { kind: 'isolatedMargin'; asset: number; isBuy: boolean; ntli: number }
@@ -32,7 +44,7 @@ export interface PendingOrder {
   coin: string
   expiresAt: number
   cloids?: `0x${string}`[]
-  native?: 'twap' | 'trailing' | 'margin'
+  native?: 'twap' | 'trailing' | 'margin' | 'outcome'
 }
 export const pendingKey = 'hl-testnet-pending-order'
 
@@ -71,7 +83,8 @@ export function loadPending(account: string): PendingOrder | null {
         ...('native' in value &&
         (value.native === 'twap' ||
           value.native === 'trailing' ||
-          value.native === 'margin')
+          value.native === 'margin' ||
+          value.native === 'outcome')
           ? { native: value.native }
           : {}),
       }
@@ -104,6 +117,67 @@ export async function submitTrade(
   if (!wallet.exchange || Date.now() >= wallet.expiresAt)
     throw new Error('请先完成钱包连接')
   const base = { account: next.account, coin: next.coin }
+  if (next.kind === 'outcome') {
+    if (hasPending || loadPending(wallet.address))
+      throw new Error('请先查询上一笔未确认请求')
+    if (Date.now() - next.at > 15000)
+      throw new Error('转换预览已过期，请重新确认')
+    const [spot, meta] = await Promise.all([
+      info.spotClearinghouseState({ user: wallet.address }),
+      info.outcomeMeta(),
+    ])
+    const current = meta.outcomes.find(
+      (item) => item.outcome === next.market.outcome,
+    )
+    if (!current || current.quoteToken !== next.market.quote)
+      throw new Error('预测市场已变化，请刷新市场后重试')
+    const question = meta.questions.find(
+      (item) => item.question === next.market.question,
+    )
+    const market = {
+      ...next.market,
+      question: question?.question,
+      questionOutcomes: question
+        ? [...question.namedOutcomes, question.fallbackOutcome]
+        : undefined,
+    }
+    if (
+      ['mergeQuestion', 'negateOutcome'].includes(next.conversion) &&
+      JSON.stringify(
+        [...(next.market.questionOutcomes ?? [])].sort((a, b) => a - b),
+      ) !==
+        JSON.stringify(
+          [...(market.questionOutcomes ?? [])].sort((a, b) => a - b),
+        )
+    )
+      throw new Error('预测问题已变化，请刷新市场后重新预览')
+    const params = prepareConversion(
+      next.conversion,
+      market,
+      next.amount,
+      spot.balances,
+    )
+    await assertSession(wallet)
+    const expiresAt = Math.min(Date.now() + 60000, wallet.expiresAt)
+    onPending({
+      ...base,
+      cloid: `0x${crypto.randomUUID().replaceAll('-', '')}`,
+      expiresAt,
+      native: 'outcome',
+    })
+    const response = await wallet.exchange.userOutcome(params, {
+      expiresAfter: expiresAt,
+    })
+    if (response?.status !== 'ok' || response.response?.type !== 'default')
+      throw new Error('转换回报未确认，请核对余额后再操作')
+    onPending(null)
+    return {
+      ...base,
+      action: next.conversion,
+      state: 'accepted',
+      message: `${conversionKinds.find(([key]) => key === next.conversion)?.[1]}已完成：${next.amount} 份`,
+    }
+  }
   if (next.kind === 'ticket') {
     if (hasPending || loadPending(wallet.address))
       throw new Error('请先查询上一笔未确认请求')

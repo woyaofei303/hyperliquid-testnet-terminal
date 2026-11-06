@@ -6,6 +6,12 @@ from pathlib import Path
 
 
 class StaticHandler(SimpleHTTPRequestHandler):
+    def translate_path(self, path):
+        resolved = super().translate_path(path)
+        # 对齐生产 try_files 的无扩展名页面路由。
+        html = Path(f"{resolved}.html")
+        return str(html) if not Path(resolved).is_file() and html.is_file() else resolved
+
     def send_error(self, code, message=None, explain=None):
         if code != 404:
             return super().send_error(code, message, explain)

@@ -32,6 +32,8 @@ export type Interval = ChartInterval
 export function useMarkets() {
   const [catalog, setCatalog] = useState<MarketContext[]>([])
   const [catalogError, setCatalogError] = useState('')
+  const [quotesError, setQuotesError] = useState('')
+  const [catalogLoading, setCatalogLoading] = useState(true)
   useEffect(() => {
     let active = true
     const refresh = () =>
@@ -45,11 +47,41 @@ export function useMarkets() {
         .catch((e) => {
           if (active) setCatalogError(errorText(e))
         })
+        .finally(() => {
+          if (active) setCatalogLoading(false)
+        })
     void refresh()
     const timer = setInterval(refresh, 300000)
+    const refreshQuotes = () => {
+      if (document.hidden) return
+      void info
+        .spotMetaAndAssetCtxs()
+        .then(([, contexts]) => {
+          if (!active) return
+          const quotes = new Map(
+            contexts.map((context) => [context.coin, context]),
+          )
+          setCatalog((previous) =>
+            previous.map((market) => {
+              const context = quotes.get(market.name)
+              return context ? { ...market, context } : market
+            }),
+          )
+          setQuotesError('')
+        })
+        .catch((error) => {
+          if (active) setQuotesError(errorText(error))
+        })
+    }
+    const quoteTimer = setInterval(refreshQuotes, 30000)
+    document.addEventListener('visibilitychange', refreshQuotes)
+    window.addEventListener('online', refreshQuotes)
     return () => {
       active = false
       clearInterval(timer)
+      clearInterval(quoteTimer)
+      document.removeEventListener('visibilitychange', refreshQuotes)
+      window.removeEventListener('online', refreshQuotes)
     }
   }, [])
   const [markets, setMarkets] = useState<MarketContext[]>([])
@@ -77,7 +109,8 @@ export function useMarkets() {
   return {
     markets: useMemo(() => [...markets, ...catalog], [markets, catalog]),
     error,
-    catalogError,
+    catalogError: catalogError || quotesError,
+    catalogLoading,
   }
 }
 

@@ -114,7 +114,7 @@ export async function loadMarketCatalog() {
   return [
     ...cashMarkets(spot),
     ...builderMarkets(perps, spot[0].tokens),
-    ...predictionMarkets(outcomes, templates),
+    ...predictionMarkets(outcomes, templates, spot[1]),
   ]
 }
 

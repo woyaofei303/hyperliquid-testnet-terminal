@@ -75,7 +75,12 @@ function expand(text: string, values: Record<string, string>) {
 export function predictionMarkets(
   meta: Outcomes,
   templates: Templates,
+  contexts: Pick<
+    SpotMeta[1][number],
+    'coin' | 'markPx' | 'prevDayPx' | 'dayNtlVlm'
+  >[] = [],
 ): MarketContext[] {
+  const byCoin = new Map(contexts.map((c) => [c.coin, c]))
   const render = (item: { name: string; description: string }) => {
     const values = Object.fromEntries(
       item.description.split('|').flatMap((part) => {
@@ -84,9 +89,21 @@ export function predictionMarkets(
       }),
     )
     const template = templates.find((t) => item.name === `template:${t.id}`)
+    const displayValues = { ...values }
+    for (const [key, type] of template?.keywords ?? []) {
+      if (type !== 'dateTime') continue
+      const match = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})$/.exec(
+        values[key] ?? '',
+      )
+      if (match)
+        displayValues[key] =
+          `${match[1]}-${match[2]}-${match[3]} ${match[4]}:${match[5]} UTC`
+    }
     return {
       values,
-      title: template ? expand(template.name, values) : item.name,
+      priceTemplate:
+        template?.keywords?.some(([, type]) => type === 'hlPerp') ?? false,
+      title: template ? expand(template.name, displayValues) : item.name,
       description: template
         ? expand(template.description, values)
         : item.description,
@@ -97,10 +114,27 @@ export function predictionMarkets(
     const parent = meta.questions?.find(
       (q) =>
         q.fallbackOutcome === item.outcome ||
-        q.namedOutcomes.includes(item.outcome),
+        q.namedOutcomes.includes(item.outcome) ||
+        q.settledNamedOutcomes.includes(item.outcome),
     )
     const question = parent ? render(parent) : null
     const values = resolved.values
+    const rawCategory =
+      /metadata=category:([^|\s]+)/.exec(
+        question?.description ?? resolved.description,
+      )?.[1] ??
+      ((question?.priceTemplate ?? resolved.priceTemplate) ? 'price' : 'other')
+    const category =
+      rawCategory === 'price'
+        ? Object.entries(question?.values ?? values).some(
+            ([key, value]) =>
+              ['perp', 'coin', 'asset', 'shortName', 'instrument'].includes(
+                key,
+              ) && /^[a-z]+:/.test(value),
+          )
+          ? 'tradfi'
+          : 'crypto'
+        : rawCategory
     const title = question
       ? `${question.title} / ${resolved.title}`
       : resolved.title
@@ -118,13 +152,61 @@ export function predictionMarkets(
         quote: item.quoteToken,
         label: `${title} · ${sideName}`,
         outcome: item.outcome,
+        eventTitle: question?.title ?? resolved.title,
+        outcomeTitle: resolved.title,
+        category,
+        venue:
+          'venue' in item && typeof item.venue === 'string'
+            ? item.venue
+            : (item.deployer ?? ''),
+        question: parent?.question,
+        questionOutcomes: parent
+          ? [...parent.namedOutcomes, parent.fallbackOutcome]
+          : undefined,
+        fallback: parent?.fallbackOutcome === item.outcome,
+        settled: parent?.settledNamedOutcomes.includes(item.outcome) ?? false,
         paired: `#${10 * item.outcome + (1 - index)}`,
         description,
         balanceCoin: `+${encoding}`,
         szDecimals: 0,
         maxLeverage: 1,
-        context: emptyContext(),
+        context: byCoin.get(`#${encoding}`) ?? emptyContext(),
       }
     })
   })
+}
+
+export function predictionEvents(markets: MarketContext[]) {
+  const events = new Map<
+    string,
+    {
+      id: string
+      title: string
+      category: string
+      venue: string
+      markets: MarketContext[]
+    }
+  >()
+  for (const market of markets) {
+    if (market.kind !== 'outcome' || market.fallback || market.settled) continue
+    if (market.question != null && (market.asset - 100000000) % 10 !== 0)
+      continue
+    const id =
+      market.question == null
+        ? `outcome:${market.outcome}`
+        : `question:${market.question}`
+    let event = events.get(id)
+    if (!event) {
+      event = {
+        id,
+        title: market.eventTitle ?? marketLabel(market),
+        category: market.category ?? 'other',
+        venue: market.venue ?? '',
+        markets: [],
+      }
+      events.set(id, event)
+    }
+    event.markets.push(market)
+  }
+  return [...events.values()]
 }

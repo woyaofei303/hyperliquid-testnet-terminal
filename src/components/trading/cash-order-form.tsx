@@ -1,4 +1,5 @@
-import { Button, Input, Tab, Tabs } from '@fameex/ui'
+import { Button, FlatSelect, Input, Tab, Tabs } from '@fameex/ui'
+import { useState } from 'react'
 import { useCashOrderForm } from '@/hooks/use-cash-order-form'
 import type { TerminalModel } from '@/hooks/use-terminal'
 import { t, useLocale } from '@/i18n'
@@ -10,6 +11,7 @@ import { HelpLabel } from './help-label'
 import { OrderAmount } from './order-amount'
 import { OrderOptions } from './order-options'
 import { OrderTypeSelector } from './order-type-selector'
+import { OutcomeConversion } from './outcome-conversion'
 import { SlippageSetting } from './slippage-setting'
 
 export function CashOrderForm({
@@ -20,6 +22,7 @@ export function CashOrderForm({
   market: MarketContext
 }) {
   useLocale()
+  const [converting, setConverting] = useState(false)
 
   const form = useCashOrderForm(model, market)
   const { fields: f, change } = form
@@ -50,6 +53,26 @@ export function CashOrderForm({
       {outcome && (
         <>
           <p className="text-sm leading-5">{market.label}</p>
+          {market.question != null && (
+            <FlatSelect
+              aria-label={t('预测结果')}
+              value={`#${(market.outcome ?? 0) * 10}`}
+              onChange={(name) =>
+                model.selectMarket(
+                  `#${Number(name.slice(1)) + ((market.asset - 100000000) % 10)}`,
+                )
+              }
+              items={model.markets
+                .filter(
+                  (m) =>
+                    m.question === market.question &&
+                    m.kind === 'outcome' &&
+                    (m.asset - 100000000) % 10 === 0 &&
+                    !m.settled,
+                )
+                .map((m) => ({ key: m.name, label: m.outcomeTitle ?? m.name }))}
+            />
+          )}
           <div className="flex gap-2">
             <Button size="sm" className="flex-1" isDisabled>
               {market.base}
@@ -78,6 +101,15 @@ export function CashOrderForm({
         value={f.kind}
         onChange={form.setKind}
       />
+      {outcome && (
+        <Button
+          size="sm"
+          variant="bordered"
+          onPress={() => setConverting(true)}
+        >
+          {t('转换结果')}
+        </Button>
+      )}
       <Tabs
         disableAnimation={false}
         aria-label={t('交易方向')}
@@ -215,6 +247,14 @@ export function CashOrderForm({
             onChange={(value) => change('slippage', value)}
           />
         )}
+        {outcome && f.side === 'buy' && (
+          <div className="flex justify-between gap-2">
+            <dt className="text-muted">{t('若所选结果结算为 1')}</dt>
+            <dd>
+              {form.size || '—'} {quote}
+            </dd>
+          </div>
+        )}
         <div className="flex justify-between gap-2">
           <dt className="text-muted">
             <HelpLabel label="预计手续费上限" />
@@ -224,6 +264,14 @@ export function CashOrderForm({
           </dd>
         </div>
       </dl>
+      {converting && (
+        <OutcomeConversion
+          key={model.address}
+          model={model}
+          market={market}
+          onClose={() => setConverting(false)}
+        />
+      )}
     </section>
   )
 }

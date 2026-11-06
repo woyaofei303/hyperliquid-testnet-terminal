@@ -6,10 +6,12 @@ import { useEffect, useState } from 'react'
 import type { TerminalModel } from '@/hooks/use-terminal'
 import { t, useLocale } from '@/i18n'
 import { display } from '@/lib/display'
-import { isCash, marketLabel, pricePrecision } from '@/lib/market-catalog'
+import { marketLabel, pricePrecision } from '@/lib/market-catalog'
 import { Money } from '@/lib/orders'
 import type { PositionActionKind } from '@/lib/position-actions'
 import { tradePreferences } from '@/lib/trade-preferences'
+import { AccountHistory } from './account-history'
+import { AssetBalances } from './asset-balances'
 import { HelpLabel } from './help-label'
 import { IsolatedMargin } from './isolated-margin'
 import { PositionClose } from './position-close'
@@ -26,15 +28,18 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
     busy,
     previewCancel,
   } = model
-  const cash = isCash(model.market)
   const labelFor = (coin: string) => {
-    const market = model.markets.find((m) => m.name === coin)
+    const name = coin.startsWith('+') ? `#${coin.slice(1)}` : coin
+    const market = model.markets.find((m) => m.name === name)
     return market ? marketLabel(market) : coin
   }
   const [tab, setTab] = useState('positions')
+  const [recordLimit, setRecordLimit] = useState(25)
   const [direction, setDirection] = useState('all')
   const [coinFilter, setCoinFilter] = useState('all')
-  const directional = tab !== 'journal' && !(tab === 'positions' && cash)
+  const historic = ['history', 'funding', 'fills'].includes(tab)
+  const directional = !['journal', 'balances', 'predictions'].includes(tab)
+  const [strategyTab, setStrategyTab] = useState('all')
   const matches = (coin: string, side?: string) =>
     (coinFilter === 'all' || coin === coinFilter) &&
     (!directional || direction === 'all' || side === direction)
@@ -44,7 +49,10 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
       matches(p.coin, new Money(p.szi).gt(0) ? 'B' : 'A'),
   )
   const balances = (account.snapshot?.spot.balances ?? []).filter(
-    (b) => (Number(b.total) !== 0 || Number(b.hold) !== 0) && matches(b.coin),
+    (b) =>
+      b.coin.startsWith('+') === (tab === 'predictions') &&
+      (Number(b.total) !== 0 || Number(b.hold) !== 0) &&
+      matches(b.coin),
   )
   const orders = (account.snapshot?.orders ?? []).filter((row) =>
     matches(row.coin, row.side),
@@ -52,17 +60,25 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
   const fills = (account.snapshot?.fills ?? []).filter((row) =>
     matches(row.coin, row.side),
   )
-  const twaps = (account.snapshot?.twaps ?? []).filter((row) =>
-    matches(row.state.coin, row.state.side),
+  const twaps = (account.snapshot?.twaps ?? []).filter(
+    (row) =>
+      matches(row.state.coin, row.state.side) &&
+      (strategyTab === 'all' ||
+        (['activated', 'waitingForTrigger'].includes(row.status.status)
+          ? 'active'
+          : 'history') === strategyTab),
   )
-  const chases = model.chase.rows.filter((row) =>
-    matches(row.ticket.market.name, row.ticket.order.b ? 'B' : 'A'),
+  const chases = model.chase.rows.filter(
+    (row) =>
+      matches(row.ticket.market.name, row.ticket.order.b ? 'B' : 'A') &&
+      (strategyTab === 'all' ||
+        (row.active ? 'active' : 'history') === strategyTab),
   )
   const entries = journal.filter((row) => matches(row.coin))
   const coins = [
     ...new Set([
       ...(coinFilter !== 'all' ? [coinFilter] : []),
-      ...(tab === 'positions' && cash
+      ...(tab === 'balances' || tab === 'predictions'
         ? (account.snapshot?.spot.balances ?? []).map((b) => b.coin)
         : []),
       ...(account.snapshot?.state.assetPositions ?? []).map(
@@ -77,7 +93,13 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
   ].sort()
   const count =
     {
-      positions: cash ? balances.length : positions.length,
+      positions: positions.length,
+      balances:
+        balances.length +
+        (account.snapshot && (coinFilter === 'all' || coinFilter === 'USDC')
+          ? 1
+          : 0),
+      predictions: balances.length,
       orders: orders.length,
       fills: fills.length,
       twaps: twaps.length,
@@ -118,83 +140,73 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
           selectedKey={tab}
           onSelectionChange={(key) => {
             setTab(String(key))
+            setStrategyTab('all')
+            setRecordLimit(25)
             setDirection('all')
             setCoinFilter('all')
           }}
-          classNames={{ tabList: 'gap-5', tab: 'h-9' }}
+          classNames={{
+            base: 'min-w-0 max-w-full overflow-x-auto',
+            tabList: 'gap-5',
+            tab: 'h-9',
+          }}
         >
-          <Tab key="positions" title={cash ? t('余额') : t('仓位')} />
+          <Tab key="balances" title={t('余额')} />
+          <Tab key="positions" title={t('仓位')} />
+          <Tab key="predictions" title={t('预测')} />
           <Tab key="orders" title={t('当前委托')} />
-          <Tab key="fills" title={t('成交记录')} />
           <Tab key="twaps" title="TWAP" />
           <Tab key="chase" title={t('追价策略')} />
+          <Tab key="fills" title={t('历史成交')} />
+          <Tab key="funding" title={t('资金费历史')} />
+          <Tab key="history" title={t('历史委托')} />
           <Tab key="journal" title={t('操作记录')} />
         </Tabs>
-        <div className="flex min-h-9 items-center gap-2">
-          {directional && (
+        {!historic && (
+          <div className="flex min-h-9 items-center gap-2">
+            {directional && (
+              <FlatSelect
+                aria-label={t('方向筛选')}
+                value={direction}
+                onChange={setDirection}
+                className="!w-24"
+                placement="bottom-end"
+                items={[
+                  { key: 'all', label: t('方向') },
+                  {
+                    key: 'B',
+                    label: tab === 'positions' ? t('多头') : t('买入'),
+                  },
+                  {
+                    key: 'A',
+                    label: tab === 'positions' ? t('空头') : t('卖出'),
+                  },
+                ]}
+              />
+            )}
             <FlatSelect
-              aria-label={t('方向筛选')}
-              value={direction}
-              onChange={setDirection}
-              className="!w-24"
+              aria-label={t('币种筛选')}
+              value={coinFilter}
+              onChange={setCoinFilter}
+              className="!w-32"
               placement="bottom-end"
               items={[
-                { key: 'all', label: t('方向') },
-                {
-                  key: 'B',
-                  label: tab === 'positions' ? t('多头') : t('买入'),
-                },
-                {
-                  key: 'A',
-                  label: tab === 'positions' ? t('空头') : t('卖出'),
-                },
+                { key: 'all', label: t('币种') },
+                ...coins.map((coin) => ({ key: coin, label: labelFor(coin) })),
               ]}
             />
-          )}
-          <FlatSelect
-            aria-label={t('币种筛选')}
-            value={coinFilter}
-            onChange={setCoinFilter}
-            className="!w-32"
-            placement="bottom-end"
-            items={[
-              { key: 'all', label: t('币种') },
-              ...coins.map((coin) => ({ key: coin, label: labelFor(coin) })),
-            ]}
-          />
-        </div>
+          </div>
+        )}
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
-        {tab === 'positions' && cash && (
-          <table className="w-full text-left text-xs">
-            <thead className="text-muted">
-              <tr>
-                {[t('资产'), t('持有数量'), t('冻结数量')].map((text) => (
-                  <th className="px-4 py-3 font-normal" key={text}>
-                    {t(text)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {balances.map((b) => (
-                <tr
-                  key={'token' in b ? b.token : b.coin}
-                  className="border-t border-edge"
-                >
-                  <td className="px-4 py-3">
-                    {b.coin.startsWith('+')
-                      ? labelFor(`#${b.coin.slice(1)}`)
-                      : b.coin}
-                  </td>
-                  <td className="px-4 py-3 tabular-nums">{b.total}</td>
-                  <td className="px-4 py-3 tabular-nums">{b.hold}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {(tab === 'balances' || tab === 'predictions') && (
+          <AssetBalances
+            model={model}
+            prediction={tab === 'predictions'}
+            coinFilter={coinFilter}
+          />
         )}
-        {tab === 'positions' && !cash && (
+        {tab === 'positions' && (
           <table
             aria-label={t('仓位')}
             className="w-full min-w-[1040px] whitespace-nowrap text-right text-xs tabular-nums"
@@ -365,11 +377,16 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
             <thead className="text-muted">
               <tr>
                 {[
-                  t('合约'),
+                  t('时间'),
+                  t('市场'),
                   t('方向'),
                   t('委托价格'),
                   t('剩余 / 原始数量'),
                   t('类型'),
+                  t('订单价值'),
+                  t('只减仓'),
+                  t('触发条件'),
+                  t('止盈 / 止损'),
                   t('订单 ID'),
                   t('操作'),
                 ].map((label) => (
@@ -380,8 +397,11 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
               </tr>
             </thead>
             <tbody>
-              {orders.map((order) => (
+              {orders.slice(0, recordLimit).map((order) => (
                 <tr key={order.oid} className="border-t border-edge">
+                  <td className="px-4 text-muted">
+                    {new Date(order.timestamp).toLocaleString()}
+                  </td>
                   <td className="px-4 py-4">{labelFor(order.coin)}</td>
                   <td
                     className={`px-4 ${order.side === 'B' ? 'text-mint' : 'text-loss'}`}
@@ -389,7 +409,9 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                     {order.side === 'B' ? t('买入') : t('卖出')}
                   </td>
                   <td className="px-4 font-mono">
-                    {order.limitPx}
+                    {order.orderType.includes('Market')
+                      ? t('市价')
+                      : order.limitPx}
                     {order.isTrigger && (
                       <span className="block text-muted">
                         {t('触发')} {order.triggerPx}
@@ -404,6 +426,21 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                     {order.reduceOnly && (
                       <span className="block text-muted">{t('只减仓')}</span>
                     )}
+                  </td>
+                  <td className="px-4 font-mono">
+                    {order.orderType.includes('Market')
+                      ? '—'
+                      : display(
+                          new Money(order.limitPx).times(order.sz).toFixed(),
+                          2,
+                        )}
+                  </td>
+                  <td className="px-4">{t(order.reduceOnly ? '是' : '否')}</td>
+                  <td className="px-4">{order.triggerCondition || 'N/A'}</td>
+                  <td className="px-4">
+                    {order.children
+                      ?.map((child) => `${child.orderType} ${child.triggerPx}`)
+                      .join(' / ') || '—'}
                   </td>
                   <td className="px-4 font-mono text-muted">{order.oid}</td>
                   <td className="px-4">
@@ -423,45 +460,30 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
             </tbody>
           </table>
         )}
-        {tab === 'fills' && (
-          <table className="w-full whitespace-nowrap text-left text-xs">
-            <thead className="text-muted">
-              <tr>
-                {[
-                  t('时间'),
-                  t('合约'),
-                  t('方向'),
-                  t('成交价格'),
-                  t('成交数量'),
-                  t('手续费'),
-                  t('订单 ID'),
-                ].map((label) => (
-                  <th key={t(label)} className="px-4 py-3 font-normal">
-                    <HelpLabel label={label} />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {fills.map((fill) => (
-                <tr key={fill.tid} className="border-t border-edge">
-                  <td className="px-4 py-4 text-muted">
-                    {new Date(fill.time).toLocaleTimeString('zh-CN')}
-                  </td>
-                  <td className="px-4">{labelFor(fill.coin)}</td>
-                  <td className="px-4">{fill.dir}</td>
-                  <td className="px-4 font-mono">{fill.px}</td>
-                  <td className="px-4 font-mono">{fill.sz}</td>
-                  <td className="px-4 font-mono">
-                    {fill.fee} {fill.feeToken}
-                  </td>
-                  <td className="px-4 font-mono text-muted">{fill.oid}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {(tab === 'history' || tab === 'funding' || tab === 'fills') && (
+          <AccountHistory key={`${address}:${tab}`} model={model} kind={tab} />
         )}
-        {tab === 'twaps' && (
+        {(tab === 'twaps' || tab === 'chase') && (
+          <Tabs
+            aria-label={t('策略记录类型')}
+            selectedKey={strategyTab}
+            onSelectionChange={(key) => setStrategyTab(String(key))}
+            classNames={{ base: 'px-4', tab: 'h-8' }}
+          >
+            <Tab key="all" title={t('全部')} />
+            <Tab key="active" title={t('当前')} />
+            <Tab key="history" title={t('历史')} />
+            {tab === 'twaps' && <Tab key="fills" title={t('填充历史')} />}
+          </Tabs>
+        )}
+        {tab === 'twaps' && strategyTab === 'fills' && (
+          <AccountHistory
+            key={`${address}:twapFills`}
+            model={model}
+            kind="twapFills"
+          />
+        )}
+        {tab === 'twaps' && strategyTab !== 'fills' && (
           <table className="w-full whitespace-nowrap text-left text-xs">
             <thead className="text-muted">
               <tr>
@@ -469,7 +491,11 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                   t('市场 / 方向'),
                   t('已执行 / 总量'),
                   t('均价'),
-                  t('时长 / 随机'),
+                  t('运行时间 / 总计'),
+                  t('触发条件'),
+                  t('最高 / 最低价格'),
+                  t('只减仓'),
+                  t('创建时间'),
                   t('状态'),
                   t('操作'),
                 ].map((label) => (
@@ -480,7 +506,7 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
               </tr>
             </thead>
             <tbody>
-              {twaps.map((item, index) => (
+              {twaps.slice(0, recordLimit).map((item, index) => (
                 <tr
                   key={`${item.twapId}-${item.time}-${index}`}
                   className="border-t border-edge"
@@ -502,8 +528,36 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                       : '—'}
                   </td>
                   <td className="px-4">
-                    {item.state.minutes} {t('分钟 /')}{' '}
-                    {item.state.randomize ? t('是') : t('否')}
+                    {display(
+                      Math.min(
+                        item.state.minutes,
+                        Math.max(
+                          0,
+                          ((['activated', 'waitingForTrigger'].includes(
+                            item.status.status,
+                          )
+                            ? Date.now()
+                            : item.time) -
+                            item.state.timestamp) /
+                            60000,
+                        ),
+                      ),
+                      1,
+                    )}{' '}
+                    / {item.state.minutes} {t('分钟')}
+                    {item.state.randomize && ` · ${t('随机')}`}
+                  </td>
+                  <td className="px-4">
+                    {item.state.trigger
+                      ? `${t(item.state.trigger.above ? '高于' : '低于')} ${item.state.trigger.px}`
+                      : '—'}
+                  </td>
+                  <td className="px-4">{item.state.stopPx ?? '—'}</td>
+                  <td className="px-4">
+                    {t(item.state.reduceOnly ? '是' : '否')}
+                  </td>
+                  <td className="px-4">
+                    {new Date(item.state.timestamp).toLocaleString()}
                   </td>
                   <td className="px-4">
                     {
@@ -552,7 +606,7 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
               )}
             </p>
             <ul className="divide-y divide-edge">
-              {chases.map((row) => (
+              {chases.slice(0, recordLimit).map((row) => (
                 <li
                   key={row.id}
                   className="flex flex-wrap items-center gap-4 py-3"
@@ -564,6 +618,32 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                   <span>
                     {t('报价')} {row.price} {t('· 剩余')} {row.remaining}
                   </span>
+                  <span>
+                    {t('已执行 / 总量')}{' '}
+                    {new Money(row.ticket.size).minus(row.remaining).toFixed()}{' '}
+                    / {row.ticket.size}
+                  </span>
+                  <span>
+                    {t('完成率')}{' '}
+                    {new Money(row.ticket.size).gt(0)
+                      ? display(
+                          new Money(row.ticket.size)
+                            .minus(row.remaining)
+                            .div(row.ticket.size)
+                            .times(100)
+                            .toFixed(),
+                          2,
+                        )
+                      : '0'}
+                    %
+                  </span>
+                  <span>
+                    {t('价格边界')} {row.ticket.order.p}
+                  </span>
+                  <span>
+                    {t('只减仓')} {t(row.ticket.order.r ? '是' : '否')}
+                  </span>
+                  <span>{new Date(row.createdAt).toLocaleString()}</span>
                   <span>{row.status}</span>
                   {row.active && (
                     <Button
@@ -608,24 +688,37 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
             ))}
           </ul>
         )}
-        {count === 0 && (
-          <div className="flex flex-col items-center gap-2 px-4 py-7 text-center text-xs text-muted">
-            <Image
-              src="/empty-dark.png"
-              width={72}
-              height={72}
-              alt=""
-              className="opacity-80"
-            />
-            <p>
-              {!address
-                ? t('连接钱包，查看账户交易数据')
-                : direction !== 'all' || coinFilter !== 'all'
-                  ? t('没有匹配的记录')
-                  : t('暂无记录')}
-            </p>
-          </div>
-        )}
+        {['orders', 'twaps', 'chase'].includes(tab) &&
+          !(tab === 'twaps' && strategyTab === 'fills') &&
+          count > recordLimit && (
+            <Button
+              size="sm"
+              variant="light"
+              onPress={() => setRecordLimit(count)}
+            >
+              {t('查看全部')} ({count})
+            </Button>
+          )}
+        {!historic &&
+          !(tab === 'twaps' && strategyTab === 'fills') &&
+          count === 0 && (
+            <div className="flex flex-col items-center gap-2 px-4 py-7 text-center text-xs text-muted">
+              <Image
+                src="/empty-dark.png"
+                width={72}
+                height={72}
+                alt=""
+                className="opacity-80"
+              />
+              <p>
+                {!address
+                  ? t('连接钱包，查看账户交易数据')
+                  : direction !== 'all' || coinFilter !== 'all'
+                    ? t('没有匹配的记录')
+                    : t('暂无记录')}
+              </p>
+            </div>
+          )}
       </div>
       {closingPosition && (
         <PositionClose
