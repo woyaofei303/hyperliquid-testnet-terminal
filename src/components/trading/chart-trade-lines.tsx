@@ -146,7 +146,7 @@ function AccountTradeLines({
         mainValue: Number(position.entryPx),
         direction:
           Number(position.szi) > 0 ? TpslDirection.Long : TpslDirection.Short,
-        profitPercent: `${new Money(position.unrealizedPnl).toFixed(2)} ${quoteName(market)}`,
+        profitPercent: `${new Money(position.unrealizedPnl).toFixed(2)} ${quoteName(market)} · ${t('收益率')} ${new Money(position.returnOnEquity).times(100).toFixed(2)}%`,
         positionAmount: `${new Money(position.szi).abs().toFixed()} ${baseName(market)}`,
         reducePrice: Number(position.liquidationPx) || null,
         takeProfitValue:

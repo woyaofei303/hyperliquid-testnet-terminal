@@ -136,6 +136,9 @@ export const en: Record<string, string> = {
   最大可下: 'Max size',
   '只减仓 Reduce-only': 'Reduce only',
   '止盈 / 止损': 'TP / SL',
+  止盈: 'Take profit',
+  止损: 'Stop loss',
+  收益率: 'ROE',
   '操作处理中…': 'Processing…',
   '等待账户数据 / 核对未确认订单':
     'Awaiting account data / reconcile pending orders',
