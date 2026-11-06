@@ -418,3 +418,143 @@ test('恢复失败后保留同步期间的实时更新供重试合并', async ()
   )
   feed.dispose()
 })
+
+test('恢复缓存的左边界不是历史终点，基础版仍能向前翻页', async () => {
+  const requests: number[] = []
+  const feed = source(async (start, end) => {
+    requests.push(start)
+    const rows: Candle[] = []
+    for (let t = start; t <= end; t += 300000) rows.push(candle(t))
+    return rows
+  })
+  try {
+    const recovered = await feed.recover(time - 300000, time + 300000)
+    const before = requests.length
+    let received: KLineData[] = []
+    await feed.kline.getBars({
+      type: 'forward',
+      timestamp: recovered.fromTime,
+      symbol: { ticker: 'BTC', pricePrecision: 1, volumePrecision: 5 },
+      period: chartPeriods['5m'],
+      callback(bars) {
+        received = bars
+      },
+    })
+    assert.ok(requests.length > before, '缓存之外应继续查询历史')
+    assert.equal(received.length, 300)
+    assert.ok(received.every((bar) => bar.timestamp < recovered.fromTime))
+  } finally {
+    feed.dispose()
+  }
+})
+
+test('基础版重载后忽略同币种同周期的旧 init 回包', async () => {
+  const pending = Promise.withResolvers<Candle[]>()
+  let calls = 0
+  const feed = source(() =>
+    ++calls === 1 ? pending.promise : Promise.resolve([candle(time, '102')]),
+  )
+  const received: number[] = []
+  const params = {
+    type: 'init' as const,
+    timestamp: null,
+    symbol: { ticker: 'BTC', pricePrecision: 1, volumePrecision: 5 },
+    period: chartPeriods['5m'],
+    callback(bars: KLineData[]) {
+      received.push(bars.at(-1)?.close ?? 0)
+    },
+  }
+  try {
+    const old = feed.kline.getBars(params)
+    await feed.recover(time - 300000, time + 300000)
+    await feed.refreshEngine('kline', () => {
+      void feed.kline.getBars(params)
+    })
+    pending.resolve([candle()])
+    await old
+    assert.deepEqual(received, [102], '旧 init 不能再次重置图表数据')
+  } finally {
+    feed.dispose()
+  }
+})
+
+test('恢复期间跨过新的蜡烛周期，不丢弃查询截止时间之后的推送', async () => {
+  const pending = Promise.withResolvers<Candle[]>()
+  const feed = source(() => pending.promise)
+  try {
+    const recovery = feed.recover(time - 300000, time + 1)
+    feed.update([candle(time + 300000, '102')])
+    pending.resolve([candle(time - 300000), candle(time)])
+    await recovery
+    const bars = Promise.withResolvers<Bar[]>()
+    feed.tradingView.getBars(
+      feed.symbolInfo,
+      '5' as ResolutionString,
+      {
+        from: (time - 300000) / 1000,
+        to: (time + 600000) / 1000,
+        countBack: 2,
+        firstDataRequest: true,
+      },
+      bars.resolve,
+      bars.reject,
+    )
+    assert.equal((await bars.promise).at(-1)?.time, time + 300000)
+  } finally {
+    feed.dispose()
+  }
+})
+
+test('隐藏引擎遗漏的数据超出实时缓冲时必须重载，连续数据可以直接追平', async () => {
+  const feed = source(async () => [candle(time)])
+  try {
+    await feed.kline.getBars({
+      type: 'init',
+      timestamp: null,
+      symbol: { ticker: 'BTC', pricePrecision: 1, volumePrecision: 5 },
+      period: chartPeriods['5m'],
+      callback() {},
+    })
+    feed.kline.subscribeBar?.({
+      symbol: { ticker: 'BTC', pricePrecision: 1, volumePrecision: 5 },
+      period: chartPeriods['5m'],
+      callback() {},
+    })
+    feed.setVisibleEngine('tradingview')
+    feed.update([candle(time + 300000)])
+    assert.equal(feed.isEngineDirty('kline'), false)
+    feed.update([candle(time + 900000)])
+    assert.equal(feed.isEngineDirty('kline'), true)
+  } finally {
+    feed.dispose()
+  }
+})
+
+test('挂起页面遗留的绘制队列不能覆盖恢复后的最新历史', async () => {
+  const feed = source(async () => [candle(time, '102')])
+  const received: number[] = []
+  try {
+    feed.update([candle(time, '100')])
+    await feed.recover(time - 300000, time + 300000)
+    await feed.refreshEngine('kline', () => {
+      void feed.kline.getBars({
+        type: 'init',
+        timestamp: null,
+        symbol: { ticker: 'BTC', pricePrecision: 1, volumePrecision: 5 },
+        period: chartPeriods['5m'],
+        callback() {
+          feed.kline.subscribeBar?.({
+            symbol: { ticker: 'BTC', pricePrecision: 1, volumePrecision: 5 },
+            period: chartPeriods['5m'],
+            callback: (bar) => received.push(bar.close),
+          })
+        },
+      })
+    })
+    await delay(10)
+    assert.ok(received.length > 0)
+    assert.ok(received.every((close) => close === 102))
+  } finally {
+    feed.dispose()
+  }
+})

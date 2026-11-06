@@ -101,6 +101,8 @@ export function createChartFeed(initial: ChartFeedContext) {
   let recoveryFlight: Promise<ChartRecoveryResult> | null = null
   let recoveryUpdates = new Map<number, Bar>()
   let recoverySnapshot: (ChartRecoveryResult & { bars: Bar[] }) | null = null
+  let klineRequest = 0
+  let tradingViewRequest = 0
   const dirtyEngines = new Set<ChartEngine>()
   const reloadWaiters = new Map<
     ChartEngine,
@@ -145,7 +147,7 @@ export function createChartFeed(initial: ChartFeedContext) {
       releaseRecovery()
   }
   const publish = () => {
-    if (!active) return
+    if (!active || recoveryBlocked) return
     if (queuedCandles) {
       updates = chartBars(queuedCandles, coin, interval)
       queuedCandles = null
@@ -164,12 +166,9 @@ export function createChartFeed(initial: ChartFeedContext) {
         )
       }
     }
-    if (recoveryBlocked) {
-      bufferRecoveryBars(updates)
-      return
-    }
     for (const listener of listeners.values()) {
       if (visibleEngine && listener.engine !== visibleEngine) continue
+      if (dirtyEngines.has(listener.engine)) continue
       performanceMetrics.measure(listener.engine, () => {
         for (const bar of updates) {
           if (bar.time < listener.last) continue
@@ -193,13 +192,18 @@ export function createChartFeed(initial: ChartFeedContext) {
     onError(error instanceof Error ? error.message : String(error))
 
   const pendingHistory = new Map<string, Promise<Candle[]>>()
-  const fromRecoveryCache = (end: number, count: number, from?: number) => {
+  const fromRecoveryCache = (
+    end: number,
+    count: number,
+    initial: boolean,
+    from?: number,
+  ) => {
     const snapshot = recoverySnapshot
     const target = Math.min(Math.max(count, historyPageSize), 5000)
     const requestedFrom =
-      from === undefined
+      from === undefined && initial
         ? (snapshot?.fromTime ?? 0)
-        : Math.min(from, candleHistoryStart(end, target, interval))
+        : Math.min(from ?? end, candleHistoryStart(end, target, interval))
     if (
       !snapshot ||
       end < snapshot.fromTime ||
@@ -228,7 +232,7 @@ export function createChartFeed(initial: ChartFeedContext) {
     const selectedInterval = interval
     const readHistory = history
     if (!recovery) {
-      const cached = fromRecoveryCache(end, count, from)
+      const cached = fromRecoveryCache(end, count, initial, from)
       if (cached) {
         lastHistoryTime = Math.max(lastHistoryTime, cached.at(-1)?.time ?? 0)
         if (initial) onLoaded(cached.length)
@@ -265,8 +269,8 @@ export function createChartFeed(initial: ChartFeedContext) {
       }
       if (!active || generation !== epoch) return null
       if (!recovery && loadedHistoryEpoch !== historyEpoch) {
-        const cached = fromRecoveryCache(end, count, from)
-        if (cached) return cached
+        const cached = fromRecoveryCache(end, count, initial, from)
+        return cached
       }
       for (const bar of chartBars(candles, selectedCoin, selectedInterval)) {
         if (bar.time >= start && bar.time < cursor) combined.set(bar.time, bar)
@@ -358,6 +362,7 @@ export function createChartFeed(initial: ChartFeedContext) {
         return
       }
       const generation = epoch
+      const request = tradingViewRequest
       void load(
         params.to * 1000,
         params.countBack,
@@ -368,7 +373,11 @@ export function createChartFeed(initial: ChartFeedContext) {
           setTimeout(() => {
             if (!active) return
             // 旧请求也必须结束回调，否则 TradingView 快速切币会一直等待。
-            if (!bars || generation !== epoch) {
+            if (
+              !bars ||
+              generation !== epoch ||
+              request !== tradingViewRequest
+            ) {
               error('图表市场或周期已变更')
               return
             }
@@ -383,8 +392,10 @@ export function createChartFeed(initial: ChartFeedContext) {
         .catch((e) =>
           setTimeout(() => {
             if (!active) return
-            if (generation === epoch) fail(e)
-            notifyLoaded('tradingview', e)
+            if (generation === epoch && request === tradingViewRequest) {
+              fail(e)
+              notifyLoaded('tradingview', e)
+            }
             error(String(e))
           }, 0),
         )
@@ -404,20 +415,22 @@ export function createChartFeed(initial: ChartFeedContext) {
         return
       }
       const generation = epoch
+      // resetData 会释放引擎的加载锁；旧回调不能再清空新数据或结束新 init。
+      const request = type === 'init' ? ++klineRequest : klineRequest
       try {
         const end = timestamp ?? Date.now()
         const bars = await load(end, historyPageSize, type === 'init')
-        if (active && generation === epoch && bars)
+        if (!active || generation !== epoch || request !== klineRequest) return
+        if (bars)
           callback(bars.map(klineBar), {
             forward:
               bars.length > 0 &&
               (bars[0]?.time ?? 0) > Date.now() - 4999 * step,
             backward: false,
           })
-        if (active && generation === epoch && type === 'init')
-          notifyLoaded('kline')
+        if (type === 'init') notifyLoaded('kline')
       } catch (e) {
-        if (active && generation === epoch) {
+        if (active && generation === epoch && request === klineRequest) {
           fail(e)
           callback([], false)
           notifyLoaded('kline', e)
@@ -489,8 +502,12 @@ export function createChartFeed(initial: ChartFeedContext) {
       if (recoveryFlight) return recoveryFlight
       const wasBlocked = recoveryBlocked
       recoveryBlocked = true
+      // 挂起前尚未绘制的旧快照不能在恢复后覆盖 REST 校准结果。
+      queuedCandles = null
       recoveryReady = false
       historyEpoch++
+      klineRequest++
+      tradingViewRequest++
       if (!wasBlocked) recoveryUpdates = new Map()
       dirtyEngines.add('kline')
       dirtyEngines.add('tradingview')
@@ -520,12 +537,12 @@ export function createChartFeed(initial: ChartFeedContext) {
             .map((bar) => [bar.time, bar]),
         )
         for (const [time, bar] of recoveryUpdates) {
-          if (time >= queryFrom && time < toTime) rows.set(time, { ...bar })
+          if (time >= queryFrom) rows.set(time, { ...bar })
         }
         const bars = [...rows.values()].sort((a, b) => a.time - b.time)
         const result = {
           fromTime: queryFrom,
-          toTime,
+          toTime: Math.max(toTime, (bars.at(-1)?.time ?? 0) + step),
           count: bars.length,
           complete: requestedFrom >= oldest,
           bars,
@@ -549,6 +566,8 @@ export function createChartFeed(initial: ChartFeedContext) {
     },
     refreshEngine(engine: ChartEngine, reset: () => void) {
       visibleEngine = engine
+      if (engine === 'kline') klineRequest++
+      else tradingViewRequest++
       return new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => {
           reloadWaiters.delete(engine)
@@ -570,6 +589,22 @@ export function createChartFeed(initial: ChartFeedContext) {
       })
     },
     isEngineDirty(engine: ChartEngine) {
+      if (dirtyEngines.has(engine)) return true
+      const first = queuedCandles
+        ? chartBars(queuedCandles, coin, interval)[0]?.time
+        : updates[0]?.time
+      for (const listener of listeners.values()) {
+        if (
+          listener.engine === engine &&
+          listener.last > 0 &&
+          first !== undefined &&
+          first > listener.last + step
+        ) {
+          dirtyEngines.add(engine)
+          // 隐藏时间超过实时缓冲范围，旧校准缓存也不足以填补中间的缺口。
+          recoverySnapshot = null
+        }
+      }
       return dirtyEngines.has(engine)
     },
     update(candles: Candle[]) {
@@ -591,6 +626,10 @@ export function createChartFeed(initial: ChartFeedContext) {
             .sort((a, b) => a.time - b.time)
             .slice(-5000)
           recoverySnapshot.count = recoverySnapshot.bars.length
+          recoverySnapshot.toTime = Math.max(
+            recoverySnapshot.toTime,
+            (recoverySnapshot.bars.at(-1)?.time ?? 0) + step,
+          )
         }
         return
       }

@@ -2,7 +2,15 @@
 
 import { BaseKlineChart } from '@fameex/kline'
 import type { Chart as KlineChart } from 'klinecharts'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useChartControls } from '@/hooks/use-chart-controls'
 import { useChartFeed } from '@/hooks/use-chart-feed'
 import { useTradingView } from '@/hooks/use-tradingview'
@@ -104,6 +112,8 @@ export const Chart = memo(function Chart(props: Props) {
   const recoveryFlightRef = useRef<Promise<void> | null>(null)
   const recoveryFlightTokenRef = useRef(0)
   const pendingEngineRef = useRef<ChartEngine | null>(null)
+  const needsHistoryRef = useRef(false)
+  const recoveryCompleteRef = useRef(true)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retryAttemptRef = useRef(0)
   const lastReconnectVersionRef = useRef(props.candleReconnectVersion)
@@ -147,7 +157,7 @@ export const Chart = memo(function Chart(props: Props) {
         ? captureKlineView(kline)
         : (() => {
             const range = widget?.activeChart().getVisibleRange()
-            if (!range) return null
+            if (!range || range.from <= 0 || range.to <= range.from) return null
             return {
               fromTime: range.from * 1000,
               toTime: range.to * 1000,
@@ -163,14 +173,26 @@ export const Chart = memo(function Chart(props: Props) {
       const task = (async () => {
         const flightToken = ++recoveryFlightTokenRef.current
         const runSelectionKey = selectionKeyRef.current
+        const isCurrent = () =>
+          selectionKeyRef.current === runSelectionKey &&
+          recoveryFlightTokenRef.current === flightToken
         try {
-          const result = await source.recover(view?.fromTime)
-          if (selectionKeyRef.current !== runSelectionKey) return
-          await source.refreshEngine(target, () => {
-            if (target === 'kline') kline?.resetData()
-            else widget?.activeChart().resetData()
-          })
+          // 重连才校准共享历史；切换引擎只加载它遗漏的数据，避免两边反复互相标脏。
+          if (needsHistoryRef.current) {
+            const result = await source.recover(view?.fromTime)
+            if (!isCurrent()) return
+            needsHistoryRef.current = false
+            recoveryCompleteRef.current = result.complete
+          }
+          if (source.isEngineDirty(target)) {
+            await source.refreshEngine(target, () => {
+              if (target === 'kline') kline?.resetData()
+              else widget?.activeChart().resetData()
+            })
+          }
+          if (!isCurrent()) return
           await nextFrame()
+          if (!isCurrent()) return
           if (kline && view) {
             if (view.barSpace) kline.setBarSpace(view.barSpace)
             if (view.offsetRight !== undefined)
@@ -189,21 +211,24 @@ export const Chart = memo(function Chart(props: Props) {
               })
             }
           }
-          pendingEngineRef.current = null
-          setPreservedEngine(null)
+          if (!isCurrent()) return
+          if (pendingEngineRef.current === target && !needsHistoryRef.current) {
+            pendingEngineRef.current = null
+            setPreservedEngine(null)
+          }
           retryAttemptRef.current = 0
           if (recoveryFlightTokenRef.current === flightToken)
             recoveryFlightRef.current = null
-          setRecoveryStatus(result.complete ? 'idle' : 'incomplete')
+          setRecoveryStatus(recoveryCompleteRef.current ? 'idle' : 'incomplete')
         } catch (e) {
-          if (selectionKeyRef.current !== runSelectionKey) return
+          if (!isCurrent()) return
           if (recoveryFlightTokenRef.current === flightToken)
             recoveryFlightRef.current = null
           const message = e instanceof Error ? e.message : String(e)
           setRecoveryError(message)
           setRecoveryStatus('error')
           source.setVisibleEngine(engineRef.current)
-          pendingEngineRef.current = target
+          pendingEngineRef.current ??= target
           const delay = Math.min(1000 * 2 ** retryAttemptRef.current++, 30000)
           if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
           retryTimerRef.current = setTimeout(() => {
@@ -217,8 +242,16 @@ export const Chart = memo(function Chart(props: Props) {
               )
           }, delay)
         } finally {
-          if (recoveryFlightTokenRef.current === flightToken)
+          if (isCurrent()) {
             recoveryFlightRef.current = null
+            const next = pendingEngineRef.current
+            if (
+              next &&
+              (next !== target ||
+                (needsHistoryRef.current && !retryTimerRef.current))
+            )
+              void recoveryRef.current(next)
+          }
         }
       })()
       recoveryFlightRef.current = task
@@ -229,12 +262,18 @@ export const Chart = memo(function Chart(props: Props) {
   recoveryRef.current = runRecovery
 
   const triggerRecovery = useCallback(() => {
+    needsHistoryRef.current = true
+    pendingEngineRef.current ??= engineRef.current
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current)
       retryTimerRef.current = null
     }
     void recoveryRef.current(pendingEngineRef.current ?? engineRef.current)
   }, [])
+
+  useEffect(() => {
+    if (error && !recoveryFlightRef.current) triggerRecovery()
+  }, [error, triggerRecovery])
 
   useEffect(() => {
     let wasHidden = document.visibilityState === 'hidden'
@@ -268,12 +307,14 @@ export const Chart = memo(function Chart(props: Props) {
       void recoveryRef.current(target)
   }, [controls.kline, controls.tradingView])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (resetSelectionKeyRef.current === selectionKey) return
     resetSelectionKeyRef.current = selectionKey
     recoveryFlightTokenRef.current++
     recoveryFlightRef.current = null
     pendingEngineRef.current = null
+    needsHistoryRef.current = false
+    recoveryCompleteRef.current = true
     setPreservedEngine(null)
     retryAttemptRef.current = 0
     if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
@@ -285,33 +326,24 @@ export const Chart = memo(function Chart(props: Props) {
   useEffect(
     () => () => {
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+      recoveryFlightTokenRef.current++
+      recoveryFlightRef.current = null
     },
     [],
   )
 
   const changeEngine = useCallback(
     (value: ChartEngine) => {
-      if (recoveryFlightRef.current) return
-      if (value === 'tradingview' && !tvMounted) {
-        setTvMounted(true)
-        if (source.isEngineDirty(value)) {
-          pendingEngineRef.current = value
-          setPreservedEngine(engineRef.current)
-          setRecoveryError('')
-          setRecoveryStatus('syncing')
-          setEngine(value)
-          void recoveryRef.current(value)
-        } else {
-          setPreservedEngine(null)
-          setEngine(value)
-        }
-        return
-      }
-      if (source.isEngineDirty(value)) {
+      if (value === 'tradingview') setTvMounted(true)
+      if (recoveryFlightRef.current || source.isEngineDirty(value)) {
         pendingEngineRef.current = value
         setPreservedEngine(
-          engineRef.current === value ? null : engineRef.current,
+          (previous) =>
+            previous ??
+            (engineRef.current === value ? null : engineRef.current),
         )
+        setRecoveryError('')
+        setRecoveryStatus('syncing')
         setEngine(value)
         void recoveryRef.current(value)
       } else {
@@ -319,7 +351,7 @@ export const Chart = memo(function Chart(props: Props) {
         setEngine(value)
       }
     },
-    [source, tvMounted],
+    [source],
   )
 
   const symbol = useMemo(
@@ -330,7 +362,6 @@ export const Chart = memo(function Chart(props: Props) {
     }),
     [props.coin, props.szDecimals, props.priceDecimals],
   )
-  const displayEngine = preservedEngine ?? engine
   return (
     <div
       ref={controls.container}
@@ -344,7 +375,7 @@ export const Chart = memo(function Chart(props: Props) {
       />
       <div className="relative min-h-[400px] flex-1 md:min-h-[460px] lg:min-h-0">
         <section
-          hidden={displayEngine !== 'kline'}
+          hidden={engine !== 'kline' && preservedEngine !== 'kline'}
           aria-hidden={engine !== 'kline' && preservedEngine !== 'kline'}
           inert={engine !== 'kline'}
           className={`absolute inset-0 ${preservedEngine === 'kline' ? 'z-20' : 'z-10'}`}
@@ -384,7 +415,9 @@ export const Chart = memo(function Chart(props: Props) {
         </section>
         {tvMounted && (
           <section
-            hidden={displayEngine !== 'tradingview'}
+            hidden={
+              engine !== 'tradingview' && preservedEngine !== 'tradingview'
+            }
             aria-hidden={
               engine !== 'tradingview' || preservedEngine === 'kline'
             }
