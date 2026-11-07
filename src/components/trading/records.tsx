@@ -260,7 +260,7 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                         className="font-medium hover:text-accent"
                       >
                         {p.coin}{' '}
-                        <span className="text-accent">{p.leverage.value}x</span>
+                        <span className="text-muted">{p.leverage.value}x</span>
                       </button>
                       <div
                         className={`mt-1 text-[10px] ${long ? 'text-mint' : 'text-loss'}`}

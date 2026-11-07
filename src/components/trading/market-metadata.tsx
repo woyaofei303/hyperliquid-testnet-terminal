@@ -18,8 +18,8 @@ export function MarketMetadata({
     : (feed.trades[0]?.px ?? market?.context.markPx)
   const meta = marketMetadata(pair, market?.kind ?? 'perp', price, locale)
   if (outcomes) {
-    meta.title = `${t('预测市场')} | FameEX Testnet`
-    meta.description = t('选择事件与结果，使用测试网资产参与预测。')
+    meta.title = `${t('预测市场')} | FameEX`
+    meta.description = t('预测市场')
   }
   // React 19 将标签提升到 head；只保留一个所有者，避免与异步注入的 Next 元数据重复。
   return (

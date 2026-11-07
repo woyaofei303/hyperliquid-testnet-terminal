@@ -38,6 +38,7 @@ test('预测事件归并选项、保留问题和后备编码，并关联实际�
   assert.equal(events.length, 1)
   assert.equal(events[0].title, '世界杯冠军')
   assert.equal(events[0].category, 'sports')
+  assert.equal(events[0].iconCoin, undefined)
   assert.deepEqual(
     events[0].markets.map((m) => m.name),
     ['#10', '#20'],
@@ -120,7 +121,55 @@ test('旧版价格模板仍可区分传统金融，并把结算时间展开为�
     ),
   )
   assert.equal(rows[0].category, 'tradfi')
+  assert.equal(predictionEvents(rows)[0].iconCoin, 'AAPL')
   assert.match(rows[0].eventTitle ?? '', /2026-11-06 19:00 UTC/)
+})
+
+test('预测图标读取事件元数据，支持币种和外部交易对，并继承父问题的标的', () => {
+  const markets = predictionMarkets(
+    {
+      outcomes: ['perp:BTC', 'shortName:BTC-USD', 'shortName:USDCBorrow'].map(
+        (description, index) => ({
+          outcome: index + 1,
+          name: '价格预测',
+          description: `${description}|metadata=category:price`,
+          quoteToken: 'USDC',
+          sideSpecs: [{ name: 'Yes' }, { name: 'No' }],
+        }),
+      ),
+      questions: [],
+    },
+    [],
+  )
+  assert.deepEqual(
+    predictionEvents(markets).map((event) => event.iconCoin),
+    ['BTC', 'BTC', undefined],
+  )
+  const range = predictionMarkets(
+    {
+      outcomes: [
+        {
+          outcome: 1,
+          name: 'Below 100',
+          description: '区间选项',
+          quoteToken: 'USDC',
+          sideSpecs: [{ name: 'Yes' }, { name: 'No' }],
+        },
+      ],
+      questions: [
+        {
+          question: 1,
+          name: '价格区间',
+          description: 'perp:kPEPE|metadata=category:price',
+          namedOutcomes: [1],
+          fallbackOutcome: 2,
+          settledNamedOutcomes: [],
+        },
+      ],
+    },
+    [],
+  )
+  assert.equal(predictionEvents(range)[0].iconCoin, 'kPEPE')
 })
 const input = {
   market: spot,

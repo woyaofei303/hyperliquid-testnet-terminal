@@ -135,6 +135,13 @@ export function predictionMarkets(
           ? 'tradfi'
           : 'crypto'
         : rawCategory
+    const eventValues = question?.values ?? values
+    const iconCoin =
+      category === 'crypto' || category === 'tradfi'
+        ? /^(?:[a-z]+:)?(k?[A-Z][A-Z0-9]*)(?:[-/](?:USD|USDC|USDT))?$/.exec(
+            eventValues.perp ?? eventValues.shortName ?? '',
+          )?.[1]
+        : undefined
     const title = question
       ? `${question.title} / ${resolved.title}`
       : resolved.title
@@ -162,6 +169,7 @@ export function predictionMarkets(
             ? item.deployerFeeScale
             : undefined,
         eventTitle: question?.title ?? resolved.title,
+        iconCoin,
         outcomeTitle: resolved.title,
         category,
         venue:
@@ -191,6 +199,7 @@ export function predictionEvents(markets: MarketContext[]) {
     {
       id: string
       title: string
+      iconCoin?: string
       category: string
       venue: string
       markets: MarketContext[]
@@ -209,6 +218,7 @@ export function predictionEvents(markets: MarketContext[]) {
       event = {
         id,
         title: market.eventTitle ?? marketLabel(market),
+        iconCoin: market.iconCoin,
         category: market.category ?? 'other',
         venue: market.venue ?? '',
         markets: [],

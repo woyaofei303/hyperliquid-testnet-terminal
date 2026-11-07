@@ -22,6 +22,7 @@ export interface Market {
   canonical?: boolean
   outcome?: number
   eventTitle?: string
+  iconCoin?: string
   outcomeTitle?: string
   category?: string
   venue?: string

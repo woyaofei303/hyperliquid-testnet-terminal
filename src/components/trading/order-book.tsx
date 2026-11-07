@@ -207,7 +207,7 @@ export function OrderBook({ model }: { model: TerminalModel }) {
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`${t('查看成交')} ${trade.tid} ${t('的链上交易（新窗口）')}`}
-                          title={t('在测试网浏览器查看交易')}
+                          title={t('在浏览器查看交易')}
                           className="inline-flex size-5 items-center justify-center rounded text-muted hover:text-accent focus-visible:outline focus-visible:outline-accent"
                         >
                           <span className="sr-only">{t('链上交易')}</span>

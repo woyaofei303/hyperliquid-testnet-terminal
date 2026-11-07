@@ -368,8 +368,8 @@ export function useTerminal() {
         account.refresh()
         setMessage(
           unresolved.native === 'outcome'
-            ? '预测转换没有客户端订单 ID。请在余额、预测持仓及官方测试网页核对实际变化；不会自动重发。'
-            : '此请求没有客户端订单 ID。请在仓位、TWAP、当前委托及官方测试网页核对实际状态；不会自动重发。',
+            ? '预测转换没有客户端订单 ID。请在余额、预测持仓及官方页面核对实际变化；不会自动重发。'
+            : '此请求没有客户端订单 ID。请在仓位、TWAP、当前委托及官方页面核对实际状态；不会自动重发。',
           'warning',
         )
         return

@@ -5263,7 +5263,7 @@ test('Web3 交易所返回 Must deposit 时转为存款引导，不保留错误�
     page
       .getByRole('region', { name: '全局通知' })
       .getByText(
-        'Hyperliquid 测试网账户尚未激活。请先存入测试 USDC 并等待到账，再完成钱包连接。',
+        'Hyperliquid 账户尚未激活。请先存入 USDC 并等待到账，再完成钱包连接。',
         { exact: true },
       ),
   ).toBeVisible()
@@ -5307,13 +5307,13 @@ test('Web3 独立资金弹窗：存提资产网络可下拉选择，无多余引
       ).toBeVisible()
       await page.getByRole('option', { name: 'USDC', exact: true }).click()
       const trigger = dialog.getByRole('button', {
-        name: /Arbitrum Sepolia · 测试网/,
+        name: /Arbitrum Sepolia.*网络/,
       })
       await trigger.focus()
       await page.keyboard.press('Enter')
       await expect(
         page.getByRole('option', {
-          name: 'Arbitrum Sepolia · 测试网',
+          name: 'Arbitrum Sepolia',
           exact: true,
         }),
       ).toBeVisible()

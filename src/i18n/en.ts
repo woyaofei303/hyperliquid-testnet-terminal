@@ -125,8 +125,8 @@ export const en: Record<string, string> = {
     'Deposit USDC from Arbitrum Sepolia, then continue connecting to trade once credited.',
   '完成钱包连接后可提交调整，无需逐笔钱包确认。':
     'Complete wallet connection to submit changes without confirming each action in your wallet.',
-  'Hyperliquid 测试网账户尚未激活。请先存入测试 USDC 并等待到账，再完成钱包连接。':
-    'Your Hyperliquid testnet account is not activated. Deposit test USDC and wait for credit before completing wallet connection.',
+  'Hyperliquid 账户尚未激活。请先存入 USDC 并等待到账，再完成钱包连接。':
+    'Your Hyperliquid account is not activated. Deposit USDC and wait for credit before completing wallet connection.',
   ' 根蜡烛，时间使用本地时区': ' candles, local time zone',
   水龙头: 'Faucet',
   交易设置: 'Trading settings',
@@ -313,8 +313,6 @@ export const en: Record<string, string> = {
   全屏图表: 'Fullscreen chart',
   启用交易: 'Enable trading',
   建立连接: 'Establish connection',
-  '在钱包中签署一次消息以建立交易连接，即可在 Hyperliquid 测试网交易。此签名不转移资金，也不收取 Gas。':
-    'Sign one message in your wallet to establish trading on Hyperliquid testnet. This signature transfers no funds and costs no gas.',
   连接账户: 'Connected account',
   '这是为当前浏览器建立连接，与账户是否曾交易无关。默认在当前标签页保留，刷新可恢复；勾选保持连接后可在重启浏览器后恢复。存款、划转和提款仍需主钱包确认。':
     'This establishes a connection for this browser regardless of previous trading history. It survives refresh in this tab; Keep connected also restores it after restarting the browser. Deposits, transfers and withdrawals still require your main wallet.',
@@ -343,7 +341,6 @@ export const en: Record<string, string> = {
   投资组合: 'Portfolio',
   账户: 'Account',
   '浏览器 ↗': 'Explorer ↗',
-  '测试币水龙头 ↗': 'Testnet faucet ↗',
   连接钱包: 'Connect wallet',
   调整保证金模式: 'Adjust margin mode',
   全仓: 'Cross',
@@ -431,7 +428,7 @@ export const en: Record<string, string> = {
   '数量（': 'Size (',
   '时间 (UTC)': 'Time (UTC)',
   链上交易: 'On-chain transaction',
-  在测试网浏览器查看交易: 'View transaction in testnet explorer',
+  在浏览器查看交易: 'View transaction in explorer',
   '正在加载成交…': 'Loading trades…',
   暂无成交: 'No trades',
   '公开市场成交 · 最近 100 笔': 'Public trades · latest 100',
@@ -619,7 +616,6 @@ export const en: Record<string, string> = {
   尚未启用: 'Not enabled',
   '正在核验账户…': 'Verifying account…',
   交易会话已启用: 'Trading session enabled',
-  启用测试网交易: 'Enable testnet trading',
   重新连接并核验: 'Reconnect and verify',
   已恢复订单确认: 'Order confirmation restored',
   恢复下单和平仓确认: 'Restore order and close confirmations',
@@ -636,7 +632,7 @@ export const en: Record<string, string> = {
     'Bridge fee up to 0.2 USDC plus source-chain gas. New accounts may incur a 1 USDC activation fee.',
   充值网络: 'Deposit network',
   提款网络: 'Withdrawal network',
-  'Arbitrum Sepolia · 测试网': 'Arbitrum Sepolia · Testnet',
+  'Arbitrum Sepolia': 'Arbitrum Sepolia',
   '存款金额（USDC）': 'Deposit amount (USDC)',
   '至少 5 USDC': 'At least 5 USDC',
   金额超过源链可用余额: 'Amount exceeds source-chain balance',
@@ -663,8 +659,8 @@ export const en: Record<string, string> = {
     ' requires mainnet deposit history for the same address.',
   '在您的合约和现货余额之间划转 USDC。':
     'Transfer USDC between perpetual and spot balances.',
-  '当前为统一账户或组合保证金模式，资金共享。请在官方测试网页管理资金。':
-    'Unified or portfolio margin shares funds. Manage them on the official testnet site.',
+  '当前为统一账户或组合保证金模式，资金共享。请在官方页面管理资金。':
+    'Unified or portfolio margin shares funds. Manage them on the official site.',
   现货账户: 'Spot account',
   合约账户: 'Perpetual account',
   '划转金额（USDC）': 'Transfer amount (USDC)',
@@ -903,8 +899,6 @@ export const en: Record<string, string> = {
     'Isolated margin adjusted. Refreshing the position.',
 
   预测市场: 'Prediction markets',
-  '选择事件与结果，使用测试网资产参与预测。':
-    'Choose an event and outcome to trade with testnet assets.',
   搜索预测市场: 'Search prediction markets',
   '搜索事件、选项或部署者': 'Search events, outcomes or deployers',
   预测分类: 'Prediction categories',

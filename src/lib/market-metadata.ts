@@ -24,10 +24,10 @@ export function marketMetadata(
       )
     : ''
   return {
-    title: `${formatted ? `${formatted} | ` : ''}${pair} ${product} | Hyperliquid Testnet`,
+    title: `${formatted ? `${formatted} | ` : ''}${pair} ${product} | Hyperliquid`,
     description: english
-      ? `${pair} ${product} trading on Hyperliquid testnet: live order book, charts, orders and positions. Test assets only.`
-      : `Hyperliquid 测试网 ${pair} ${product}交易：实时订单簿、K 线、订单与仓位管理。仅使用测试资产。`,
-    keywords: `${pair}, ${product}, Hyperliquid, Testnet, Perp DEX, Web3`,
+      ? `${pair} ${product} trading on Hyperliquid: live order book, charts, orders and positions.`
+      : `Hyperliquid ${pair} ${product}交易：实时订单簿、K 线、订单与仓位管理。`,
+    keywords: `${pair}, ${product}, Hyperliquid, Perp DEX, Web3`,
   }
 }

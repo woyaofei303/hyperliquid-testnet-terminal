@@ -343,9 +343,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 }
                 labelPlacement="outside"
                 selectedKeys={['arbitrum']}
-                items={[
-                  { key: 'arbitrum', label: t('Arbitrum Sepolia · 测试网') },
-                ]}
+                items={[{ key: 'arbitrum', label: t('Arbitrum Sepolia') }]}
                 isDisabled={busy}
                 popoverProps={{
                   portalContainer: popoverContainer ?? undefined,

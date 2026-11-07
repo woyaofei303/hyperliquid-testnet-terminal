@@ -76,7 +76,13 @@ export const dropdownStyle = tv({
       'text-2 text-body-s',
       'flex items-center gap-1',
     ],
-    menuStyle: ['bg-3', 'rounded', 'py-1', 'px-0'],
+    menuStyle: [
+      'bg-3',
+      'rounded',
+      'py-1',
+      'px-0',
+      'max-h-[min(320px,60dvh)] overflow-y-auto overscroll-contain',
+    ],
     // contentStyle: 'shadow-z200 border-cc-2 min-w-0 rounded border p-0',
     contentStyle: 'min-w-20 p-0 shadow-none',
     itemStyle: [

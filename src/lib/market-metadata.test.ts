@@ -13,5 +13,11 @@ test('metadata follows the selected pair, product, language and live price', () 
     marketMetadata('ETH / USDC', 'perp', undefined, 'en-US').title,
     /79,423|undefined|NaN/,
   )
-  assert.match(meta.description, /测试网/)
+  assert.match(meta.description, /实时订单簿/)
+  for (const locale of ['zh-CN', 'en-US']) {
+    assert.doesNotMatch(
+      JSON.stringify(marketMetadata('BTC / USDC', 'perp', '79423.5', locale)),
+      /测试网|测试资产|testnet|test assets/i,
+    )
+  }
 })

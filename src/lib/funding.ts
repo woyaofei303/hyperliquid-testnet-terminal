@@ -135,7 +135,7 @@ export async function assertDepositSession(session: WalletSession) {
     Number(await session.provider.request({ method: 'eth_chainId' })) !==
     DEPOSIT_CHAIN.id
   )
-    throw new Error('请先切换到 Arbitrum Sepolia 测试网')
+    throw new Error('请先切换到 Arbitrum Sepolia')
 }
 export type FundingWrite = 'approve' | 'deposit'
 export async function sendDeposit(

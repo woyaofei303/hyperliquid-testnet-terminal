@@ -60,7 +60,7 @@ export function MarketSelector({ model }: { model: TerminalModel }) {
           </span>
           {model.market?.kind !== 'spot' &&
             model.market?.kind !== 'outcome' && (
-              <span className="rounded bg-accent/10 px-1 text-[10px] text-accent">
+              <span className="rounded bg-surface px-1 text-[10px] text-text-2">
                 {model.market?.maxLeverage ?? '—'}x
               </span>
             )}
@@ -296,7 +296,7 @@ function MarketList({
                 type="button"
                 aria-label={`${t(favorites.includes(m.name) ? '取消收藏' : '收藏')} ${marketLabel(m)}`}
                 aria-pressed={favorites.includes(m.name)}
-                className={`mr-2 w-3 shrink-0 hover:text-accent ${favorites.includes(m.name) ? 'text-accent' : 'text-muted'}`}
+                className="group mr-2 flex size-4 shrink-0 items-center justify-center text-muted hover:text-sem-y aria-pressed:text-sem-y"
                 onClick={() => {
                   const next = favorites.includes(m.name)
                     ? favorites.filter((v) => v !== m.name)
@@ -304,7 +304,16 @@ function MarketList({
                   saveFavorites(next)
                 }}
               >
-                {favorites.includes(m.name) ? '★' : '☆'}
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                  className="size-3.5 fill-none group-aria-pressed:fill-current"
+                >
+                  <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z" />
+                </svg>
               </button>
               <button
                 type="button"
@@ -321,7 +330,7 @@ function MarketList({
                   <CoinIcon coin={m.kind === 'outcome' ? '' : baseName(m)} />
                   <span className="truncate">
                     {marketLabel(m)}
-                    <small className="ml-1 text-accent">
+                    <small className="ml-1 text-muted">
                       {m.kind === 'perp'
                         ? `${m.maxLeverage}x${m.dex ? ` · ${m.dex}` : ''}`
                         : m.kind === 'spot'

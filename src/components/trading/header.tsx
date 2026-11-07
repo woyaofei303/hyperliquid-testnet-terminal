@@ -16,7 +16,7 @@ export function Header({
   const { wallet, busy, connect } = model
   return (
     <header className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-edge bg-panel px-4 py-2">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4 sm:gap-8">
         <h1 className="shrink-0">
           <Image
             src="/fameex-logo.svg"
@@ -26,24 +26,21 @@ export function Header({
             className="h-6 w-auto"
           />
         </h1>
-        <span className="rounded border border-amber-300/20 bg-amber-300/5 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-200">
-          TESTNET
-        </span>
         <nav
           aria-label={t('产品导航')}
-          className="flex items-center gap-4 text-sm"
+          className="flex items-center gap-3 text-sm sm:gap-6"
         >
           <Link
             href="/"
             aria-current={view === 'trade' ? 'page' : undefined}
-            className="text-muted hover:text-ink aria-[current=page]:text-accent"
+            className="flex h-10 items-center border-b-2 border-transparent px-1 text-muted transition-colors hover:text-ink aria-[current=page]:border-accent aria-[current=page]:font-semibold aria-[current=page]:text-ink motion-reduce:transition-none"
           >
             {t('交易')}
           </Link>
           <Link
             href="/outcomes"
             aria-current={view === 'outcomes' ? 'page' : undefined}
-            className="text-muted hover:text-ink aria-[current=page]:text-accent"
+            className="flex h-10 items-center border-b-2 border-transparent px-1 text-muted transition-colors hover:text-ink aria-[current=page]:border-accent aria-[current=page]:font-semibold aria-[current=page]:text-ink motion-reduce:transition-none"
           >
             {t('预测')}
           </Link>
