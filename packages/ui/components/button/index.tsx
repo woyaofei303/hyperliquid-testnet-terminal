@@ -96,7 +96,7 @@ const Base = extendVariants(ButtonPrimitive, {
     {
       variant: 'bordered',
       color: 'default',
-      class: 'border-text-4 !text-2 hover:bg-hover-n',
+      class: 'border-cc-1 text-text-2 hover:bg-hover-n hover:text-ink',
     },
     {
       variant: 'bordered',
@@ -110,9 +110,8 @@ const Base = extendVariants(ButtonPrimitive, {
     },
     {
       variant: 'bordered',
-      color: 'primary',
       isDisabled: true,
-      class: 'border-text-4 !text-4',
+      class: 'border-cc-1 !text-4 hover:bg-transparent',
     },
     //   light disabled
     {
@@ -123,7 +122,7 @@ const Base = extendVariants(ButtonPrimitive, {
     {
       variant: 'light',
       color: 'default',
-      class: '!text-2 hover:bg-hover-n',
+      class: 'text-text-2 hover:bg-hover-n hover:text-ink',
     },
     {
       variant: 'light',
@@ -145,7 +144,7 @@ const Base = extendVariants(ButtonPrimitive, {
 
 export const Button = ({
   type = 'button',
-  color = 'primary',
+  color,
   variant = 'solid',
   ref,
   className,
@@ -157,9 +156,13 @@ export const Button = ({
       ref={ref}
       type={type}
       variant={variant}
-      color={color}
+      // 主操作保留品牌色，辅助操作按需显式强调。
+      color={color ?? (variant === 'solid' ? 'primary' : 'default')}
       // 原生 dialog 转移焦点时组件标记可能误报，以浏览器的键盘焦点判断为准。
-      className={classNames('[&:not(:focus-visible)]:outline-none', className)}
+      className={classNames(
+        'data-[focus-visible=true]:outline-accent [&:not(:focus-visible)]:outline-none',
+        className,
+      )}
       {...rest}
     />
   )

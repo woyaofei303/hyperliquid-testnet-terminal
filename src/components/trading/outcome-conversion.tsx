@@ -109,7 +109,7 @@ export function OutcomeConversion({
           />
           <button
             type="button"
-            className="text-left text-xs text-accent"
+            className="text-left text-xs text-text-2 underline-offset-4 hover:text-ink hover:underline"
             onClick={() => setAmount(maximum)}
           >
             {t('最大可转换')}：{maximum}{' '}

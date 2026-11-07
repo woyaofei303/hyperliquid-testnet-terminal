@@ -24,7 +24,7 @@ export const input: InputStylesFactory = tv({
     inputStyle: [
       'min-w-20',
       'flex-1 bg-transparent !outline-none focus-visible:outline-none',
-      'placeholder:text-4 caret-brand-1',
+      'placeholder:text-text-3 caret-brand-1',
       'group-data-[has-value=true]:text-1',
       // 去掉 Chrome / Safari 自动填充的默认黄/蓝底，并与主题文字色一致
       '[&:-webkit-autofill]:[-webkit-text-fill-color:rgb(var(--fx-text-1)_/_1)]',
@@ -50,7 +50,7 @@ export const input: InputStylesFactory = tv({
       'w-[15px]',
       'h-[15px]',
       // 'absolute',
-      'text-4',
+      'text-text-3 hover:text-ink',
       // 'right-4.5',
       // 'p-2',
       'rtl:right-auto',

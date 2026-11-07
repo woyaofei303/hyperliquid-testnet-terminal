@@ -42,7 +42,7 @@ export function FundingRoute({
         <Button
           aria-label={t('交换划转方向')}
           variant="light"
-          className="h-9 min-w-9 p-2 text-accent"
+          className="h-9 min-w-9 p-2"
           isDisabled={disabled}
           onPress={onSwap}
         >
@@ -110,7 +110,7 @@ export function WithdrawalForm({ model }: { model: TerminalModel }) {
           <Button
             variant="light"
             size="sm"
-            className="whitespace-nowrap px-0 text-accent"
+            className="whitespace-nowrap px-0"
             isDisabled={busy || !quote || f.quoteLoading}
             onPress={() => {
               if (quote) setAmount(quote.available)
@@ -177,7 +177,7 @@ export function WithdrawalForm({ model }: { model: TerminalModel }) {
         <Button
           variant="light"
           size="sm"
-          className="w-full text-xs text-accent"
+          className="w-full text-xs"
           isDisabled={busy}
           onPress={() => {
             model.setTransferToPerp(true)

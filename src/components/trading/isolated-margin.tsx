@@ -102,7 +102,7 @@ export function IsolatedMargin({
             <button
               type="button"
               disabled={!quote || pending}
-              className="shrink-0 text-xs text-accent"
+              className="shrink-0 text-xs text-text-2 underline-offset-4 hover:text-ink hover:underline"
               onClick={() => quote && setAmount(quote[direction])}
             >
               {t('最大')}

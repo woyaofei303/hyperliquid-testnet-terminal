@@ -56,11 +56,11 @@ const CustomSpinner = memo(
       >
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#8B5CF6" stopOpacity={1} />
-            <stop offset="25%" stopColor="#8B5CF6" stopOpacity={0.8} />
-            <stop offset="60%" stopColor="#8B5CF6" stopOpacity={0.3} />
-            <stop offset="85%" stopColor="#8B5CF6" stopOpacity={0.08} />
-            <stop offset="100%" stopColor="transparent" stopOpacity={0} />
+            <stop offset="0%" stopColor="currentColor" stopOpacity={1} />
+            <stop offset="25%" stopColor="currentColor" stopOpacity={0.8} />
+            <stop offset="60%" stopColor="currentColor" stopOpacity={0.3} />
+            <stop offset="85%" stopColor="currentColor" stopOpacity={0.08} />
+            <stop offset="100%" stopColor="currentColor" stopOpacity={0} />
           </linearGradient>
         </defs>
         {/* 底部灰色圆环 */}
@@ -68,12 +68,12 @@ const CustomSpinner = memo(
           cx={config.center}
           cy={config.center}
           r={config.radius}
-          stroke="#0B0C0E"
+          stroke="currentColor"
           strokeOpacity={0.04}
           strokeWidth={config.strokeWidth}
           fill="none"
         />
-        {/* 紫色旋转圆环  */}
+        {/* 继承按钮或提示的前景色。 */}
         <circle
           cx={config.center}
           cy={config.center}

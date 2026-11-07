@@ -313,7 +313,6 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 className="w-full max-w-none"
                 classNames={{
                   trigger: 'h-10 bg-panel px-3',
-                  label: 'text-xs font-normal text-muted',
                   innerWrapper: 'w-full',
                 }}
                 label={t('资产')}
@@ -336,7 +335,6 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 className="w-full max-w-none"
                 classNames={{
                   trigger: 'h-10 bg-panel px-3',
-                  label: 'text-xs font-normal text-muted',
                   innerWrapper: 'w-full',
                 }}
                 label={web3Panel === 'deposit' ? t('充值网络') : t('提款网络')}

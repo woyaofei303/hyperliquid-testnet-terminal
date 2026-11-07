@@ -154,7 +154,7 @@ export function PositionClose({
               />
               <button
                 type="button"
-                className="mt-1 text-xs text-accent"
+                className="mt-1 text-xs text-text-2 underline-offset-4 hover:text-ink hover:underline"
                 onClick={() =>
                   market && setPrice(formatOrderPrice(mark, market))
                 }

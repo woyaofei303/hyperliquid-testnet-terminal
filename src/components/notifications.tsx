@@ -21,8 +21,8 @@ const colors = {
   success: 'success',
   error: 'danger',
   warning: 'warning',
-  info: 'primary',
-  loading: 'primary',
+  info: 'default',
+  loading: 'default',
 } as const
 const active = new Map<
   string,
@@ -71,7 +71,7 @@ export function notify(tone: FeedbackTone, text: string, channel = 'terminal') {
             ? 'text-amber-300'
             : tone === 'success'
               ? 'text-mint'
-              : 'text-accent',
+              : 'text-text-2',
     },
     timeout:
       tone === 'loading' || tone === 'error'
@@ -79,7 +79,10 @@ export function notify(tone: FeedbackTone, text: string, channel = 'terminal') {
         : tone === 'success'
           ? 4500
           : 8000,
-    icon: tone === 'loading' ? <Spinner size="sm" /> : undefined,
+    icon:
+      tone === 'loading' ? (
+        <Spinner size="sm" className="text-text-2" />
+      ) : undefined,
     hideCloseButton: true,
     endContent: (
       <Button

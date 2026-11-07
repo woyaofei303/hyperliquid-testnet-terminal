@@ -5,9 +5,10 @@ import type { VariantProps } from 'tailwind-variants'
 export const select = tv({
   slots: {
     baseStyle: 'group flex flex-col',
-    labelStyle: 'text-1 mb-1 font-semibold',
+    labelStyle:
+      'mb-1 text-xs font-normal text-text-2 group-data-[filled=true]:text-text-2',
     triggerStyle: [
-      'w-full bg-transparent outline-none focus-visible:outline-none',
+      'w-full bg-transparent outline-none focus-visible:outline-none data-[focus-visible=true]:outline-accent',
       'placeholder:text-4 group-data-[has-value=true]:text-1 caret-brand-1 font-semibold placeholder:font-semibold',
       'tap-highlight-transparent relative inline-flex w-full flex-row items-center !rounded-[8px] px-3 py-2',
       'box-border border border-transparent',
@@ -15,8 +16,8 @@ export const select = tv({
       'h-auto min-h-0 justify-between',
     ],
     valueStyle: 'text-2 text-body-s',
-    selectorStyle: 'text-2 static h-3 w-3',
-    spinnerStyle: 'text-brand-1',
+    selectorStyle: 'text-text-3 static h-3 w-3',
+    spinnerStyle: 'text-text-2',
     listboxStyle: 'bg-3 rounded px-0 py-2',
     listboxWrapperStyle: 'max-h-[300px]',
     popoverContentStyle: 'rounded p-0',
