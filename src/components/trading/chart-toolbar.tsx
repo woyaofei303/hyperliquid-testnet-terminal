@@ -8,6 +8,7 @@ import type { useChartControls } from '@/hooks/use-chart-controls'
 import { t, useLocale } from '@/i18n'
 import { type ChartInterval, chartIntervals } from '@/lib/chart-periods'
 export type ChartEngine = 'kline' | 'tradingview'
+export type ChartMode = ChartEngine | 'depth'
 export const periodLabel = (value: ChartInterval) =>
   value
     .replace(/m$/, t('分'))
@@ -30,8 +31,8 @@ export function ChartToolbar({
 }: {
   interval: ChartInterval
   controls: ReturnType<typeof useChartControls>
-  engine: ChartEngine
-  onEngineChange: (value: ChartEngine) => void
+  engine: ChartMode
+  onEngineChange: (value: ChartMode) => void
 }) {
   useLocale()
 
@@ -43,7 +44,13 @@ export function ChartToolbar({
       aria-label={t('图表工具栏')}
       className="flex min-h-10 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-edge bg-bg-2 px-2 py-1 text-3"
     >
-      <div className="flex min-w-0 flex-wrap items-center gap-0.5">
+      <div
+        className={
+          engine === 'depth'
+            ? 'hidden'
+            : 'flex min-w-0 flex-wrap items-center gap-0.5'
+        }
+      >
         {quick.map((value) => (
           <button
             type="button"
@@ -227,7 +234,7 @@ export function ChartToolbar({
           aria-label={t('图表引擎')}
           role="toolbar"
         >
-          {(['kline', 'tradingview'] as const).map((value) => (
+          {(['kline', 'tradingview', 'depth'] as const).map((value) => (
             <button
               type="button"
               key={value}
@@ -238,7 +245,11 @@ export function ChartToolbar({
                 engine === value ? 'rounded-m bg-2 text-1' : 'text-3',
               )}
             >
-              {value === 'kline' ? t('基础版') : 'TradingView'}
+              {value === 'kline'
+                ? t('基础版')
+                : value === 'depth'
+                  ? t('深度图')
+                  : 'TradingView'}
             </button>
           ))}
         </div>

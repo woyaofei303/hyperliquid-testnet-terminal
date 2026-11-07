@@ -1,5 +1,14 @@
 // 前端文案：简体中文为源文案，英文与同一交易状态共享，不通过切换路由重建会话。
 export const en: Record<string, string> = {
+  深度图: 'Depth',
+  市场深度图: 'Market depth chart',
+  买卖累计深度: 'Cumulative bid and ask depth',
+  深度图价格范围: 'Depth chart price range',
+  价差幅度: 'Price distance',
+  累计挂单: 'Cumulative size',
+  暂无深度数据: 'No depth data',
+  '正在加载深度数据…': 'Loading depth data…',
+  '深度数据已过期，等待更新': 'Depth data is stale. Waiting for updates.',
   预测订单类型: 'Prediction order type',
   预测方向: 'Outcome side',
   下单百分比: 'Order percentage',

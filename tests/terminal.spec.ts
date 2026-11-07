@@ -1954,6 +1954,108 @@ test('杠杆独立确认，超精度输入被阻止在签名前', async ({ page 
   })
 })
 
+test('深度图双侧累计、悬停实时更新并保留 K 线实例和周期', async ({ page }) => {
+  const { pushMarket, writes, socketConnections } = await mockExchange(page)
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto('/')
+  const basic = page.getByRole('region', { name: /基础版 K 线图/ })
+  await expect(basic).toHaveAttribute('aria-label', /已加载 40 根/)
+  await page.getByRole('button', { name: '1分', exact: true }).click()
+  await basic
+    .locator('canvas')
+    .first()
+    .evaluate((canvas) => canvas.setAttribute('data-preserved', 'true'))
+  await page.getByRole('button', { name: '深度图', exact: true }).click()
+  const depth = page.getByRole('region', { name: '市场深度图' })
+  await expect(depth).toBeVisible()
+  await expect(basic).toBeHidden()
+  await expect(
+    page.getByRole('button', { name: '指标', exact: true }),
+  ).toBeHidden()
+  const slider = depth.getByRole('slider')
+  await slider.focus()
+  await slider.press('End')
+  await expect(depth.getByRole('tooltip', { name: '买盘' })).toContainText(
+    '69,980.0',
+  )
+  await expect(depth.getByRole('tooltip', { name: '卖盘' })).toContainText(
+    '70,020.0',
+  )
+  await expect(depth.getByRole('tooltip', { name: '卖盘' })).toContainText(
+    '20.00000',
+  )
+  const oldPath = await depth
+    .locator('[data-depth-side="buy"]')
+    .getAttribute('d')
+  expect(oldPath).toContain(' H ')
+  expect(oldPath).not.toMatch(/NaN|Infinity/)
+  await pushMarket('BTC', 71000)
+  await expect(depth.getByRole('tooltip', { name: '卖盘' })).toContainText(
+    '71,020.0',
+  )
+  await slider.press('Escape')
+  await expect(depth.getByRole('tooltip')).toHaveCount(0)
+  await slider.hover({ position: { x: 20, y: 60 } })
+  await expect(depth.getByRole('tooltip')).toHaveCount(2)
+  await page.screenshot({
+    path: 'output-tdd/playwright/depth-chart/desktop.png',
+  })
+  await page.getByRole('button', { name: '全屏图表' }).click()
+  await expect(depth).toBeVisible()
+  await expect
+    .poll(async () => (await depth.boundingBox())?.width ?? 0)
+    .toBeGreaterThan(1300)
+  await page.getByRole('button', { name: '退出全屏' }).click()
+  await page.getByRole('button', { name: '基础版', exact: true }).click()
+  await expect(basic).toBeVisible()
+  await expect(basic.locator('canvas[data-preserved]')).toHaveCount(1)
+  await expect(
+    page.getByRole('button', { name: '1分', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'TradingView', exact: true }).click()
+  const tvCanvas = page.frameLocator('iframe').locator('canvas').first()
+  await expect(tvCanvas).toBeVisible()
+  await tvCanvas.evaluate((canvas) =>
+    canvas.setAttribute('data-preserved', 'true'),
+  )
+  await page.getByRole('button', { name: '深度图', exact: true }).click()
+  await expect(tvCanvas).toBeHidden()
+  await page.getByRole('button', { name: 'TradingView', exact: true }).click()
+  await expect(tvCanvas).toBeVisible()
+  await expect(tvCanvas).toHaveAttribute('data-preserved', 'true')
+  expect(socketConnections).toHaveLength(2)
+  expect(writes).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('手机深度图适应窄屏，切币清除悬停且使用新市场单位', async ({ page }) => {
+  await mockExchange(page, 'sparse-depth')
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByRole('button', { name: '深度图', exact: true }).click()
+  const depth = page.getByRole('region', { name: '市场深度图' })
+  await expect(depth).toContainText('累计挂单 (BTC)')
+  await depth.getByRole('slider').focus()
+  await depth.getByRole('slider').press('End')
+  await expect(depth.getByRole('tooltip')).toHaveCount(2)
+  for (const tooltip of await depth.getByRole('tooltip').all()) {
+    const box = await tooltip.boundingBox()
+    expect(box && box.x >= 0 && box.x + box.width <= 390).toBeTruthy()
+  }
+  await page.screenshot({
+    path: 'output-tdd/playwright/depth-chart/mobile.png',
+  })
+  await page.getByRole('button', { name: '交易市场' }).click()
+  await page.getByRole('option', { name: 'ETH / USDC', exact: true }).click()
+  await expect(depth).toContainText('累计挂单 (ETH)')
+  await expect(depth.getByRole('tooltip')).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: '深度图', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+})
+
 test('实际图表引擎可切换，切币和切周期继续使用 Hyperliquid 行情', async ({
   page,
 }) => {

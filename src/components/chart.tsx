@@ -27,6 +27,7 @@ import { ChartDrawingTools } from './trading/chart-drawing-tools'
 import { ChartIndicators } from './trading/chart-indicators'
 import { type ChartEngine, ChartToolbar } from './trading/chart-toolbar'
 import { ChartTradeLines } from './trading/chart-trade-lines'
+import { DepthChart } from './trading/depth-chart'
 
 type Props = {
   coin: string
@@ -97,6 +98,7 @@ export const Chart = memo(function Chart(props: Props) {
   const locale = useLocale()
 
   const [engine, setEngine] = useState<ChartEngine>('kline')
+  const [depthVisible, setDepthVisible] = useState(false)
   const controls = useChartControls(engine, props.onIntervalChange, props.coin)
   const [tvMounted, setTvMounted] = useState(false)
   const [preservedEngine, setPreservedEngine] = useState<ChartEngine | null>(
@@ -390,14 +392,21 @@ export const Chart = memo(function Chart(props: Props) {
       <ChartToolbar
         interval={props.interval}
         controls={controls}
-        engine={engine}
-        onEngineChange={changeEngine}
+        engine={depthVisible ? 'depth' : engine}
+        onEngineChange={(value) => {
+          setDepthVisible(value === 'depth')
+          if (value !== 'depth') changeEngine(value)
+        }}
       />
       <div className="relative min-h-[400px] flex-1 md:min-h-[460px] lg:min-h-0">
         <section
-          hidden={engine !== 'kline' && preservedEngine !== 'kline'}
-          aria-hidden={engine !== 'kline' && preservedEngine !== 'kline'}
-          inert={engine !== 'kline'}
+          hidden={
+            depthVisible || (engine !== 'kline' && preservedEngine !== 'kline')
+          }
+          aria-hidden={
+            depthVisible || (engine !== 'kline' && preservedEngine !== 'kline')
+          }
+          inert={depthVisible || engine !== 'kline'}
           className={`absolute inset-0 ${preservedEngine === 'kline' ? 'z-20' : 'z-10'}`}
           aria-label={
             t('基础版 K 线图，已加载 ') + count + t(' 根蜡烛，时间使用本地时区')
@@ -410,12 +419,18 @@ export const Chart = memo(function Chart(props: Props) {
                 key={controls.drawingReset}
                 chart={controls.kline}
                 coin={props.coin}
-                visible={engine === 'kline' || preservedEngine === 'kline'}
+                visible={
+                  !depthVisible &&
+                  (engine === 'kline' || preservedEngine === 'kline')
+                }
                 expanded={controls.drawing}
                 onExpandedChange={controls.setDrawing}
               />
             }
-            visible={engine === 'kline' || preservedEngine === 'kline'}
+            visible={
+              !depthVisible &&
+              (engine === 'kline' || preservedEngine === 'kline')
+            }
             dataLoader={source.kline}
             symbolInfo={symbol}
             period={chartPeriods[props.interval]}
@@ -428,7 +443,10 @@ export const Chart = memo(function Chart(props: Props) {
               <ChartTradeLines
                 chart={result}
                 visibility={controls.tradeLines}
-                visible={engine === 'kline' || preservedEngine === 'kline'}
+                visible={
+                  !depthVisible &&
+                  (engine === 'kline' || preservedEngine === 'kline')
+                }
               />
             )}
           </BaseKlineChart>
@@ -436,13 +454,20 @@ export const Chart = memo(function Chart(props: Props) {
         {tvMounted && (
           <section
             hidden={
-              engine !== 'tradingview' && preservedEngine !== 'tradingview'
+              depthVisible ||
+              (engine !== 'tradingview' && preservedEngine !== 'tradingview')
             }
             aria-hidden={
-              engine !== 'tradingview' || preservedEngine === 'kline'
+              depthVisible ||
+              engine !== 'tradingview' ||
+              preservedEngine === 'kline'
             }
             className={`absolute inset-0 ${preservedEngine === 'tradingview' ? 'z-20' : engine === 'tradingview' ? 'z-10' : 'z-0 pointer-events-none'}`}
-            inert={engine !== 'tradingview' || preservedEngine === 'kline'}
+            inert={
+              depthVisible ||
+              engine !== 'tradingview' ||
+              preservedEngine === 'kline'
+            }
             aria-label={
               t('TradingView K 线图，已加载 ') +
               count +
@@ -454,16 +479,17 @@ export const Chart = memo(function Chart(props: Props) {
               onReady={controls.setTradingView}
               coin={props.coin}
               interval={props.interval}
-              visible={engine === 'tradingview'}
+              visible={!depthVisible && engine === 'tradingview'}
             />
           </section>
         )}
-        {loaded && !count && !error && (
+        {depthVisible && <DepthChart />}
+        {!depthVisible && loaded && !count && !error && (
           <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted">
             {t('此市场暂无历史成交')}
           </p>
         )}
-        {error && (
+        {!depthVisible && error && (
           <p
             role="alert"
             className="absolute inset-x-2 bottom-2 z-40 bg-panel p-2 text-xs text-loss"
@@ -472,7 +498,7 @@ export const Chart = memo(function Chart(props: Props) {
             {t(error)}
           </p>
         )}
-        {recoveryStatus !== 'idle' && (
+        {!depthVisible && recoveryStatus !== 'idle' && (
           <div
             role={recoveryStatus === 'error' ? 'alert' : 'status'}
             className="absolute left-2 top-2 z-40 flex items-center gap-2 rounded border border-edge bg-panel/95 px-2 py-1 text-xs text-ink shadow"
@@ -499,12 +525,15 @@ export const Chart = memo(function Chart(props: Props) {
           </div>
         )}
       </div>
-      {engine === 'kline' && controls.indicatorsOpen && controls.kline && (
-        <ChartIndicators
-          chart={controls.kline}
-          onClose={() => controls.setIndicatorsOpen(false)}
-        />
-      )}
+      {!depthVisible &&
+        engine === 'kline' &&
+        controls.indicatorsOpen &&
+        controls.kline && (
+          <ChartIndicators
+            chart={controls.kline}
+            onClose={() => controls.setIndicatorsOpen(false)}
+          />
+        )}
       {controls.error && (
         <p role="alert" className="p-2 text-xs text-loss">
           {t(controls.error)}
