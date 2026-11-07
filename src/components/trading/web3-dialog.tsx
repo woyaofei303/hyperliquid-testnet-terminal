@@ -199,6 +199,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 <div className="mt-3 flex items-center justify-between">
                   <Button
                     variant="light"
+                    color="default"
                     size="sm"
                     onPress={async () => {
                       try {
@@ -212,7 +213,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                     {copied ? t('已复制') : t('复制地址')}
                   </Button>
                   <a
-                    className="text-accent"
+                    className="rounded-md px-2 py-1 text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     href={`https://app.hyperliquid-testnet.xyz/explorer/address/${wallet.address}`}
                     target="_blank"
                     rel="noreferrer"
@@ -274,14 +275,15 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 </>
               )}
               <div
-                className={`grid gap-2 ${canTransfer ? 'grid-cols-3' : 'grid-cols-2'}`}
+                className={`grid gap-2.5 pt-1 ${canTransfer ? 'grid-cols-3' : 'grid-cols-2'}`}
               >
                 {(['deposit', 'transfer', 'withdraw'] as const)
                   .filter((panel) => panel !== 'transfer' || canTransfer)
                   .map((panel) => (
                     <Button
                       key={panel}
-                      variant="bordered"
+                      color={panel === 'deposit' ? 'primary' : 'default'}
+                      className="min-w-0 px-3"
                       isDisabled={busy}
                       onPress={() => setWeb3Panel(panel)}
                     >
@@ -296,6 +298,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
               <Button
                 variant="light"
                 color="default"
+                className="w-full hover:!text-loss"
                 isDisabled={busy}
                 onPress={model.disconnect}
               >

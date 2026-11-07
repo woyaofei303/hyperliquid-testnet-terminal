@@ -70,7 +70,6 @@ export function Header({
         )}
         {wallet ? (
           <Button
-            variant="bordered"
             color="default"
             size="sm"
             type="button"

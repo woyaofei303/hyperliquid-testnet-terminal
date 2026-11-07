@@ -21,7 +21,7 @@ const Base = extendVariants(ButtonPrimitive, {
       true: 'opacity-100 pointer-events-auto',
     },
     size: {
-      lg: 'h-10 !text-subtitle font-semibold',
+      lg: 'h-10 !text-body-regular font-semibold',
       md: 'text-body-regular h-8 font-semibold',
       sm: 'text-body-regular h-7 font-normal',
     },
@@ -36,7 +36,7 @@ const Base = extendVariants(ButtonPrimitive, {
     radius: {
       none: 'rounded-none',
       sm: 'rounded',
-      md: 'rounded-m',
+      md: 'rounded-md',
       lg: 'rounded-lg',
       full: 'rounded-[99px]',
     },
@@ -45,7 +45,7 @@ const Base = extendVariants(ButtonPrimitive, {
   defaultVariants: {
     radius: 'md',
     color: 'primary',
-    height: 'lg',
+    size: 'lg',
     variant: 'solid',
     isIconOnly: false,
   },
@@ -54,7 +54,8 @@ const Base = extendVariants(ButtonPrimitive, {
     {
       variant: 'solid',
       color: 'primary',
-      class: 'bg-brand-1 !text-6 hover:bg-hover-brand-1 font-bold',
+      class:
+        'bg-brand-1 !text-6 hover:bg-hover-brand-1 data-[pressed=true]:bg-press-b font-semibold',
     },
     {
       variant: 'solid',
@@ -64,7 +65,7 @@ const Base = extendVariants(ButtonPrimitive, {
     {
       variant: 'solid',
       color: 'default',
-      class: 'bg-cc-2 !text-1 hover:bg-hover-n',
+      class: 'bg-cc-2 !text-1 hover:bg-hover-n data-[pressed=true]:bg-press-n',
     },
     {
       variant: 'solid',

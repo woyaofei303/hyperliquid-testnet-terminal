@@ -108,7 +108,7 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
       </dl>
       <div className="grid grid-cols-2 gap-2 border-t border-edge p-3">
         <Button
-          className="col-span-2"
+          className="col-span-2 h-9"
           size="sm"
           isDisabled={busy}
           onPress={() => model.setWeb3Panel('deposit')}
@@ -117,9 +117,9 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
         </Button>
         {canTransfer && (
           <Button
-            className="flex-1"
+            className="h-9 min-w-0"
             size="sm"
-            variant="bordered"
+            color="default"
             isDisabled={busy}
             onPress={() => model.setWeb3Panel('transfer')}
           >
@@ -127,9 +127,9 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
           </Button>
         )}
         <Button
-          className={canTransfer ? 'flex-1' : 'col-span-2'}
+          className={`h-9 min-w-0 ${canTransfer ? '' : 'col-span-2'}`}
           size="sm"
-          variant="bordered"
+          color="default"
           isDisabled={busy}
           onPress={() => model.setWeb3Panel('withdraw')}
         >
