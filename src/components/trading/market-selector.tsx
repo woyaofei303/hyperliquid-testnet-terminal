@@ -255,8 +255,8 @@ function MarketList({
           {model.catalogError}
         </p>
       )}
-      <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2 overflow-y-auto py-3 pl-8 pr-3 text-right text-xs text-muted [scrollbar-gutter:stable]">
-        <span className="-ml-5 text-left">{t('市场')}</span>
+      <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2 overflow-y-auto py-3 pl-9 pr-3 text-right text-xs text-muted [scrollbar-gutter:stable]">
+        <span className="-ml-6 text-left">{t('市场')}</span>
         {[
           ['price', t('最新价格')],
           ['change', t('24h 涨跌')],
