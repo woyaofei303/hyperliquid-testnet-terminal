@@ -80,7 +80,7 @@ test('only a known collision from an extension is excluded from app error notifi
   assert.equal(
     isWalletInjectionConflict({
       message: 'Cannot redefine property: ethereum',
-      filename: 'https://hyperliquid.sunshinedairy.net/app.js',
+      filename: 'https://app.fameex-testnet.xyz/app.js',
     }),
     false,
   )

@@ -1,6 +1,12 @@
 # 发布到阿里云
 
-网站使用 `https://hyperliquid.sunshinedairy.net`。沿用原 `dy` 站点的方式：GitHub Actions 构建静态文件，阿里云 Nginx 提供文件，现有 Caddy 负责 HTTPS。行情和钱包请求由浏览器直接发往测试网，不经过应用服务器。生产机器不需要 Node，也不保存钱包密钥。
+网站使用 `https://app.fameex-testnet.xyz`。沿用原 `dy` 站点的方式：GitHub Actions 构建静态文件，阿里云 Nginx 提供文件，现有 Caddy 负责 HTTPS。行情和钱包请求由浏览器直接发往测试网，不经过应用服务器。生产机器不需要 Node，也不保存钱包密钥。
+
+域名迁移已于 2026-11-07 完成：`app.fameex-testnet.xyz`、`dy.fameex-testnet.xyz`、`live.fameex-testnet.xyz` 的 A 记录均指向 `47.80.28.238`，三个站点的 HTTPS 均返回 200。`hyperliquid.sunshinedairy.net` 保留为直达 `app.fameex-testnet.xyz` 的 301 跳转入口，保留路径和查询参数。旧 `dex`、`testnet`、`dy`、`live` 解析与代理入口已移除，运营商缓存需等待原 TTL 到期。
+
+`live` 的公开构建域名、SEO、Caddy `DOMAIN`、HLS 和 WebRTC 允许的来源已同步更新。健康接口、SEO 检查及两种媒体协议的跨域预检均通过；本次未实际开播。
+
+本次手工发布的交易站版本为 `4b1a6fdbfaa8c05884d62999d13dd057aa182a0e-20261107214515-1`，在该提交上仅应用本次域名修改后构建。最终切换前的服务器配置备份位于 `/root/hyperliquid-deploy-backups/final-fameex-20261107T135254Z`；其中 `restore-map.json` 记录备份与原路径对应关系，含运行时秘密的备份仅管理员可读。需要恢复域名配置时，先确认停播，按映射恢复文件并重建 Streamlab 服务；不要直接覆盖在线配置或删除录制卷。
 
 本站使用独立的 `/srv/hyperliquid` 目录、`hyperliquid-deploy` 普通账号、`hyperliquid` Compose 项目及 `127.0.0.1:8089` 端口。原 `dy` 和 `live` 站点继续使用各自的服务。新增的代理片段写入 `shared/extra-sites.caddy`，避免原 Streamlab 发布时丢失本站配置。
 
@@ -30,7 +36,7 @@ STATIC_EXPORT=1 npm run test:e2e -- --workers=2
 
 ## 服务器首次接入
 
-DNS 的 `hyperliquid` A 记录指向 `47.80.28.238`。管理员先核对服务器、8089 空闲端口和现有 Caddy，再上传 `deploy/` 及专用 SSH 公钥，在服务器运行：
+在 `fameex-testnet.xyz` 的 DNS 中添加 `app` A 记录，指向 `47.80.28.238`。管理员先核对服务器、8089 空闲端口和现有 Caddy，再上传 `deploy/` 及专用 SSH 公钥，在服务器运行：
 
 ```bash
 bash /tmp/hyperliquid-setup/bootstrap.sh /tmp/hyperliquid-setup/deploy.pub
@@ -55,10 +61,15 @@ Secrets:
 ## 检查和回滚
 
 ```bash
-curl --fail https://hyperliquid.sunshinedairy.net/version.txt
+curl --fail https://app.fameex-testnet.xyz/version.txt
+curl --head 'https://hyperliquid.sunshinedairy.net/version.txt?check=1'
 gh run list --repo woyaofei303/hyperliquid-testnet-terminal --workflow deploy-aliyun.yml --limit 5
 ```
 
 在 Actions 选择 `rollback` 可恢复上一成功版本。这不会回退 Git 提交，也不会清空浏览器中的账户设置。发布目录和旧哈希资源暂不自动清理；维护时保留当前、上一版本和仍可能被旧页面使用的资源。
 
-新域名与 `localhost` 的浏览器存储隔离。首次访问线上地址需要重新连接钱包、建立本站交易连接；不要手工复制旧站点中的交易密钥。部署验收仅查询行情和测试模拟交互，不代表真实订单或资金操作已经实测。
+第二条命令应返回 `301`，且 `Location` 为 `https://app.fameex-testnet.xyz/version.txt?check=1`。必须保留 `hyperliquid.sunshinedairy.net` 的 DNS 记录、代理配置和有效证书，浏览器才能收到 HTTPS 跳转。
+
+旧域名仅保留 `hyperliquid` 的跳转所需记录。后续发布与回滚均使用新域名做健康检查；服务器地址、SSH 凭证和发布目录不变。
+
+新域名与旧域名、`localhost` 的浏览器存储隔离。首次访问新地址需要重新连接钱包、建立本站交易连接；不要手工复制旧站点中的交易密钥。部署验收仅查询行情和测试模拟交互，不代表真实订单或资金操作已经实测。

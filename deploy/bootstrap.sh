@@ -13,7 +13,7 @@ task_source=$(cd -- "$(dirname -- "$0")" && pwd)
 task_config=/home/admin/streamlab/shared/config/Caddyfile
 task_extra=/home/admin/streamlab/shared/extra-sites.caddy
 [[ -f $task_config ]] || { echo '找不到原 Caddy 配置'; exit 1; }
-if grep -qF 'hyperliquid.sunshinedairy.net' "$task_config" "$task_extra"; then
+if grep -qE 'app\.fameex-testnet\.xyz|hyperliquid\.sunshinedairy\.net' "$task_config" "$task_extra"; then
   echo '域名已配置，请先检查现状'
   exit 1
 fi

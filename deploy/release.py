@@ -58,7 +58,7 @@ def copy_asset(source, destination):
 def check_health(release_id):
     url = os.environ.get("DEPLOY_HEALTH_URL", "http://127.0.0.1:8089/version.txt")
     request = urllib.request.Request(
-        url, headers={"Host": "hyperliquid.sunshinedairy.net", "Cache-Control": "no-cache"}
+        url, headers={"Host": "app.fameex-testnet.xyz", "Cache-Control": "no-cache"}
     )
     # 本机探测不经过服务器可能配置的 HTTP 代理。
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))

@@ -89,7 +89,7 @@ jobs:
     timeout-minutes: 15
     environment:
       name: aliyun-production
-      url: https://hyperliquid.sunshinedairy.net
+      url: https://app.fameex-testnet.xyz
     env:
       OPERATION: ${{ inputs.operation || 'deploy' }}
       RELEASE_ID: ${{ needs.verify.outputs.release_id }}
@@ -147,6 +147,6 @@ jobs:
               out/ "$target:/srv/hyperliquid/releases/$release/"
             ssh "${ssh_options[@]}" "$target" "python3 - '$release'" < deploy/release.py
           fi
-          actual="$(curl --fail --silent --show-error --retry 3 --max-time 30 https://hyperliquid.sunshinedairy.net/version.txt)"
+          actual="$(curl --fail --silent --show-error --retry 3 --max-time 30 https://app.fameex-testnet.xyz/version.txt)"
           [[ "$actual" == "$release" ]] || { echo 'Public HTTPS version check failed'; exit 1; }
-          printf 'Operation: %s\n\nActive release: `%s`\n\nhttps://hyperliquid.sunshinedairy.net\n' "$OPERATION" "$release" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Operation: %s\n\nActive release: `%s`\n\nhttps://app.fameex-testnet.xyz\n' "$OPERATION" "$release" >> "$GITHUB_STEP_SUMMARY"

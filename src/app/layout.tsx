@@ -4,7 +4,7 @@ import { Providers } from '@/components/providers'
 
 export const metadata: Metadata = {
   applicationName: 'Hyperliquid Terminal',
-  metadataBase: new URL('https://hyperliquid.sunshinedairy.net'),
+  metadataBase: new URL('https://app.fameex-testnet.xyz'),
   alternates: { canonical: '/' },
 }
 

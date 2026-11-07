@@ -1,6 +1,6 @@
 # Hyperliquid 测试网交易终端
 
-阿里云发布地址：`https://hyperliquid.sunshinedairy.net`。构建、发布与回滚操作见 [部署说明](docs/aliyun-deployment.md)。
+阿里云发布地址：`https://app.fameex-testnet.xyz`。旧地址 `https://hyperliquid.sunshinedairy.net` 保留为 301 跳转入口，路径和查询参数保持不变。构建、发布与回滚操作见 [部署说明](docs/aliyun-deployment.md)。
 
 这个项目把行情、委托和仓位管理放在一个页面里。打开页面就能查看测试网订单簿和 K 线；准备好有测试 USDC 的钱包后，可启用交易、挂单、撤单、开仓、减仓和平仓。
 
