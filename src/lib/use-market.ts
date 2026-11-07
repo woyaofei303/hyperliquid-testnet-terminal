@@ -6,7 +6,7 @@ import type {
   ActiveSpotAssetCtxEvent,
 } from '@nktkas/hyperliquid/api/subscription'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { type ChartInterval, intervalMs } from './chart-periods.ts'
+import type { ChartInterval } from './chart-periods.ts'
 import { createFrameBatch } from './frame-batch.ts'
 import {
   type AccountSnapshot,
@@ -127,7 +127,12 @@ export function useMarket(coin: string, interval: Interval) {
   const [error, setError] = useState('')
   const [receivedAt, setReceivedAt] = useState(0)
   const [now, setNow] = useState(0)
-  const [candleReconnectVersion, setCandleReconnectVersion] = useState(0)
+  const [candleRecovery, setCandleRecovery] = useState({
+    coin,
+    interval,
+    version: 0,
+    fromTime: 0,
+  })
   const [connection, setConnection] = useState<{
     transport: WebSocketTransport
     sub: SubscriptionClient
@@ -159,8 +164,37 @@ export function useMarket(coin: string, interval: Interval) {
     const { transport, sub, fastSub } = connection
     let active = true
     let generation = 0
-    const buffer = new Map<number, Candle>()
     let didOpen = false
+    let lastMessage = Date.now()
+    let lastCandleTime = 0
+    let disconnectedFrom: number | null = null
+    const reportGap = (fromTime: number) => {
+      setCandleRecovery((previous) => ({
+        coin,
+        interval,
+        version: previous.version + 1,
+        fromTime,
+      }))
+    }
+    const receivedMessage = () => {
+      const now = Date.now()
+      // 心跳也算连接活动；冷清市场没有新蜡烛不等于连接中断。
+      if (didOpen && now - lastMessage > 45000 && disconnectedFrom === null)
+        reportGap(lastCandleTime || lastMessage)
+      lastMessage = now
+    }
+    const checkConnection = () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return
+      if (
+        transport.socket.readyState === 3 ||
+        (transport.socket.readyState === 1 && Date.now() - lastMessage > 45000)
+      ) {
+        disconnectedFrom ??= lastCandleTime || lastMessage
+        transport.socket.reconnect()
+      }
+      const fast = connection.fastTransport.socket
+      if (fast.readyState === 3) fast.reconnect()
+    }
     const pendingCandles = new Map<number, Candle>()
     let pendingBook: Book | null = null
     const bookFrame = createFrameBatch('book', () => {
@@ -199,19 +233,9 @@ export function useMarket(coin: string, interval: Interval) {
     }
     async function snapshots() {
       const epoch = ++generation
-      buffer.clear()
       try {
-        const [history, latestBook] = await Promise.all([
-          info.candleSnapshot({
-            coin,
-            interval,
-            startTime: Date.now() - intervalMs(interval) * 2,
-          }),
-          info.l2Book({ coin }),
-        ])
+        const latestBook = await info.l2Book({ coin })
         if (!active || generation !== epoch) return
-        setCandles(mergeCandles(history, [...buffer.values()]))
-        buffer.clear()
         acceptBook(latestBook)
         setError('')
       } catch (e) {
@@ -220,7 +244,10 @@ export function useMarket(coin: string, interval: Interval) {
     }
     const opened = () => {
       if (active) {
-        if (didOpen) setCandleReconnectVersion((version) => version + 1)
+        if (didOpen)
+          reportGap(disconnectedFrom ?? (lastCandleTime || lastMessage))
+        disconnectedFrom = null
+        lastMessage = Date.now()
         didOpen = true
         setStatus('实时连接')
         void snapshots()
@@ -228,6 +255,7 @@ export function useMarket(coin: string, interval: Interval) {
     }
     const closed = () => {
       if (active) {
+        disconnectedFrom ??= lastCandleTime || lastMessage
         setStatus('正在重连')
         setReceivedAt(0)
       }
@@ -239,6 +267,10 @@ export function useMarket(coin: string, interval: Interval) {
         setStatus('订阅失败')
       }
     }
+    transport.socket.addEventListener('message', receivedMessage)
+    document.addEventListener('visibilitychange', checkConnection)
+    window.addEventListener('online', checkConnection)
+    window.addEventListener('pageshow', checkConnection)
     transport.socket.addEventListener('open', opened)
     transport.socket.addEventListener('close', closed)
     if (transport.socket.readyState === 1) opened()
@@ -258,17 +290,16 @@ export function useMarket(coin: string, interval: Interval) {
           { coin, interval },
           (candle) => {
             if (!active || candle.s !== coin || candle.i !== interval) return
+            receivedMessage()
+            lastCandleTime = candle.t
             performanceMetrics.input('candles')
             const combined = pendingCandles.has(candle.t)
             pendingCandles.set(candle.t, candle)
-            buffer.set(candle.t, candle)
             let dropped = 0
-            if (pendingCandles.size > 500) {
+            if (pendingCandles.size > 5000) {
               pendingCandles.delete(pendingCandles.keys().next().value ?? 0)
               dropped++
             }
-            if (buffer.size > 500)
-              buffer.delete(buffer.keys().next().value ?? 0)
             performanceMetrics.queue(
               'candles',
               pendingCandles.size,
@@ -287,7 +318,10 @@ export function useMarket(coin: string, interval: Interval) {
       bookFrame.cancel()
       candleFrame.cancel()
       pendingCandles.clear()
-      buffer.clear()
+      transport.socket.removeEventListener('message', receivedMessage)
+      document.removeEventListener('visibilitychange', checkConnection)
+      window.removeEventListener('online', checkConnection)
+      window.removeEventListener('pageshow', checkConnection)
       transport.socket.removeEventListener('open', opened)
       transport.socket.removeEventListener('close', closed)
       for (const subscription of subscriptions)
@@ -418,7 +452,10 @@ export function useMarket(coin: string, interval: Interval) {
     error,
     stale,
     receivedAt,
-    candleReconnectVersion,
+    candleRecovery:
+      candleRecovery.coin === coin && candleRecovery.interval === interval
+        ? candleRecovery
+        : undefined,
   }
 }
 

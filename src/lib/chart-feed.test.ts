@@ -317,6 +317,89 @@ test('恢复历史时缓冲实时更新，并让图表重载复用校准后的�
   feed.dispose()
 })
 
+test('短暂断线只校准缺口边界，不额外请求 300 根历史', async () => {
+  const requests: [number, number][] = []
+  const feed = source(async (start, end) => {
+    requests.push([start, end])
+    return [candle(time - 300000), candle(time), candle(time + 300000)]
+  })
+  try {
+    await feed.recover(time - 300000, time + 600000)
+    assert.deepEqual(requests, [[time - 300000, time + 600000 - 1]])
+  } finally {
+    feed.dispose()
+  }
+})
+
+test('跨越 1000 个周期的恢复分为四批，不重叠也不额外扫描历史', async () => {
+  const requests: [number, number][] = []
+  const feed = source(async (start, end) => {
+    requests.push([start, end])
+    const rows: Candle[] = []
+    for (let t = start; t <= end; t += 300000) rows.push(candle(t))
+    return rows
+  })
+  try {
+    const result = await feed.recover(time - 999 * 300000, time + 300000)
+    assert.equal(result.count, 1000)
+    assert.equal(requests.length, 4)
+    assert.ok(requests.every(([start, end]) => end - start + 1 <= 300 * 300000))
+    for (let i = 1; i < requests.length; i++)
+      assert.equal(requests[i][1] + 1, requests[i - 1][0])
+    assert.equal(requests.at(-1)?.[0], time - 999 * 300000)
+  } finally {
+    feed.dispose()
+  }
+})
+
+test('校准没有改动旧蜡烛时直接追加，保留已加载历史供另一引擎复用', async () => {
+  let calls = 0
+  const feed = source(async (start, end) => {
+    calls++
+    const bars: Candle[] = []
+    for (let t = start; t <= end; t += 300000) bars.push(candle(t))
+    return bars
+  })
+  const received: number[] = []
+  try {
+    await feed.kline.getBars({
+      type: 'init',
+      timestamp: time + 300000,
+      symbol: { ticker: 'BTC', pricePrecision: 1, volumePrecision: 5 },
+      period: chartPeriods['5m'],
+      callback() {},
+    })
+    feed.kline.subscribeBar?.({
+      symbol: { ticker: 'BTC', pricePrecision: 1, volumePrecision: 5 },
+      period: chartPeriods['5m'],
+      callback: (bar) => received.push(bar.timestamp),
+    })
+    feed.setVisibleEngine('kline')
+    await feed.recover(time - 300000, time + 600000)
+    assert.equal(feed.isEngineDirty('kline'), false)
+    await delay(10)
+    assert.ok(received.includes(time + 300000))
+    const before = calls
+    const result = Promise.withResolvers<Bar[]>()
+    feed.tradingView.getBars(
+      feed.symbolInfo,
+      '5' as ResolutionString,
+      {
+        from: (time - 200 * 300000) / 1000,
+        to: (time + 600000) / 1000,
+        countBack: 200,
+        firstDataRequest: true,
+      },
+      result.resolve,
+      result.reject,
+    )
+    assert.ok((await result.promise).length >= 200)
+    assert.equal(calls, before)
+  } finally {
+    feed.dispose()
+  }
+})
+
 test('TradingView 历史重载先清缓存，再等新的 getBars 完成', async () => {
   const feed = source(async () => [candle(time)])
   feed.setVisibleEngine('tradingview')
@@ -505,7 +588,7 @@ test('恢复期间跨过新的蜡烛周期，不丢弃查询截止时间之后�
   }
 })
 
-test('隐藏引擎遗漏的数据超出实时缓冲时必须重载，连续数据可以直接追平', async () => {
+test('隐藏引擎从共享缓存追平连续的多批推送，无需重载', async () => {
   const feed = source(async () => [candle(time)])
   try {
     await feed.kline.getBars({
@@ -523,8 +606,172 @@ test('隐藏引擎遗漏的数据超出实时缓冲时必须重载，连续数�
     feed.setVisibleEngine('tradingview')
     feed.update([candle(time + 300000)])
     assert.equal(feed.isEngineDirty('kline'), false)
-    feed.update([candle(time + 900000)])
+    feed.update([candle(time + 600000), candle(time + 900000)])
+    assert.equal(feed.isEngineDirty('kline'), false)
+  } finally {
+    feed.dispose()
+  }
+})
+
+test('休眠后先收到最新推送仍从断线边界补齐，恢复失败不丢失边界', async () => {
+  const requests: [number, number][] = []
+  let fail = true
+  const feed = source(async (start, end) => {
+    requests.push([start, end])
+    if (fail) throw new Error('offline')
+    const rows: Candle[] = []
+    for (let t = start; t <= end; t += 300000) rows.push(candle(t))
+    return rows
+  })
+  try {
+    feed.update([candle(time - 12 * 300000)])
+    feed.markGap(time - 12 * 300000)
+    feed.update([candle(time)])
+    await assert.rejects(feed.recover(undefined, time + 300000), /offline/)
+    fail = false
+    const result = await feed.recover(undefined, time + 300000)
+    assert.equal(result.count, 14)
+    assert.equal(requests.length, 2)
+    assert.equal(requests[0][0], time - 13 * 300000)
+    assert.deepEqual(requests[0], requests[1])
+  } finally {
+    feed.dispose()
+  }
+})
+
+test('恢复期间再次断线，上一轮成功不能清除新缺口', async () => {
+  const pending = Promise.withResolvers<Candle[]>()
+  const feed = source(() => pending.promise)
+  try {
+    feed.markGap(time)
+    const recovery = feed.recover(undefined, time + 300000)
+    feed.markGap(time + 300000)
+    pending.resolve([candle(time)])
+    await recovery
+    assert.equal(feed.needsRecovery(), true)
+    await feed.recover(undefined, time + 600000)
+    assert.equal(feed.needsRecovery(), false)
+  } finally {
+    feed.dispose()
+  }
+})
+
+test('修正旧蜡烛时重载保留翻页历史，旧实时快照不能覆盖校准值', async () => {
+  let correcting = false
+  let calls = 0
+  const feed = source(async (start, end) => {
+    calls++
+    const rows: Candle[] = []
+    for (let t = start; t <= end; t += 300000)
+      rows.push(
+        correcting && t === time - 300000
+          ? { ...candle(t, '104'), h: '104' }
+          : candle(t),
+      )
+    return rows
+  })
+  const params = {
+    type: 'init' as const,
+    timestamp: time + 300000,
+    symbol: { ticker: 'BTC', pricePrecision: 1, volumePrecision: 5 },
+    period: chartPeriods['5m'],
+    callback(_bars: KLineData[]) {},
+  }
+  try {
+    await feed.kline.getBars(params)
+    await feed.kline.getBars({
+      ...params,
+      type: 'forward',
+      timestamp: time - 299 * 300000,
+    })
+    feed.kline.subscribeBar?.({ ...params, callback() {} })
+    feed.setVisibleEngine('kline')
+    const old = candle(time - 300000)
+    feed.update([old])
+    correcting = true
+    await feed.recover(time - 2 * 300000, time + 600000)
     assert.equal(feed.isEngineDirty('kline'), true)
+    const before = calls
+    let loaded: KLineData[] = []
+    await feed.refreshEngine('kline', () => {
+      void feed.kline.getBars({
+        ...params,
+        timestamp: time + 600000,
+        callback(bars) {
+          loaded = bars
+        },
+      })
+    })
+    assert.equal(calls, before)
+    assert.equal(loaded[0].timestamp, time - 599 * 300000)
+    assert.equal(
+      loaded.find((bar) => bar.timestamp === time - 300000)?.close,
+      104,
+    )
+    feed.update([old, candle(time + 300000)])
+    await feed.kline.getBars({
+      ...params,
+      timestamp: time + 600000,
+      callback(bars) {
+        assert.equal(
+          bars.find((bar) => bar.timestamp === time - 300000)?.close,
+          104,
+        )
+      },
+    })
+  } finally {
+    feed.dispose()
+  }
+})
+
+test('TradingView 校准重载后实时回调不能倒退到重载前的末根', async () => {
+  let correcting = false
+  const feed = source(async () => [
+    { ...candle(time - 300000, correcting ? '102' : '101') },
+    candle(time),
+    ...(correcting ? [candle(time + 300000)] : []),
+  ])
+  const params = {
+    from: (time - 300000) / 1000,
+    to: (time + 600000) / 1000,
+    countBack: 2,
+    firstDataRequest: true,
+  }
+  const received: number[] = []
+  try {
+    const initial = Promise.withResolvers<Bar[]>()
+    feed.tradingView.getBars(
+      feed.symbolInfo,
+      '5' as ResolutionString,
+      params,
+      initial.resolve,
+      initial.reject,
+    )
+    await initial.promise
+    feed.tradingView.subscribeBars(
+      feed.symbolInfo,
+      '5' as ResolutionString,
+      (bar) => received.push(bar.time),
+      'tv',
+      () => {},
+    )
+    feed.setVisibleEngine('tradingview')
+    correcting = true
+    await feed.recover(time - 300000, time + 600000)
+    await feed.refreshEngine('tradingview', () => {
+      feed.tradingView.getBars(
+        feed.symbolInfo,
+        '5' as ResolutionString,
+        params,
+        () => {
+          received.length = 0
+        },
+        assert.fail,
+      )
+    })
+    await delay(10)
+    assert.ok(received.length > 0)
+    assert.ok(received.every((t) => t >= time + 300000))
   } finally {
     feed.dispose()
   }

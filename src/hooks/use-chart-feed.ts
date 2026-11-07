@@ -4,6 +4,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import { createChartFeed } from '@/lib/chart-feed'
@@ -18,6 +19,7 @@ export function useChartFeed({
   label,
   priceDecimals,
   candles,
+  candleRecovery,
 }: {
   coin: string
   interval: ChartInterval
@@ -25,6 +27,7 @@ export function useChartFeed({
   label?: string
   priceDecimals?: number
   candles: Candle[]
+  candleRecovery?: { version: number; fromTime: number }
 }) {
   const [count, setCount] = useState(0)
   const [error, setError] = useState('')
@@ -48,13 +51,18 @@ export function useChartFeed({
     [coin, interval, szDecimals, label, priceDecimals, onLoaded],
   )
   const [source] = useState(() => createChartFeed(context))
+  const previousRecovery = useRef(candleRecovery)
   useLayoutEffect(() => {
     if (source.select(context)) {
       setLoaded(false)
       setCount(0)
       setError('')
+      previousRecovery.current = candleRecovery
     }
-  }, [source, context])
+    if (candleRecovery !== previousRecovery.current && candleRecovery?.version)
+      source.markGap(candleRecovery.fromTime)
+    previousRecovery.current = candleRecovery
+  }, [source, context, candleRecovery])
   useEffect(() => {
     source.update(candles)
   }, [source, candles])

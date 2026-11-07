@@ -92,7 +92,12 @@ export function createChartFeed(initial: ChartFeedContext) {
   let epoch = 0
   let active = true
   let updates: Bar[] = []
-  let queuedCandles: Candle[] | null = null
+  const seenCandles = new Map<number, Candle>()
+  const cachedBars = new Map<number, Bar>()
+  let coveredRanges: [number, number][] = []
+  let gapFrom: number | null = null
+  let gapVersion = 0
+  let hasHistory = false
   let visibleEngine: ChartEngine | null = null
   let lastHistoryTime = 0
   let historyEpoch = 0
@@ -100,7 +105,6 @@ export function createChartFeed(initial: ChartFeedContext) {
   let recoveryReady = false
   let recoveryFlight: Promise<ChartRecoveryResult> | null = null
   let recoveryUpdates = new Map<number, Bar>()
-  let recoverySnapshot: (ChartRecoveryResult & { bars: Bar[] }) | null = null
   let klineRequest = 0
   let tradingViewRequest = 0
   const dirtyEngines = new Set<ChartEngine>()
@@ -118,19 +122,54 @@ export function createChartFeed(initial: ChartFeedContext) {
       engine: ChartEngine
       callback: (bar: Bar) => void
       last: number
+      delivered?: Bar
       resetCache?: () => void
     }
   >()
-  const bufferRecoveryBars = (bars: Bar[]) => {
-    for (const bar of bars) recoveryUpdates.set(bar.time, bar)
-    while (recoveryUpdates.size > 5000)
-      recoveryUpdates.delete(recoveryUpdates.keys().next().value ?? 0)
+  const sortedCache = () =>
+    [...cachedBars.values()].sort((a, b) => a.time - b.time)
+  const storeBars = (bars: Bar[], from: number, to: number) => {
+    const first = sortedCache()[0]?.time ?? Infinity
+    for (const bar of bars) {
+      const previous = cachedBars.get(bar.time)
+      const changed =
+        !previous ||
+        ['open', 'high', 'low', 'close', 'volume'].some(
+          (key) => previous[key as keyof Bar] !== bar[key as keyof Bar],
+        )
+      if (changed) {
+        for (const listener of listeners.values()) {
+          if (bar.time >= first && bar.time < listener.last)
+            dirtyEngines.add(listener.engine)
+        }
+        cachedBars.set(bar.time, bar)
+      }
+    }
+    const oldest = Math.max(
+      candleHistoryStart(Date.now(), 5000, interval),
+      sortedCache().at(-5000)?.time ?? 0,
+    )
+    for (const time of cachedBars.keys()) {
+      if (time < oldest) {
+        cachedBars.delete(time)
+        seenCandles.delete(time)
+      }
+    }
+    const ranges = [...coveredRanges, [from, to] as [number, number]]
+      .filter(([, end]) => end > oldest)
+      .sort((a, b) => a[0] - b[0])
+    coveredRanges = []
+    for (const [start, end] of ranges) {
+      const last = coveredRanges.at(-1)
+      if (last && start <= last[1]) last[1] = Math.max(last[1], end)
+      else coveredRanges.push([Math.max(start, oldest), end])
+    }
   }
   const releaseRecovery = () => {
+    if (gapFrom !== null) return
     recoveryBlocked = false
     recoveryReady = false
     recoveryUpdates.clear()
-    if (recoverySnapshot) updates = recoverySnapshot.bars.slice(-2)
     frame.schedule()
   }
   const notifyLoaded = (engine: ChartEngine, error?: unknown) => {
@@ -148,32 +187,16 @@ export function createChartFeed(initial: ChartFeedContext) {
   }
   const publish = () => {
     if (!active || recoveryBlocked) return
-    if (queuedCandles) {
-      updates = chartBars(queuedCandles, coin, interval)
-      queuedCandles = null
-      if (recoverySnapshot) {
-        const rows = new Map(
-          recoverySnapshot.bars.map((bar) => [bar.time, bar]),
-        )
-        for (const bar of updates) rows.set(bar.time, bar)
-        recoverySnapshot.bars = [...rows.values()]
-          .sort((a, b) => a.time - b.time)
-          .slice(-5000)
-        recoverySnapshot.count = recoverySnapshot.bars.length
-        recoverySnapshot.toTime = Math.max(
-          recoverySnapshot.toTime,
-          (recoverySnapshot.bars.at(-1)?.time ?? 0) + step,
-        )
-      }
-    }
+    const bars = sortedCache()
     for (const listener of listeners.values()) {
       if (visibleEngine && listener.engine !== visibleEngine) continue
       if (dirtyEngines.has(listener.engine)) continue
       performanceMetrics.measure(listener.engine, () => {
-        for (const bar of updates) {
-          if (bar.time < listener.last) continue
+        for (const bar of bars) {
+          if (bar.time < listener.last || bar === listener.delivered) continue
           listener.callback({ ...bar })
           listener.last = bar.time
+          listener.delivered = bar
         }
       })
     }
@@ -192,39 +215,35 @@ export function createChartFeed(initial: ChartFeedContext) {
     onError(error instanceof Error ? error.message : String(error))
 
   const pendingHistory = new Map<string, Promise<Candle[]>>()
-  const fromRecoveryCache = (
+  const fromCache = (
     end: number,
     count: number,
     initial: boolean,
     from?: number,
+    restore = false,
   ) => {
-    const snapshot = recoverySnapshot
-    const target = Math.min(Math.max(count, historyPageSize), 5000)
+    if (!hasHistory) return null
+    const bars = sortedCache()
     const requestedFrom =
-      from === undefined && initial
-        ? (snapshot?.fromTime ?? 0)
-        : Math.min(from ?? end, candleHistoryStart(end, target, interval))
+      initial && (from === undefined || restore)
+        ? (bars[0]?.time ?? end)
+        : Math.min(from ?? end, candleHistoryStart(end, count, interval))
     if (
-      !snapshot ||
-      end < snapshot.fromTime ||
-      end > snapshot.toTime + step ||
-      (requestedFrom < snapshot.fromTime && snapshot.complete)
+      !coveredRanges.some(([start, to]) => start <= requestedFrom && to >= end)
     )
       return null
-    return snapshot.bars
-      .filter(
-        (bar) =>
-          bar.time < end &&
-          bar.time >= Math.max(requestedFrom, snapshot.fromTime),
-      )
+    return bars
+      .filter((bar) => bar.time < end && (initial || bar.time >= requestedFrom))
       .map((bar) => ({ ...bar }))
   }
+
   async function load(
     end: number,
     count: number,
     initial: boolean,
     from?: number,
     recovery = false,
+    restore = false,
   ) {
     const generation = epoch
     const loadedHistoryEpoch = historyEpoch
@@ -232,7 +251,7 @@ export function createChartFeed(initial: ChartFeedContext) {
     const selectedInterval = interval
     const readHistory = history
     if (!recovery) {
-      const cached = fromRecoveryCache(end, count, initial, from)
+      const cached = fromCache(end, count, initial, from, restore)
       if (cached) {
         lastHistoryTime = Math.max(lastHistoryTime, cached.at(-1)?.time ?? 0)
         if (initial) onLoaded(cached.length)
@@ -241,10 +260,12 @@ export function createChartFeed(initial: ChartFeedContext) {
       }
     }
     const oldest = candleHistoryStart(Date.now(), 5000, selectedInterval)
-    const target = Math.min(
-      from === undefined ? 1 : Math.max(count, historyPageSize),
-      5000,
-    )
+    const target = recovery
+      ? 0
+      : Math.min(
+          from === undefined ? 1 : Math.max(count, historyPageSize),
+          5000,
+        )
     let cursor = end
     const combined = new Map<number, Bar>()
     while (
@@ -254,6 +275,7 @@ export function createChartFeed(initial: ChartFeedContext) {
       const start = Math.max(
         candleHistoryStart(cursor, historyPageSize, selectedInterval),
         oldest,
+        recovery ? (from ?? oldest) : oldest,
       )
       const key = `${generation}:${loadedHistoryEpoch}:${start}:${cursor}`
       let request = pendingHistory.get(key)
@@ -269,7 +291,7 @@ export function createChartFeed(initial: ChartFeedContext) {
       }
       if (!active || generation !== epoch) return null
       if (!recovery && loadedHistoryEpoch !== historyEpoch) {
-        const cached = fromRecoveryCache(end, count, initial, from)
+        const cached = fromCache(end, count, initial, from, restore)
         return cached
       }
       for (const bar of chartBars(candles, selectedCoin, selectedInterval)) {
@@ -279,13 +301,15 @@ export function createChartFeed(initial: ChartFeedContext) {
       // Sparse markets may have gaps: scan older windows only until countBack or retention is reached.
     }
     if (!recovery) {
-      for (const bar of queuedCandles
-        ? chartBars(queuedCandles, coin, interval)
-        : updates) {
+      for (const bar of updates) {
         if (bar.time >= cursor && bar.time < end) combined.set(bar.time, bar)
       }
     }
     const bars = [...combined.values()].sort((a, b) => a.time - b.time)
+    if (!recovery) {
+      storeBars(bars, cursor, end)
+      hasHistory = true
+    }
     lastHistoryTime = Math.max(lastHistoryTime, bars.at(-1)?.time ?? 0)
     if (initial) onLoaded(bars.length)
     onError('')
@@ -297,7 +321,13 @@ export function createChartFeed(initial: ChartFeedContext) {
     callback: (bar: Bar) => void,
     resetCache?: () => void,
   ) {
-    const listener = { engine, callback, last: lastHistoryTime, resetCache }
+    const listener = {
+      engine,
+      callback,
+      last: lastHistoryTime,
+      resetCache,
+      delivered: undefined as Bar | undefined,
+    }
     listeners.set(id, listener)
     defer(() => {
       if (
@@ -306,10 +336,11 @@ export function createChartFeed(initial: ChartFeedContext) {
         recoveryBlocked
       )
         return
-      for (const bar of updates) {
-        if (bar.time < listener.last) continue
+      for (const bar of sortedCache()) {
+        if (bar.time < listener.last || bar === listener.delivered) continue
         callback({ ...bar })
         listener.last = bar.time
+        listener.delivered = bar
       }
     })
   }
@@ -368,6 +399,8 @@ export function createChartFeed(initial: ChartFeedContext) {
         params.countBack,
         params.firstDataRequest,
         params.from * 1000,
+        false,
+        dirtyEngines.has('tradingview') || reloadWaiters.has('tradingview'),
       )
         .then((bars) => {
           setTimeout(() => {
@@ -381,12 +414,20 @@ export function createChartFeed(initial: ChartFeedContext) {
               error('图表市场或周期已变更')
               return
             }
+            const reloaded =
+              params.firstDataRequest || reloadWaiters.has('tradingview')
+            if (reloaded) {
+              for (const listener of listeners.values()) {
+                if (listener.engine !== 'tradingview') continue
+                listener.last = bars.at(-1)?.time ?? 0
+                listener.delivered = undefined
+              }
+            }
             callback(
               bars.map((bar) => ({ ...bar })),
               { noData: bars.length === 0 },
             )
-            if (params.firstDataRequest || reloadWaiters.has('tradingview'))
-              notifyLoaded('tradingview')
+            if (reloaded) notifyLoaded('tradingview')
           }, 0)
         })
         .catch((e) =>
@@ -481,7 +522,12 @@ export function createChartFeed(initial: ChartFeedContext) {
       resolution = chartResolutions[interval] as ResolutionString
       period = chartPeriods[interval]
       updates = []
-      queuedCandles = null
+      seenCandles.clear()
+      cachedBars.clear()
+      coveredRanges = []
+      gapFrom = null
+      gapVersion = 0
+      hasHistory = false
       frame.cancel()
       frame = createFrameBatch('chartFeed', publish)
       lastHistoryTime = 0
@@ -489,7 +535,6 @@ export function createChartFeed(initial: ChartFeedContext) {
       recoveryReady = false
       recoveryFlight = null
       recoveryUpdates.clear()
-      recoverySnapshot = null
       dirtyEngines.clear()
       listeners.clear()
       return true
@@ -498,27 +543,46 @@ export function createChartFeed(initial: ChartFeedContext) {
       visibleEngine = engine
       frame.schedule()
     },
+    lastBarTime(engine: ChartEngine) {
+      return Math.max(
+        0,
+        ...[...listeners.values()]
+          .filter((listener) => listener.engine === engine)
+          .map((listener) => listener.last),
+      )
+    },
+    needsRecovery() {
+      return gapFrom !== null
+    },
+    markGap(fromTime?: number) {
+      gapVersion++
+      const from = fromTime || lastHistoryTime || Date.now()
+      gapFrom = Math.min(gapFrom ?? from, from)
+      recoveryBlocked = true
+    },
     recover(fromTime?: number, toTime = Date.now()) {
       if (recoveryFlight) return recoveryFlight
       const wasBlocked = recoveryBlocked
       recoveryBlocked = true
       // 挂起前尚未绘制的旧快照不能在恢复后覆盖 REST 校准结果。
-      queuedCandles = null
+      updates = []
       recoveryReady = false
       historyEpoch++
       klineRequest++
       tradingViewRequest++
       if (!wasBlocked) recoveryUpdates = new Map()
-      dirtyEngines.add('kline')
-      dirtyEngines.add('tradingview')
-      const fallbackFrom = lastHistoryTime
-        ? lastHistoryTime - step
-        : candleHistoryStart(toTime, historyPageSize, interval)
-      const viewFrom =
-        fromTime === undefined
+      const fallbackFrom =
+        hasHistory && lastHistoryTime
+          ? candleHistoryStart(lastHistoryTime + 1, 2, interval)
+          : candleHistoryStart(toTime, historyPageSize, interval)
+      const requestedFrom =
+        fromTime ??
+        (gapFrom === null
           ? fallbackFrom
-          : candleHistoryStart(fromTime, historyPageSize, interval)
-      const requestedFrom = Math.min(viewFrom, fallbackFrom)
+          : candleHistoryStart(gapFrom + 1, 2, interval))
+      const hadHistory = hasHistory
+      const recoveringGapVersion = gapVersion
+      const generation = epoch
       // shortcut: Hyperliquid retains 5000 candles, add an archive if deeper recovery is required.
       const oldest = candleHistoryStart(toTime, 5000, interval)
       const queryFrom = Math.max(requestedFrom, oldest)
@@ -530,14 +594,20 @@ export function createChartFeed(initial: ChartFeedContext) {
           queryFrom,
           true,
         )
-        if (!loaded) throw new Error('图表市场或周期已变更')
+        if (!loaded || !active || generation !== epoch)
+          throw new Error('图表市场或周期已变更')
         const rows = new Map(
           loaded
             .filter((bar) => bar.time >= queryFrom && bar.time < toTime)
             .map((bar) => [bar.time, bar]),
         )
         for (const [time, bar] of recoveryUpdates) {
-          if (time >= queryFrom) rows.set(time, { ...bar })
+          const historical = rows.get(time)
+          if (
+            time >= queryFrom &&
+            (!historical || (bar.volume ?? 0) >= (historical.volume ?? 0))
+          )
+            rows.set(time, { ...bar })
         }
         const bars = [...rows.values()].sort((a, b) => a.time - b.time)
         const result = {
@@ -547,12 +617,23 @@ export function createChartFeed(initial: ChartFeedContext) {
           complete: requestedFrom >= oldest,
           bars,
         }
-        recoverySnapshot = result
+        storeBars(bars, queryFrom, result.toTime)
+        hasHistory = true
+        if (gapVersion === recoveringGapVersion) gapFrom = null
         recoveryReady = true
         lastHistoryTime = Math.max(lastHistoryTime, bars.at(-1)?.time ?? 0)
         updates = bars.slice(-2)
-        dirtyEngines.add('kline')
-        dirtyEngines.add('tradingview')
+        for (const engine of ['kline', 'tradingview'] as const) {
+          if (
+            !hadHistory ||
+            ![...listeners.values()].some(
+              (listener) => listener.engine === engine,
+            )
+          )
+            dirtyEngines.add(engine)
+        }
+        if (!visibleEngine || !dirtyEngines.has(visibleEngine))
+          releaseRecovery()
         onError('')
         return result
       })()
@@ -589,51 +670,43 @@ export function createChartFeed(initial: ChartFeedContext) {
       })
     },
     isEngineDirty(engine: ChartEngine) {
-      if (dirtyEngines.has(engine)) return true
-      const first = queuedCandles
-        ? chartBars(queuedCandles, coin, interval)[0]?.time
-        : updates[0]?.time
+      const oldest = sortedCache()[0]?.time
       for (const listener of listeners.values()) {
         if (
           listener.engine === engine &&
           listener.last > 0 &&
-          first !== undefined &&
-          first > listener.last + step
-        ) {
+          oldest &&
+          listener.last < oldest
+        )
           dirtyEngines.add(engine)
-          // 隐藏时间超过实时缓冲范围，旧校准缓存也不足以填补中间的缺口。
-          recoverySnapshot = null
-        }
       }
       return dirtyEngines.has(engine)
     },
     update(candles: Candle[]) {
       if (!active) return
       performanceMetrics.input('chartFeed')
-      performanceMetrics.queue(
-        'chartFeed',
-        candles.length,
-        queuedCandles ? 1 : 0,
+      const changed = candles.filter(
+        (candle) => seenCandles.get(candle.t) !== candle,
       )
+      const bars = chartBars(changed, coin, interval)
+      for (const candle of changed) seenCandles.set(candle.t, candle)
+      while (seenCandles.size > 5000)
+        seenCandles.delete(seenCandles.keys().next().value ?? 0)
+      if (!bars.length) return
+      performanceMetrics.queue('chartFeed', bars.length)
       if (recoveryBlocked) {
-        bufferRecoveryBars(chartBars(candles, coin, interval))
-        if (recoverySnapshot) {
-          const rows = new Map(
-            recoverySnapshot.bars.map((bar) => [bar.time, bar]),
-          )
-          for (const [time, bar] of recoveryUpdates) rows.set(time, bar)
-          recoverySnapshot.bars = [...rows.values()]
-            .sort((a, b) => a.time - b.time)
-            .slice(-5000)
-          recoverySnapshot.count = recoverySnapshot.bars.length
-          recoverySnapshot.toTime = Math.max(
-            recoverySnapshot.toTime,
-            (recoverySnapshot.bars.at(-1)?.time ?? 0) + step,
-          )
+        for (const bar of bars) recoveryUpdates.set(bar.time, bar)
+        while (recoveryUpdates.size > 5000)
+          recoveryUpdates.delete(recoveryUpdates.keys().next().value ?? 0)
+        if (recoveryReady) {
+          storeBars(bars, bars[0].time, (bars.at(-1)?.time ?? 0) + step)
         }
         return
       }
-      queuedCandles = candles
+      updates = bars
+      const previousLast = lastHistoryTime
+      lastHistoryTime = Math.max(lastHistoryTime, bars.at(-1)?.time ?? 0)
+      storeBars(bars, previousLast || bars[0].time, lastHistoryTime + step)
       frame.schedule()
     },
     dispose() {
@@ -646,7 +719,9 @@ export function createChartFeed(initial: ChartFeedContext) {
       reloadWaiters.clear()
       active = false
       frame.cancel()
-      queuedCandles = null
+      cachedBars.clear()
+      seenCandles.clear()
+      coveredRanges = []
       listeners.clear()
       updates = []
     },

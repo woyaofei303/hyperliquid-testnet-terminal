@@ -33,7 +33,7 @@ type Props = {
   label?: string
   priceDecimals?: number
   interval: ChartInterval
-  candleReconnectVersion: number
+  candleRecovery?: { version: number; fromTime: number }
   onIntervalChange: (value: ChartInterval) => void
   szDecimals: number
   candles: Candle[]
@@ -116,7 +116,7 @@ export const Chart = memo(function Chart(props: Props) {
   const recoveryCompleteRef = useRef(true)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retryAttemptRef = useRef(0)
-  const lastReconnectVersionRef = useRef(props.candleReconnectVersion)
+  const lastReconnectVersionRef = useRef(props.candleRecovery?.version)
   const selectionKey = `${props.coin}:${props.interval}`
   const selectionKeyRef = useRef(selectionKey)
   const resetSelectionKeyRef = useRef(selectionKey)
@@ -153,7 +153,7 @@ export const Chart = memo(function Chart(props: Props) {
         return
       }
 
-      const view: ChartView | null = kline
+      let view: ChartView | null = kline
         ? captureKlineView(kline)
         : (() => {
             const range = widget?.activeChart().getVisibleRange()
@@ -163,7 +163,9 @@ export const Chart = memo(function Chart(props: Props) {
               toTime: range.to * 1000,
               widthSeconds: range.to - range.from,
               followsLatest:
-                range.to * 1000 >= Date.now() - intervalMs(props.interval) * 3,
+                range.to * 1000 >=
+                (source.lastBarTime('tradingview') || Date.now()) -
+                  intervalMs(props.interval) * 3,
             }
           })()
       pendingEngineRef.current = target
@@ -179,12 +181,19 @@ export const Chart = memo(function Chart(props: Props) {
         try {
           // 重连才校准共享历史；切换引擎只加载它遗漏的数据，避免两边反复互相标脏。
           if (needsHistoryRef.current) {
-            const result = await source.recover(view?.fromTime)
+            const result = await source.recover()
             if (!isCurrent()) return
-            needsHistoryRef.current = false
+            needsHistoryRef.current = source.needsRecovery()
             recoveryCompleteRef.current = result.complete
+            if (
+              !result.complete &&
+              view?.toTime &&
+              view.toTime < result.fromTime
+            )
+              view = null
           }
-          if (source.isEngineDirty(target)) {
+          const reset = source.isEngineDirty(target)
+          if (reset) {
             await source.refreshEngine(target, () => {
               if (target === 'kline') kline?.resetData()
               else widget?.activeChart().resetData()
@@ -193,13 +202,13 @@ export const Chart = memo(function Chart(props: Props) {
           if (!isCurrent()) return
           await nextFrame()
           if (!isCurrent()) return
-          if (kline && view) {
+          if (reset && kline && view) {
             if (view.barSpace) kline.setBarSpace(view.barSpace)
             if (view.offsetRight !== undefined)
               kline.setOffsetRightDistance(view.offsetRight)
             if (view.followsLatest) kline.scrollToRealTime()
             else if (view.toTime) kline.scrollToTimestamp(view.toTime)
-          } else if (widget && view?.fromTime && view.toTime) {
+          } else if (reset && widget && view?.fromTime && view.toTime) {
             const chart = widget.activeChart()
             if (view.followsLatest) {
               const width = view.widthSeconds ?? 3600
@@ -276,30 +285,41 @@ export const Chart = memo(function Chart(props: Props) {
   }, [error, triggerRecovery])
 
   useEffect(() => {
-    let wasHidden = document.visibilityState === 'hidden'
-    const pageShown = (event: PageTransitionEvent) => {
-      if (event.persisted) triggerRecovery()
-    }
-    const visibilityChanged = () => {
-      const hidden = document.visibilityState === 'hidden'
-      if (wasHidden && !hidden) triggerRecovery()
-      wasHidden = hidden
-    }
-    window.addEventListener('online', triggerRecovery)
-    window.addEventListener('pageshow', pageShown)
-    document.addEventListener('visibilitychange', visibilityChanged)
-    return () => {
-      window.removeEventListener('online', triggerRecovery)
-      window.removeEventListener('pageshow', pageShown)
-      document.removeEventListener('visibilitychange', visibilityChanged)
-    }
-  }, [triggerRecovery])
+    if (
+      props.candles.length &&
+      !recoveryFlightRef.current &&
+      source.isEngineDirty(engine)
+    )
+      void recoveryRef.current(engine)
+  }, [source, engine, props.candles])
 
   useEffect(() => {
-    if (lastReconnectVersionRef.current === props.candleReconnectVersion) return
-    lastReconnectVersionRef.current = props.candleReconnectVersion
-    triggerRecovery()
-  }, [props.candleReconnectVersion, triggerRecovery])
+    const resume = () => {
+      if (document.visibilityState !== 'visible') return
+      source.setVisibleEngine(engineRef.current)
+      if (
+        needsHistoryRef.current ||
+        pendingEngineRef.current ||
+        source.isEngineDirty(engineRef.current)
+      )
+        void recoveryRef.current(pendingEngineRef.current ?? engineRef.current)
+    }
+    window.addEventListener('online', resume)
+    window.addEventListener('pageshow', resume)
+    document.addEventListener('visibilitychange', resume)
+    return () => {
+      window.removeEventListener('online', resume)
+      window.removeEventListener('pageshow', resume)
+      document.removeEventListener('visibilitychange', resume)
+    }
+  }, [source])
+
+  useEffect(() => {
+    if (lastReconnectVersionRef.current === props.candleRecovery?.version)
+      return
+    lastReconnectVersionRef.current = props.candleRecovery?.version
+    if (props.candleRecovery?.version) triggerRecovery()
+  }, [props.candleRecovery?.version, triggerRecovery])
 
   useEffect(() => {
     const target = pendingEngineRef.current

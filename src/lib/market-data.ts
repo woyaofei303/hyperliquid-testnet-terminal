@@ -41,5 +41,5 @@ export function mergeTrades(
 export function mergeCandles(history: Candle[], updates: Candle[]) {
   const candles = new Map(history.map((c) => [c.t, c]))
   for (const candle of updates) candles.set(candle.t, candle)
-  return [...candles.values()].sort((a, b) => a.t - b.t).slice(-500)
+  return [...candles.values()].sort((a, b) => a.t - b.t).slice(-5000)
 }

@@ -73,7 +73,7 @@ export function Terminal({ view = 'trade' }: { view?: 'trade' | 'outcomes' }) {
                       }
                       priceDecimals={market ? pricePrecision(market) : 1}
                       interval={interval}
-                      candleReconnectVersion={feed.candleReconnectVersion}
+                      candleRecovery={feed.candleRecovery}
                       onIntervalChange={setIntervalValue}
                       candles={feed.candles}
                       szDecimals={market?.szDecimals ?? 5}

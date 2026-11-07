@@ -96,7 +96,7 @@ test('持续高频行情、资源回收与连接复用 @benchmark', async ({
     ).toBeLessThanOrEqual(100)
     expect(
       sample.modules.find((row) => row.id === 'candles')?.retained,
-    ).toBeLessThanOrEqual(500)
+    ).toBeLessThanOrEqual(5000)
   }
   await page.screenshot({ path: testInfo.outputPath('metrics.png') })
   const recovery: (typeof initial)[] = []
@@ -420,7 +420,7 @@ async function mockExchange(
   })
   let pushTrade = (_coin: string, _tid: number) => {}
   const tradeSubscriptions: string[] = []
-  let pushMarket = (_coin: string, _price: number) => {}
+  let pushMarket = (_coin: string, _price: number, _time?: number) => {}
   const candles = (
     coin: string,
     interval: string,
@@ -993,7 +993,7 @@ async function mockExchange(
             },
           }),
         )
-        pushMarket = (coin, price) => {
+        pushMarket = (coin, price, time) => {
           const depth = book(coin)
           depth.levels[0].forEach((row, i) => {
             row.px = String(price - 1 - i)
@@ -1013,6 +1013,7 @@ async function mockExchange(
               channel: 'candle',
               data: {
                 ...candles(coin, '5m').at(-1),
+                ...(time === undefined ? {} : { t: time, T: time + 299999 }),
                 c: String(price),
                 h: String(Math.max(70100, price)),
                 l: String(Math.min(69800, price)),
@@ -1143,7 +1144,8 @@ async function mockExchange(
     releaseHistory,
     socketConnections,
     tradeSubscriptions,
-    pushMarket: (coin: string, price: number) => pushMarket(coin, price),
+    pushMarket: (coin: string, price: number, time?: number) =>
+      pushMarket(coin, price, time),
     pushTrade: (coin: string, tid: number) => pushTrade(coin, tid),
   }
 }
@@ -2008,11 +2010,12 @@ test('网络恢复后重新校准当前显示的 KLineChart 和 TradingView', as
   const syncing = page.getByText('K 线历史同步中', { exact: true })
   let releaseHistory = exchange.pauseCandleHistory()
   let before = exchange.candleHistoryRequests()
-  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  exchange.disconnectMarket()
   await expect
     .poll(() => exchange.candleHistoryRequests())
     .toBeGreaterThan(before)
-  await page.getByRole('button', { name: '关闭提示' }).click()
+  if (await page.getByRole('button', { name: '关闭提示' }).isVisible())
+    await page.getByRole('button', { name: '关闭提示' }).click()
   await expect(syncing).toBeVisible()
   releaseHistory()
   await expect(syncing).toHaveCount(0)
@@ -2033,14 +2036,15 @@ test('网络恢复后重新校准当前显示的 KLineChart 和 TradingView', as
   await expect(tradingViewRegion).toBeVisible()
   releaseHistory = exchange.pauseCandleHistory()
   before = exchange.candleHistoryRequests()
-  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  exchange.disconnectMarket()
   await expect
     .poll(() => exchange.candleHistoryRequests())
     .toBeGreaterThan(before)
   await expect(syncing).toBeVisible()
   releaseHistory()
   await expect(syncing).toHaveCount(0)
-  await page.getByRole('button', { name: '关闭提示' }).click()
+  if (await page.getByRole('button', { name: '关闭提示' }).isVisible())
+    await page.getByRole('button', { name: '关闭提示' }).click()
   await page.getByRole('button', { name: '基础版', exact: true }).click()
   await expect(syncing).toHaveCount(0)
   await expect(klineRegion).toBeVisible()
@@ -2072,11 +2076,12 @@ test('K 线恢复期间连续切换引擎，最终显示最后一次选择并继
   )
   const before = exchange.candleHistoryRequests()
   const release = exchange.pauseCandleHistory()
-  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  exchange.disconnectMarket()
   await expect
     .poll(() => exchange.candleHistoryRequests())
     .toBeGreaterThan(before)
-  await page.getByRole('button', { name: '关闭提示' }).click()
+  if (await page.getByRole('button', { name: '关闭提示' }).isVisible())
+    await page.getByRole('button', { name: '关闭提示' }).click()
   await page.getByRole('button', { name: '基础版', exact: true }).click()
   await page.getByRole('button', { name: 'TradingView', exact: true }).click()
   await page.getByRole('button', { name: '基础版', exact: true }).click()
@@ -2086,6 +2091,45 @@ test('K 线恢复期间连续切换引擎，最终显示最后一次选择并继
   exchange.pushMarket('BTC', 70087)
   await expect.poll(() => chartTextPoint(page, '70,087')).not.toBeNull()
   expect(errors).toEqual([])
+  expect(exchange.writes).toEqual([])
+})
+
+test('健康连接返回标签页不请求历史，两个图表实例保持不变', async ({ page }) => {
+  const exchange = await mockExchange(page)
+  await page.goto('/')
+  const basic = page.getByRole('region', { name: /基础版 K 线图/ })
+  await expect(basic).toHaveAttribute('aria-label', /已加载 40 根/)
+  await page.getByRole('button', { name: 'TradingView', exact: true }).click()
+  await expect(page.frameLocator('iframe').locator('body')).toContainText(
+    /开=\d/,
+  )
+  const iframe = await page.locator('iframe').getAttribute('id')
+  for (const name of ['TradingView', '基础版']) {
+    const toast = page.getByRole('button', { name: '关闭提示' })
+    if (await toast.isVisible()) await toast.click()
+    await page.getByRole('button', { name, exact: true }).click()
+    const before = exchange.candleHistoryRequests()
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'hidden',
+      })
+      document.dispatchEvent(new Event('visibilitychange'))
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'visible',
+      })
+      document.dispatchEvent(new Event('visibilitychange'))
+      window.dispatchEvent(new Event('online'))
+    })
+    exchange.pushMarket('BTC', 70087)
+    await expect(page.getByText('K 线历史同步中', { exact: true })).toHaveCount(
+      0,
+    )
+    await page.waitForTimeout(400)
+    expect(exchange.candleHistoryRequests()).toBe(before)
+    expect(await page.locator('iframe').getAttribute('id')).toBe(iframe)
+  }
   expect(exchange.writes).toEqual([])
 })
 
@@ -2159,6 +2203,98 @@ test('K 线页面长时间隐藏后恢复，基础版仍能向左加载历史', 
     await page.mouse.up()
   }
   await expect.poll(() => Math.min(...ends)).toBeLessThan(oldestRequest)
+})
+
+test('TradingView 模拟休眠十二小时后只补缺口，重复返回事件不叠加请求', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  await recordChartText(page)
+  const requests: { startTime: number; endTime: number }[] = []
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/info',
+    async (route) => {
+      const request = route.request().postDataJSON()
+      if (request.type !== 'candleSnapshot') return route.fallback()
+      const { startTime, endTime, coin, interval } = request.req
+      requests.push({ startTime, endTime })
+      const data = []
+      for (let t = startTime; t <= endTime; t += 300000)
+        data.push({
+          t,
+          T: t + 299999,
+          s: coin,
+          i: interval,
+          o: '69900',
+          h: '70100',
+          l: '69800',
+          c: '70000',
+          v: '1',
+          n: 1,
+        })
+      await route.fulfill({ json: data })
+    },
+  )
+  await page.clock.install()
+  await page.goto('/')
+  await expect(
+    page.getByRole('region', { name: /基础版 K 线图/ }),
+  ).toHaveAttribute('aria-label', /已加载 300 根/)
+  await page.getByRole('button', { name: 'TradingView', exact: true }).click()
+  await expect(page.frameLocator('iframe').locator('body')).toContainText(
+    /开=\d/,
+  )
+  const iframe = await page.locator('iframe').getAttribute('id')
+  const before = requests.length
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await page.clock.fastForward(12 * 60 * 60 * 1000)
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    })
+    for (let i = 0; i < 4; i++) {
+      document.dispatchEvent(new Event('visibilitychange'))
+      window.dispatchEvent(new Event('online'))
+    }
+  })
+  await expect.poll(() => requests.length).toBeGreaterThan(before)
+  await expect(page.getByText('K 线历史同步中', { exact: true })).toHaveCount(0)
+  await page.waitForTimeout(500)
+  const recovered = requests.slice(before)
+  expect(recovered).toHaveLength(1)
+  expect(recovered[0].endTime - recovered[0].startTime).toBeLessThan(
+    150 * 300000,
+  )
+  expect(recovered[0].endTime - recovered[0].startTime).toBeGreaterThan(
+    12 * 60 * 60 * 1000,
+  )
+  expect(await page.locator('iframe').getAttribute('id')).toBe(iframe)
+  await expect(page.frameLocator('iframe').locator('body')).toContainText(
+    /开=\d/,
+  )
+  const current = await page.evaluate(
+    () => Math.floor(Date.now() / 300000) * 300000,
+  )
+  exchange.pushMarket('BTC', 70089, current)
+  await expect(page.frameLocator('iframe').locator('body')).toContainText(
+    /收=70,?089/,
+  )
+  const toast = page.getByRole('button', { name: '关闭提示' })
+  if (await toast.isVisible()) await toast.click()
+  await page.getByRole('button', { name: '基础版', exact: true }).click()
+  await expect.poll(() => chartTextPoint(page, '70,089')).not.toBeNull()
+  expect(requests).toHaveLength(before + 1)
+  await page.screenshot({
+    path: 'output-tdd/playwright/chart-recovery/after-simulated-sleep.png',
+  })
+  expect(exchange.writes).toEqual([])
 })
 
 test('K 线历史请求失败后自动重试，WebSocket 断开重连后继续实时更新', async ({
