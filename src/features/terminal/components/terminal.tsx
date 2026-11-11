@@ -6,7 +6,6 @@ import {
   isCash,
   marketLabel,
   pricePrecision,
-  quoteName,
 } from '@/features/market/lib/market-catalog'
 import { useTerminal } from '@/features/terminal/hooks/use-terminal'
 import { t, useLocale } from '@/i18n'
@@ -206,12 +205,7 @@ export function Terminal({ view = 'trade' }: { view?: 'trade' | 'outcomes' }) {
             <span className={feed.stale ? 'text-amber-300' : 'text-accent'}>
               ● {feed.stale ? t('行情未就绪 / 已过期') : t(feed.status)}
             </span>
-            <div className="flex items-center gap-3">
-              <PerformancePanel />
-              <span>
-                {quoteName(market)} {t('· 以交易所返回为准')}
-              </span>
-            </div>
+            {process.env.NEXT_PUBLIC_PERF_CHECK === '1' && <PerformancePanel />}
           </footer>
         </div>
       )}

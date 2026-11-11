@@ -146,7 +146,7 @@ export function OrderBook({ model }: { model: TerminalModel }) {
               <span className="text-loss">{t('卖盘')}</span>
             </span>
             <span>
-              {feed.stale ? t('等待深度更新') : t('快速前 5 档 · 深档快照')}
+              {feed.stale ? t('等待深度更新') : t('较远档位定时更新')}
             </span>
           </div>
         </Tab>

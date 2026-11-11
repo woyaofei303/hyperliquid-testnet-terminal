@@ -2109,7 +2109,7 @@ test('网络恢复后重新校准当前显示的 KLineChart 和 TradingView', as
     page.getByRole('region', { name: /基础版 K 线图，已加载 40 根/ }),
   ).toBeVisible()
 
-  const syncing = page.getByText('K 线历史同步中', { exact: true })
+  const syncing = page.getByText('正在更新 K 线…', { exact: true })
   let releaseHistory = exchange.pauseCandleHistory()
   let before = exchange.candleHistoryRequests()
   exchange.disconnectMarket()
@@ -2188,7 +2188,7 @@ test('K 线恢复期间连续切换引擎，最终显示最后一次选择并继
   await page.getByRole('button', { name: 'TradingView', exact: true }).click()
   await page.getByRole('button', { name: '基础版', exact: true }).click()
   release()
-  await expect(page.getByText('K 线历史同步中', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('正在更新 K 线…', { exact: true })).toHaveCount(0)
   await expect(basic).toBeVisible()
   exchange.pushMarket('BTC', 70087)
   await expect.poll(() => chartTextPoint(page, '70,087')).not.toBeNull()
@@ -2225,7 +2225,7 @@ test('健康连接返回标签页不请求历史，两个图表实例保持不�
       window.dispatchEvent(new Event('online'))
     })
     exchange.pushMarket('BTC', 70087)
-    await expect(page.getByText('K 线历史同步中', { exact: true })).toHaveCount(
+    await expect(page.getByText('正在更新 K 线…', { exact: true })).toHaveCount(
       0,
     )
     await page.waitForTimeout(400)
@@ -2291,7 +2291,7 @@ test('K 线页面长时间隐藏后恢复，基础版仍能向左加载历史', 
     document.dispatchEvent(new Event('visibilitychange'))
   })
   await expect.poll(() => ends.length).toBeGreaterThan(before)
-  await expect(page.getByText('K 线历史同步中', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('正在更新 K 线…', { exact: true })).toHaveCount(0)
   await expect(basic.locator('.pointer-events-auto')).toHaveCount(0)
   const oldestRequest = Math.min(...ends)
   const canvas = await basic.locator('canvas').first().boundingBox()
@@ -2367,7 +2367,7 @@ test('TradingView 模拟休眠十二小时后只补缺口，重复返回事件�
     }
   })
   await expect.poll(() => requests.length).toBeGreaterThan(before)
-  await expect(page.getByText('K 线历史同步中', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('正在更新 K 线…', { exact: true })).toHaveCount(0)
   await page.waitForTimeout(500)
   const recovered = requests.slice(before)
   expect(recovered).toHaveLength(1)
@@ -2421,7 +2421,7 @@ test('K 线历史请求失败后自动重试，WebSocket 断开重连后继续�
   )
   await page.goto('/')
   const basic = page.getByRole('region', { name: /基础版 K 线图/ })
-  const syncing = page.getByText('K 线历史同步中', { exact: true })
+  const syncing = page.getByText('正在更新 K 线…', { exact: true })
   await expect(basic).toHaveAttribute('aria-label', /已加载 40 根/)
   await expect(syncing).toHaveCount(0)
   expect(rejected).toBe(true)
@@ -2941,40 +2941,44 @@ test('突发行情按帧合并，盘口三列累计正确且标记价实时更�
   await expect(page.getByRole('region', { name: '市场概览' })).toContainText(
     '70,999.0',
   )
-  await page.getByRole('button', { name: /性能 ·/ }).click()
-  await expect(page.getByRole('table', { name: '模块性能指标' })).toContainText(
-    '订单簿数据',
-  )
-  await expect(page.getByRole('table', { name: '模块性能指标' })).toContainText(
-    '标记价 / 市场数据',
-  )
-  let measured = {
-    retained: 0,
-    pending: 0,
-    coalesced: 0,
-    totalInput: 0,
-    totalUpdates: 0,
-  }
-  await expect
-    .poll(async () => {
-      const download = page.waitForEvent('download')
-      await page.getByRole('button', { name: '导出指标', exact: true }).click()
-      const result = await download
-      const path = await result.path()
-      if (!path) throw new Error('指标下载失败')
-      const data = JSON.parse(await readFile(path, 'utf8'))
-      measured = data.modules.find((row: { id: string }) => row.id === 'book')
-      return measured.totalInput
+  if (process.env.PERF_CHECK === '1') {
+    await page.getByRole('button', { name: /性能 ·/ }).click()
+    await expect(
+      page.getByRole('table', { name: '模块性能指标' }),
+    ).toContainText('订单簿数据')
+    await expect(
+      page.getByRole('table', { name: '模块性能指标' }),
+    ).toContainText('标记价 / 市场数据')
+    let measured = {
+      retained: 0,
+      pending: 0,
+      coalesced: 0,
+      totalInput: 0,
+      totalUpdates: 0,
+    }
+    await expect
+      .poll(async () => {
+        const download = page.waitForEvent('download')
+        await page
+          .getByRole('button', { name: '导出指标', exact: true })
+          .click()
+        const result = await download
+        const path = await result.path()
+        if (!path) throw new Error('指标下载失败')
+        const data = JSON.parse(await readFile(path, 'utf8'))
+        measured = data.modules.find((row: { id: string }) => row.id === 'book')
+        return measured.totalInput
+      })
+      .toBeGreaterThanOrEqual(1000)
+    expect(measured.retained).toBeLessThanOrEqual(40)
+    expect(measured.pending).toBeLessThanOrEqual(1)
+    expect(measured.coalesced).toBeGreaterThan(0)
+    expect(measured.totalUpdates).toBeLessThan(measured.totalInput)
+    await page.screenshot({
+      path: 'output-tdd/playwright/market-performance/metrics.png',
+      fullPage: true,
     })
-    .toBeGreaterThanOrEqual(1000)
-  expect(measured.retained).toBeLessThanOrEqual(40)
-  expect(measured.pending).toBeLessThanOrEqual(1)
-  expect(measured.coalesced).toBeGreaterThan(0)
-  expect(measured.totalUpdates).toBeLessThan(measured.totalInput)
-  await page.screenshot({
-    path: 'output-tdd/playwright/market-performance/metrics.png',
-    fullPage: true,
-  })
+  }
   expect(socketConnections).toHaveLength(2)
   expect(writes).toEqual([])
 })
@@ -4185,10 +4189,16 @@ test('现货高级订单：确认期间切换账户会中止余额查询后的�
   expect(writes).toHaveLength(0)
 })
 
-test('性能面板鼠标开关无自动描边，键盘焦点仍清晰可见', async ({ page }) => {
+test('正式页面隐藏性能调试入口，性能验收模式保留键盘操作', async ({ page }) => {
   await mockExchange(page)
   await page.goto('/')
   const trigger = page.getByRole('button', { name: /性能 ·/ })
+  if (process.env.PERF_CHECK !== '1') {
+    await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
+    await expect(trigger).toHaveCount(0)
+    await expect(page.getByText('· 以交易所返回为准')).toHaveCount(0)
+    return
+  }
   const dialog = page.getByRole('dialog', { name: '性能监测', exact: true })
   const exportButton = dialog.getByRole('button', {
     name: '导出指标',

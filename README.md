@@ -216,6 +216,13 @@ npm run build
 npm run test:e2e -- --workers=1
 ```
 
+普通构建不显示性能面板。需要运行高频行情基准测试时，构建和测试都使用现有的 `PERF_CHECK=1` 开关；这些测试只注入模拟行情，不发真实交易。测试完重新执行不带开关的构建，避免将诊断界面发布给用户。
+
+```sh
+PERF_CHECK=1 npm run build:static
+PERF_CHECK=1 STATIC_EXPORT=1 npm run test:e2e -- --grep @benchmark --workers=1
+```
+
 下面两项访问真实测试网，只查询行情。`verify:read` 校验市场配置、HTTP 订单簿、历史 K 线和 WebSocket 推送；`test:live` 检查真实页面、BTC/ETH 切换和手机排版，并断言没有 `/exchange` 请求。
 
 ```sh

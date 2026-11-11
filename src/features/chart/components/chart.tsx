@@ -505,10 +505,10 @@ export const Chart = memo(function Chart(props: Props) {
           >
             <span>
               {recoveryStatus === 'syncing'
-                ? t('K 线历史同步中')
+                ? t('正在更新 K 线…')
                 : recoveryStatus === 'incomplete'
-                  ? t('部分历史超出交易所留存范围，无法校准')
-                  : `${t('K 线历史同步失败：')}${t(recoveryError)}`}
+                  ? t('部分历史 K 线已不可获取')
+                  : `${t('K 线更新失败：')}${t(recoveryError)}`}
             </span>
             {recoveryStatus === 'error' && (
               <button
@@ -519,7 +519,7 @@ export const Chart = memo(function Chart(props: Props) {
                   triggerRecovery()
                 }}
               >
-                {t('重试同步')}
+                {t('重试')}
               </button>
             )}
           </div>

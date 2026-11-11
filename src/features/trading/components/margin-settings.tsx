@@ -141,9 +141,7 @@ export function MarginSettings(props: {
               <p className="mt-4 text-xs leading-6 text-muted">
                 {t('当前市场上限')}
                 {market.maxLeverage}
-                {t(
-                  'x。提高杠杆会减少开仓所需保证金；最终可用杠杆和订单接受结果以 Hyperliquid 校验为准。',
-                )}
+                {t('x。提高杠杆会减少开仓所需保证金。')}
               </p>
             </>
           )}

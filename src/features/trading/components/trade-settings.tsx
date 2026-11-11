@@ -45,8 +45,8 @@ export function TradeSettings() {
           </div>
           <p className="mt-4 border-t border-edge pt-3 text-xs leading-5 text-muted">
             {locale === 'en-US'
-              ? 'Saved in this browser. Turning confirmations off submits orders immediately. Wallet signatures and validation still apply.'
-              : '保存在当前浏览器。关闭确认后点击下单将直接提交；钱包签名和交易校验仍然保留。'}
+              ? 'Turning confirmations off submits orders immediately.'
+              : '关闭确认后，点击下单将直接提交。'}
           </p>
         </section>
       }

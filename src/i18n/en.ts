@@ -1,5 +1,6 @@
 // 前端文案：简体中文为源文案，英文与同一交易状态共享，不通过切换路由重建会话。
 export const en: Record<string, string> = {
+  '正在读取账户类型…': 'Loading account type…',
   '在手机 App 上交易': 'Trade in the mobile app',
   '先连接下方电脑钱包，再点「授权手机交易 / 管理设备」生成二维码。用 App 扫码并核对授权后，手机即可独立交易。':
     'Connect a wallet below, then open “Authorize phone / Manage devices” to generate a QR code. Scan it in the app and confirm the authorization to trade from your phone.',
@@ -140,12 +141,11 @@ export const en: Record<string, string> = {
 
   '）': ')',
   '图表加载失败：': 'Chart failed: ',
-  'K 线历史同步中': 'Synchronizing candle history',
-  '部分历史超出交易所留存范围，无法校准':
-    'Some history is outside the exchange retention range and cannot be reconciled',
-  'K 线历史同步失败：': 'Candle history sync failed: ',
+  '正在更新 K 线…': 'Updating candles…',
+  '部分历史 K 线已不可获取': 'Some historical candles are no longer available',
+  'K 线更新失败：': 'Candle update failed: ',
   '网络不可用，等待恢复后重试': 'Offline; will retry when the network returns',
-  重试同步: 'Retry sync',
+  重试: 'Retry',
   此市场暂无历史成交: 'No historical trades for this market',
   '行情加载失败：': 'Market data failed: ',
   暂时无法显示: 'Currently unavailable',
@@ -362,8 +362,8 @@ export const en: Record<string, string> = {
     'This market supports isolated margin only.',
   杠杆倍数: 'Leverage',
   当前市场上限: 'Market maximum ',
-  'x。提高杠杆会减少开仓所需保证金；最终可用杠杆和订单接受结果以 Hyperliquid 校验为准。':
-    'x. Higher leverage reduces initial margin. Hyperliquid determines available leverage and order acceptance.',
+  'x。提高杠杆会减少开仓所需保证金。':
+    'x. Higher leverage reduces initial margin.',
   '启用交易后可提交调整，无需逐笔钱包确认。':
     'Once trading is enabled, changes do not require separate wallet confirmations.',
   取消: 'Cancel',
@@ -426,7 +426,7 @@ export const en: Record<string, string> = {
   买盘: 'Bids',
   卖盘: 'Asks',
   等待深度更新: 'Waiting for depth',
-  '快速前 5 档 · 深档快照': 'Fast top 5 · deeper snapshots',
+  较远档位定时更新: 'Deeper levels update periodically',
   最新成交: 'Recent trades',
   '成交数据异常：': 'Trade data error: ',
   '价格（': 'Price (',

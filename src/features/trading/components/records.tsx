@@ -672,9 +672,7 @@ export function TradingRecords({ model }: { model: TerminalModel }) {
                 <time className="font-mono text-muted">
                   {entry.at.slice(11, 19)} UTC
                 </time>
-                <span>
-                  {entry.coin} · {entry.action}
-                </span>
+                <span>{entry.coin}</span>
                 <span
                   className={
                     entry.state === 'rejected' || entry.state === 'unconfirmed'

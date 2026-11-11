@@ -124,16 +124,14 @@ export function AccountTypeSetting({
                 ? t(
                     '投资组合保证金处于测试阶段，账户价值需低于 2,500 万美元；资格与借贷额度由交易所校验。',
                   )
-                : t('统一账户的同一资产无需在现货与合约之间划转。')}
+                : null}
             {t('确认后由钱包签名修改整个账户的类型。')}
           </p>
           {!connected && (
             <p className="text-xs text-muted">{t('请先连接钱包。')}</p>
           )}
           {connected && !mode && (
-            <p className="text-xs text-muted">
-              {t('请等到账户类型读取完成；查询失败时可关闭弹窗后刷新账户。')}
-            </p>
+            <p className="text-xs text-muted">{t('正在读取账户类型…')}</p>
           )}
           {error && (
             <p role="alert" className="text-xs text-loss">
