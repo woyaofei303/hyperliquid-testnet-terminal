@@ -17,7 +17,7 @@ test('手机授权签名包含独立设备名与明确到期时间，拒绝超�
   })
   assert.throws(() =>
     phoneApproval(
-      { ...request, expiresAt: request.expiresAt + 1 },
+      { ...request, expiresAt: request.expiresAt + 30001 },
       request.account,
       now,
     ),

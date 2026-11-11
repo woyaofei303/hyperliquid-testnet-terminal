@@ -66,3 +66,37 @@ test('只有交易所返回的同名、同地址且未到期授权可以恢复',
     parsePhoneRequest({ ...request, account: address }, offer.account, now),
   )
 })
+
+test('服务器与手机稍快时仍可配对，但不接受过期或超出时钟容差的数据', async () => {
+  const { AGENT_DURATION, parsePhoneRequest } = await import(
+    './phone-pairing.ts'
+  )
+  for (const skew of [2500, 30000]) {
+    const ahead = { ...offer, expiresAt: now + 300000 + skew }
+    assert.deepEqual(parsePairingQR(pairingQR(ahead), offer.relay, now), ahead)
+    const request = {
+      account: offer.account,
+      agentAddress: `0x${'5'.repeat(40)}` as const,
+      agentName: 'Phone-5555555555',
+      expiresAt: now + AGENT_DURATION + skew,
+    }
+    assert.deepEqual(parsePhoneRequest(request, offer.account, now), request)
+  }
+  for (const expiresAt of [now, now - 1, now + 300000 + 30001])
+    assert.throws(() =>
+      parsePairingQR(pairingQR({ ...offer, expiresAt }), offer.relay, now),
+    )
+  for (const expiresAt of [now, now - 1, now + AGENT_DURATION + 30001])
+    assert.throws(() =>
+      parsePhoneRequest(
+        {
+          account: offer.account,
+          agentAddress: `0x${'5'.repeat(40)}`,
+          agentName: 'Phone-5555555555',
+          expiresAt,
+        },
+        offer.account,
+        now,
+      ),
+    )
+})

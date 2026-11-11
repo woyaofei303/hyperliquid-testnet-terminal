@@ -8277,6 +8277,8 @@ test('手机配对核对后才签名，通知丢失可重试且关闭不删除�
       return
     }
     if (request.url().endsWith('/pairings')) {
+      // 复现线上服务器比电脑快几秒，刚创建的二维码仍应显示。
+      offer.expiresAt = Date.now() + 302500
       await route.fulfill({
         headers,
         json: {

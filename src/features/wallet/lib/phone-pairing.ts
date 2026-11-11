@@ -5,6 +5,8 @@ import { bytesToHex, hexToBytes, isAddress, sha256, stringToBytes } from 'viem'
 export const PAIRING_TTL = 5 * 60_000
 export const AGENT_DURATION = 7 * 24 * 60 * 60_000
 export const PHONE_AGENT_PREFIX = 'Phone-'
+// 三台设备的时钟可能相差几秒；只容忍未来上限偏差，不延后已有到期时间。
+const CLOCK_SKEW = 30_000
 export interface PairingOffer {
   version: 1
   relay: string
@@ -72,7 +74,7 @@ export function parsePairingQR(
     typeof v.expiresAt !== 'number' ||
     !Number.isSafeInteger(v.expiresAt) ||
     v.expiresAt <= now ||
-    v.expiresAt > now + PAIRING_TTL
+    v.expiresAt > now + PAIRING_TTL + CLOCK_SKEW
   )
     throw new Error('二维码已过期或设备时间不正确，请在 Web 重新生成')
   return {
@@ -106,7 +108,7 @@ export function parsePhoneRequest(
     typeof v.expiresAt !== 'number' ||
     !Number.isSafeInteger(v.expiresAt) ||
     v.expiresAt <= now ||
-    v.expiresAt > now + AGENT_DURATION
+    v.expiresAt > now + AGENT_DURATION + CLOCK_SKEW
   )
     throw new Error('手机代理地址、授权期限或账户不匹配')
   return {
@@ -217,7 +219,9 @@ export async function pairingFetch(
         ? '配对已过期或取消，请重新扫码；已提交的授权请到设备列表核验'
         : response.status === 409
           ? '二维码已被使用，请重新生成'
-          : '配对服务不可用，请检查地址和网络后重试',
+          : response.status === 429
+            ? '配对请求过于频繁，请稍后再试'
+            : '配对服务不可用，请检查地址和网络后重试',
     )
   return response.json()
 }
