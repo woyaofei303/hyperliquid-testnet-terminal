@@ -6,7 +6,7 @@
 
 ## 一次操作怎样调用这些代码
 
-例如输入 BTC 数量并预览订单：页面使用 `@fameex/ui` 的 Input 接收文本，再由原有 `prepareOrder` 按 Hyperliquid 市场元数据检查数量和价格精度。Button 打开确认框；实际授权、签名、发送仍走 `src/lib/hyperliquid.ts`。组件只负责交互，不替换资金或订单规则。
+例如输入 BTC 数量并预览订单：页面使用 `@fameex/ui` 的 Input 接收文本，再由原有 `prepareOrder` 按 Hyperliquid 市场元数据检查数量和价格精度。Button 打开确认框；实际授权、签名、发送仍走 `src/shared/lib/hyperliquid.ts`。组件只负责交互，不替换资金或订单规则。
 
 - `ui`：复用 Button、Input、Select、Checkbox、Spinner、Tabs、Slider、SmartPopover、Modal 的实际实现及样式，保留原工程的 HeroUI 2.8.5。Motion 依赖采用原锁文件中的 Framer Motion 12.7.4、motion-dom 12.7.4 和 motion-utils 12.7.2，并锁定配套版本，避免新版子依赖导致生产构建缺少导出。Input 的标签补齐关联及原生输入属性；Select 修复一处无效 CSS 选择器并移除多余背景色；SVG 补齐无障碍属性。Select 允许调用方配置 slot 尺寸；Tabs 保留原实现及动画，避免全局禁用动画后丢失自定义选中条。Slider 使用原样式与拖动交互，将 `es-toolkit/union` 换成原生 Set，刻度按钮补齐键盘与禁用状态，未为去重新增依赖。SmartPopover 沿用原状态 hook，点击型弹层不随鼠标离开关闭，触发器改为可键盘操作的按钮，并在卸载时清理计时器。市场列表的搜索、分类和排序参考 `TradeHeader/MarketList`，数据及下单规则由本项目提供。其余差异主要是 Biome 格式和无用导入清理。
 - `utils`：复用 `classNames/cn`、`getColorByCssVar`、`createCssVar`、`withAlpha`。它们实际用于组件样式合并和图表颜色。类名合并保留默认字号组，再追加 FameEX 的自定义字号，修复 `text-xs` 被 `text-1` 覆盖的问题。没有引入 FameEX 的请求鉴权、密码处理或 CEX 签名工具。
@@ -21,7 +21,7 @@
 
 资金和交易授权弹窗适配 `apps/web/src/components/Modal.tsx`：保留 HeroUI Modal 原语、480px 宽度、16px 圆角、24px 内容间距、Close 原图标和进入/退出动画，窄屏按视口收缩，内容区可滚动。覆盖 HeroUI 默认桌面大外边距为 12px，避免高弹窗出现外层滚动并误关下拉。去掉此处不用的尺寸选项和业务依赖；增加可读的关闭标签与减少动态效果支持。资金下拉挂载在弹窗根节点、滚动正文之外，避免被无障碍隔离误隐藏；同时关闭容器滚动触发的菜单自动关闭，保留外部点击和 Esc 关闭。划转继续参考 Transfer/ModeSelect，交换按钮使用原 `Transfer2.svg` 路径。状态、签名和费用查询仍在 Hyperliquid 的 hook 与业务层。
 
-两套图表都由 `src/lib/chart-feed.ts` 提供数据。初始化时请求 Hyperliquid `candleSnapshot`；实时蜡烛复用 `useMarket` 的 WebSocket 推送。历史返回时按时间去重，并保留已经收到的更新；退订后不再触发旧回调。向左拖动会继续查询可用历史，不能突破 Hyperliquid 最近 5000 根的上限。首次加载目前会与页面行情摘要各查询一次快照，实时连接没有另开一套。
+两套图表都由 `src/features/chart/lib/chart-feed.ts` 提供数据。初始化时请求 Hyperliquid `candleSnapshot`；实时蜡烛复用 `useMarket` 的 WebSocket 推送。历史返回时按时间去重，并保留已经收到的更新；退订后不再触发旧回调。向左拖动会继续查询可用历史，不能突破 Hyperliquid 最近 5000 根的上限。首次加载目前会与页面行情摘要各查询一次快照，实时连接没有另开一套。
 
 ## 基础版绘图、指标与交易线
 

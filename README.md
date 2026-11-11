@@ -245,20 +245,43 @@ npm run verify:read -- 0x替换为你的40位十六进制公开地址
 
 ## 对照源码理解状态变化
 
-- `src/lib/hyperliquid.ts`：固定测试网连接、读取主账户数据、钱包连接和可恢复交易会话。浏览器扩展签交易授权及资金划转，订单使用已登记 API 钱包的 L1 签名，避免混淆两种协议；参见 [官方签名说明](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/signing)。
-- `src/lib/funding.ts`：固定测试链和 CCTP 合约、校验 USDC 金额、模拟合约调用、提交源链授权/充值，构造 CCTP 提款参数、预留 Gas/激活费，并匹配跨链到账证据。
-- `src/lib/cctp.ts`：查询和校验 CCTP 消息，解析目标链事件，将存款与 HyperCore 流水关联，并核对提款原 nonce、收款人和实际到账净额。
-- `src/hooks/use-wallet-providers.ts`、`use-funding.ts`：分别负责扩展发现，以及余额、待确认资金记录和轮询；`src/components/trading/web3-dialog.tsx` 与 `withdrawal-form.tsx` 渲染账户、存款、划转、提款及确认页，资金请求和记录由 hook 管理。
-- `src/lib/use-market.ts`：订阅订单簿和 K 线；重连后补 HTTP 快照，旧市场的异步结果不能写回新市场。订单簿消息按完整快照处理；K 线按时间去重合并。
-- `src/lib/orders.ts`：数量精度、价格有效数字、10 USDC 开仓门槛、IOC 滑点边界和回报解析。资产编号来自元数据索引，不把主网 BTC 编号搬到测试网；参见 [价格与数量精度规则](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/tick-and-lot-size)。
-- `src/lib/chart-feed.ts`：把 Hyperliquid 毫秒 OHLCV 转换为两种图表契约，校验币种、周期、价格范围，处理历史翻页、推送先到和退订。遵循 [Hyperliquid K 线接口](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint#candle-snapshot)、[KLineChart 数据接入](https://klinecharts.com/en-US/guide/data-integration) 和 [TradingView Datafeed](https://www.tradingview.com/charting-library-docs/latest/connecting_data/datafeed-api/) 的时间及异步回调规则。
-- `src/hooks/use-terminal.ts`：协调钱包、账户、预览确认、回报核对及刷新；`use-order-form.ts` 管理输入草稿，`use-margin-settings.ts` 管理保证金与杠杆弹层。
-- `src/components/trading/order-type-selector.tsx`、`order-options.tsx`：共用的类型菜单和高级参数 UI；现货/预测的状态与校验在 `use-cash-order-form.ts`、`cash-order.ts` 中。
-- `src/lib/order-ticket.ts`、`submit-ticket.ts`、`native-orders.ts`：构建与提交条件单、阶梯单和原生高级订单，逐笔处理回报；`use-chase-orders.ts` 管理浏览器追价的生命周期。
-- `src/lib/performance.ts`、`frame-batch.ts`：采样模块指标与逐帧提交，只有持续压力才降级。
-- `src/lib/trading.ts`：提交交易动作、校验杠杆、保存未确认订单的业务规则。UI 不直接拼签名请求。
-- `src/hooks/use-chart-feed.ts`、`use-tradingview.ts`、`use-chart-controls.ts`：分别处理共享数据、TradingView 生命周期和工具栏操作。旧市场的迟到回调会结束，但不能写入新市场。
-- `src/components/terminal.tsx`：只负责页面布局；`src/components/trading/` 渲染市场、盘口、账户、记录和弹层。
+源码按功能模块组织。查找一个功能时，先进入对应的 `features` 目录，再看其中的 `components`（界面）、`hooks`（状态和副作用）与 `lib`（业务规则）。单元测试紧邻被测文件，不需要在顶层组件、Hook 和工具目录之间来回寻找。
+
+```text
+src/
+├── app/                 Next.js 路由、全局样式与 Provider
+├── features/
+│   ├── wallet/          钱包发现、连接弹窗、交易会话存储
+│   ├── market/          市场选择、行情订阅、盘口、深度与最新成交
+│   ├── chart/           K 线引擎、数据接口、周期、指标、绘图与交易线
+│   ├── trading/         下单、订单确认、撤单、仓位、杠杆与交易记录
+│   ├── assets/          账户订阅、余额、存款、划转、提款与资产流水
+│   └── terminal/        页面组装，以及钱包、行情、交易和资产的协调
+├── shared/
+│   ├── components/      通知、错误边界、帮助提示与性能面板
+│   └── lib/             交易所适配、格式化、反馈与性能工具
+└── i18n/                全局语言状态与翻译
+```
+
+以连接钱包后买入 BTC 为例：`app/page.tsx` 渲染 `terminal/components/terminal.tsx`，`use-terminal.ts` 协调钱包选择与连接。`assets/hooks/use-account.ts` 读取并订阅当前账户，`market/hooks/use-market.ts` 接收行情，`trading` 中的下单表单生成草稿与确认参数。用户确认后，交易逻辑通过共享的 Hyperliquid 适配器签名和提交；回报再更新委托、仓位和余额。账户订阅失败保留错误状态，结果不明的订单继续沿用未确认记录保护，不自动重发。
+
+功能模块之间直接引用实际文件；`shared/lib/hyperliquid.ts` 继续集中处理测试网客户端、账户读取和签名适配，没有另加转发入口。`packages/` 仍提供 FameEX 通用组件、图表和工具。端到端测试保留在 `tests/`，覆盖多个模块一起运行的流程；`npm test` 递归发现 `src/` 内所有 `*.test.ts`。
+
+- `src/shared/lib/hyperliquid.ts`：固定测试网连接、读取主账户数据、钱包连接和可恢复交易会话。浏览器扩展签交易授权及资金划转，订单使用已登记 API 钱包的 L1 签名，避免混淆两种协议；参见 [官方签名说明](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/signing)。
+- `src/features/assets/lib/funding.ts`：固定测试链和 CCTP 合约、校验 USDC 金额、模拟合约调用、提交源链授权/充值，构造 CCTP 提款参数、预留 Gas/激活费，并匹配跨链到账证据。
+- `src/features/assets/lib/cctp.ts`：查询和校验 CCTP 消息，解析目标链事件，将存款与 HyperCore 流水关联，并核对提款原 nonce、收款人和实际到账净额。
+- `src/features/wallet/hooks/use-wallet-providers.ts` 负责扩展发现；`src/features/assets/hooks/use-funding.ts` 管理余额、待确认资金记录和轮询。`wallet/components/web3-dialog.tsx` 是钱包与资金弹窗入口，提款表单位于 `assets/components/withdrawal-form.tsx`。
+- `src/features/assets/hooks/use-account.ts`：订阅当前钱包与 DEX 的账户状态，并通过 HTTP 定期核对；切换钱包时清理旧订阅，旧请求不能更新新账户。
+- `src/features/market/hooks/use-market.ts`：订阅订单簿和 K 线；重连后补 HTTP 快照，旧市场的异步结果不能写回新市场。订单簿消息按完整快照处理；K 线按时间去重合并。
+- `src/features/trading/lib/orders.ts`：数量精度、价格有效数字、10 USDC 开仓门槛、IOC 滑点边界和回报解析。资产编号来自元数据索引，不把主网 BTC 编号搬到测试网；参见 [价格与数量精度规则](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/tick-and-lot-size)。
+- `src/features/chart/lib/chart-feed.ts`：把 Hyperliquid 毫秒 OHLCV 转换为两种图表契约，校验币种、周期、价格范围，处理历史翻页、推送先到和退订。遵循 [Hyperliquid K 线接口](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint#candle-snapshot)、[KLineChart 数据接入](https://klinecharts.com/en-US/guide/data-integration) 和 [TradingView Datafeed](https://www.tradingview.com/charting-library-docs/latest/connecting_data/datafeed-api/) 的时间及异步回调规则。
+- `src/features/terminal/hooks/use-terminal.ts`：协调钱包、账户、预览确认、回报核对及刷新；`trading/hooks/use-order-form.ts` 管理输入草稿，`trading/hooks/use-margin-settings.ts` 管理保证金与杠杆弹层。
+- `src/features/trading/components/order-type-selector.tsx`、`order-options.tsx`：共用的类型菜单和高级参数 UI；现货/预测的状态与校验在 `use-cash-order-form.ts`、`cash-order.ts` 中。
+- `src/features/trading/lib/order-ticket.ts`、`submit-ticket.ts`、`native-orders.ts`：构建与提交条件单、阶梯单和原生高级订单，逐笔处理回报；`use-chase-orders.ts` 管理浏览器追价的生命周期。
+- `src/shared/lib/performance.ts`、`frame-batch.ts`：采样模块指标与逐帧提交，只有持续压力才降级。
+- `src/features/trading/lib/trading.ts`：提交交易动作、校验杠杆、保存未确认订单的业务规则。UI 不直接拼签名请求。
+- `src/features/chart/hooks/use-chart-feed.ts`、`use-tradingview.ts`、`use-chart-controls.ts`：分别处理共享数据、TradingView 生命周期和工具栏操作。旧市场的迟到回调会结束，但不能写入新市场。
+- `src/features/terminal/components/terminal.tsx`：组装页面布局，调用各功能模块的 `components` 渲染市场、盘口、账户、记录和弹层。
 - `tests/terminal.spec.ts`：通过页面验证上述流程，只有外部钱包和网络边界被模拟。
 
 行情元数据每 30 秒刷新，账户每 15 秒轮询，并由订单更新、成交推送触发刷新。公开最新成交最多展示 100 条，账户历史成交按需查询最近最多 2000 条，页面操作记录最多保留 100 条。它适合演示和学习交易产品研发；长时间压力、真实浏览器钱包兼容性和真实交易行为仍需要后续账户验收。
@@ -270,3 +293,7 @@ npm run verify:read -- 0x替换为你的40位十六进制公开地址
 连接账户后，持仓线显示开仓均价、数量与盈亏。悬停可平仓或设置止盈止损；拖动止盈止损控件会把价格带入确认框，确认后才提交。已有整仓保护线可拖动修改原单，订单线的关闭按钮可撤单。部分仓位与重复保护单保持为独立订单线。切换市场或账户时旧线条自动清理；取消弹窗会恢复账户当前价格。键盘 Tab 也可进入图表平仓、保护和撤单入口。
 
 图表只负责价格交互。提交仍经过最新仓位、订单状态、价格精度和只减仓校验；数量、方向或订单在确认期间发生变化时停止提交。实现和源文件适配见 `packages/README.md`。
+
+## 手机扫码交易
+
+钱包面板可生成二维码，让 RN 手机端保存独立的测试网交易代理。需要启动配对服务并配置服务地址；见 [手机扫码授权说明](docs/PHONE-AGENT-PAIRING.md)。签名或回执失败时只查询结果，不自动重复签名。

@@ -1,5 +1,10 @@
 // 前端文案：简体中文为源文案，英文与同一交易状态共享，不通过切换路由重建会话。
 export const en: Record<string, string> = {
+  '在手机 App 上交易': 'Trade in the mobile app',
+  '先连接下方电脑钱包，再点「授权手机交易 / 管理设备」生成二维码。用 App 扫码并核对授权后，手机即可独立交易。':
+    'Connect a wallet below, then open “Authorize phone / Manage devices” to generate a QR code. Scan it in the app and confirm the authorization to trade from your phone.',
+  '手机扫码入口：点击下方按钮生成授权二维码，再用 App 的「扫描电脑授权二维码」扫描。':
+    'Open the button below to generate an authorization QR code, then choose “Scan computer authorization QR code” in the mobile app.',
   深度图: 'Depth',
   市场深度图: 'Market depth chart',
   买卖累计深度: 'Cumulative bid and ask depth',

@@ -42,7 +42,7 @@ test('持续高频行情、资源回收与连接复用 @benchmark', async ({
     const path = await (await download).path()
     if (!path) throw new Error('指标下载失败')
     const data = JSON.parse(await readFile(path, 'utf8'))
-    return data as import('../src/lib/performance').PerformanceSnapshot
+    return data as import('../src/shared/lib/performance').PerformanceSnapshot
   }
   const initial = await capture()
   const samples: (typeof initial)[] = []
@@ -167,7 +167,7 @@ test('长任务故障注入触发降频并自动恢复 @benchmark', async ({
     if (!path) throw new Error('指标下载失败')
     return JSON.parse(
       await readFile(path, 'utf8'),
-    ) as import('../src/lib/performance').PerformanceSnapshot
+    ) as import('../src/shared/lib/performance').PerformanceSnapshot
   }
   const snapshots: Awaited<ReturnType<typeof capture>>[] = []
   let sent = 0
@@ -3629,6 +3629,17 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
     })
     await amount.click()
     await amount.press('ControlOrMeta+A')
+    await expect
+      .poll(() =>
+        amount.evaluate((element) => {
+          const input = element as HTMLInputElement
+          return (
+            input.selectionStart === 0 &&
+            input.selectionEnd === input.value.length
+          )
+        }),
+      )
+      .toBe(true)
     await amount.press('Backspace')
     await expect(amount).toHaveValue('')
     await price.fill(
@@ -4560,6 +4571,15 @@ test('Web3 未安装钱包仍显示列表，点击进入对应官方安装页', 
   const downloads = [
     ['MetaMask', 'https://metamask.com/download'],
     ['Rabby', 'https://rabby.io/'],
+    ['OKX Wallet', 'https://web3.okx.com/download'],
+    ['Bitget Wallet', 'https://web3.bitget.com/wallet-download'],
+    ['Phantom', 'https://phantom.com/download'],
+    ['Coinbase Wallet', 'https://www.coinbase.com/wallet/downloads'],
+    ['Trust Wallet', 'https://trustwallet.com/download'],
+    [
+      'Bybit Wallet',
+      'https://chromewebstore.google.com/detail/bybit-wallet/pdliaogehgdbhbnmkklieghmmjkpigpa',
+    ],
   ]
   for (const [, url] of downloads) {
     await page.context().route(url, (route) =>
@@ -4572,6 +4592,10 @@ test('Web3 未安装钱包仍显示列表，点击进入对应官方安装页', 
   await page.goto('/')
   await page.getByRole('button', { name: '连接钱包', exact: true }).click()
   const dialog = page.getByRole('dialog')
+  await expect(
+    dialog.getByRole('heading', { name: '在手机 App 上交易' }),
+  ).toBeVisible()
+  await expect(dialog.getByText(/先连接下方电脑钱包，再点/)).toBeVisible()
   for (const [name, url] of downloads) {
     const link = dialog.getByRole('link', {
       name: `${name} 未安装，前往官网安装`,
@@ -4579,6 +4603,10 @@ test('Web3 未安装钱包仍显示列表，点击进入对应官方安装页', 
     await expect(link).toBeVisible()
     await expect(link).toContainText('未安装')
     await expect(link).toHaveAttribute('href', url)
+    await expect(link).toHaveAttribute('target', '_blank')
+    await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    // Chrome 商店响应被 mock 时会关闭浏览器，这里只核对安装地址。
+    if (name === 'Bybit Wallet') continue
     const popup = page.waitForEvent('popup')
     await link.click()
     const installPage = await popup
@@ -4593,6 +4621,20 @@ test('Web3 未安装钱包仍显示列表，点击进入对应官方安装页', 
   await expect(
     dialog.getByText('安装并启用扩展后，刷新本页即可连接。'),
   ).toBeVisible()
+  await expect(dialog.getByRole('link')).toHaveCount(downloads.length)
+  await dialog.getByRole('link').first().scrollIntoViewIfNeeded()
+  await page.screenshot({
+    path: 'output-tdd/playwright/wallet-catalog/desktop.png',
+  })
+  await page.setViewportSize({ width: 390, height: 667 })
+  await dialog.getByRole('link').last().scrollIntoViewIfNeeded()
+  await expect(dialog.getByRole('link').last()).toBeInViewport()
+  await expect(
+    dialog.getByRole('button', { name: '关闭钱包面板' }),
+  ).toBeInViewport()
+  await page.screenshot({
+    path: 'output-tdd/playwright/wallet-catalog/mobile.png',
+  })
   await dialog.getByRole('button', { name: '关闭钱包面板' }).click()
   await page.getByRole('button', { name: '语言', exact: true }).click()
   await page.getByRole('menuitemradio', { name: 'English' }).click()
@@ -4659,7 +4701,10 @@ test('Web3 多钱包发现与断开：主动弹出连接列表，重新选择前
     page.getByRole('button', { name: 'MetaMask 连接 →' }),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Rabby 连接 →' })).toBeVisible()
-  await expect(page.getByRole('dialog').getByRole('link')).toHaveCount(0)
+  await expect(page.getByRole('dialog').getByRole('link')).toHaveCount(6)
+  await expect(
+    page.getByRole('dialog').getByRole('link', { name: /MetaMask|Rabby/ }),
+  ).toHaveCount(0)
   expect(
     await page.evaluate(() => localStorage.getItem('test-selected-wallet')),
   ).toBeNull()
@@ -6799,11 +6844,16 @@ test('快速盘口独立于深档快照刷新，仓位通过账户推送更新',
       p: '71000',
       t: { limit: { tif: 'Gtc' } },
     })
+  await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(
     positions.getByRole('button', { name: '市价', exact: true }),
   ).toBeEnabled()
-  exchange.setPosition(0)
   await positions.getByRole('button', { name: '市价', exact: true }).click()
+  await expect(
+    page.getByRole('button', { name: '市价平仓', exact: true }),
+  ).toBeVisible()
+  // 弹窗打开后再模拟远端平仓，避免前一单的账户刷新提前移除仓位行。
+  exchange.setPosition(0)
   await page.getByRole('button', { name: '市价平仓', exact: true }).click()
   await expect(
     page.getByText('仓位已关闭，请刷新账户', { exact: true }),
@@ -8164,4 +8214,180 @@ test('预测专用下单：默认市价 USDC、固定 Yes/No、保持草稿、�
   await page.screenshot({
     path: 'output-tdd/playwright/prediction-order/limit.png',
   })
+})
+
+test('手机配对核对后才签名，通知丢失可重试且关闭不删除已授权配对', async ({
+  page,
+}) => {
+  test.skip(
+    !process.env.NEXT_PUBLIC_PHONE_PAIRING_URL,
+    '显式配置本地配对服务地址才运行扫码场景',
+  )
+  const { encryptPairing, decryptPairing, pairingCode } = await import(
+    '../src/features/wallet/lib/phone-pairing'
+  )
+  const exchange = await mockExchange(page)
+  await page.addInitScript(() => {
+    const original = crypto.getRandomValues.bind(crypto)
+    crypto.getRandomValues = <T extends ArrayBufferView | null>(
+      array: T,
+    ): T => {
+      if (array instanceof Uint8Array && array.length === 32) {
+        array.fill(7)
+        return array
+      }
+      if (array)
+        original(
+          new Uint8Array(array.buffer, array.byteOffset, array.byteLength),
+        )
+      return array
+    }
+  })
+  const relay = process.env.NEXT_PUBLIC_PHONE_PAIRING_URL as string
+  const offer = {
+    version: 1 as const,
+    relay,
+    id: '1'.repeat(32),
+    token: '2'.repeat(64),
+    key: '07'.repeat(32),
+    account: address as `0x${string}`,
+    expiresAt: Date.now() + 300000,
+  }
+  const phone = {
+    account: address as `0x${string}`,
+    agentAddress: `0x${'3'.repeat(40)}` as const,
+    agentName: 'Phone-3333333333',
+    expiresAt: Date.now() + 604800000,
+  }
+  let scanned = false
+  let approved = false
+  let signs = 0
+  let deleted = 0
+  let responseEnvelope = ''
+  let publishCalls = 0
+  await page.route(`${relay}/**`, async (route) => {
+    const request = route.request()
+    const headers = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    }
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers })
+      return
+    }
+    if (request.url().endsWith('/pairings')) {
+      await route.fulfill({
+        headers,
+        json: {
+          id: offer.id,
+          phoneToken: offer.token,
+          webToken: '4'.repeat(64),
+          expiresAt: offer.expiresAt,
+        },
+      })
+      return
+    }
+    if (request.method() === 'DELETE') {
+      deleted++
+      await route.fulfill({ headers, json: { ok: true } })
+      return
+    }
+    if (request.url().endsWith('/approval')) {
+      publishCalls++
+      const envelope = request.postDataJSON().envelope
+      expect(decryptPairing(offer, 'approval', envelope)).toEqual(phone)
+      if (!responseEnvelope) {
+        responseEnvelope = envelope
+        await route.abort('failed')
+        return
+      }
+      expect(envelope).toBe(responseEnvelope)
+      await route.fulfill({ headers, json: { ok: true } })
+      return
+    }
+    await route.fulfill({
+      headers,
+      json: {
+        ...(scanned
+          ? { request: encryptPairing(offer, 'request', phone) }
+          : {}),
+      },
+    })
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: '连接钱包', exact: true }).click()
+  await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+  await expect.poll(exchange.agentRegistrations).toBe(1)
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/info',
+    async (route) => {
+      if (approved && route.request().postDataJSON().type === 'extraAgents')
+        await route.fulfill({
+          json: [
+            {
+              address: phone.agentAddress,
+              name: phone.agentName,
+              validUntil: phone.expiresAt,
+            },
+          ],
+        })
+      else await route.fallback()
+    },
+  )
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/exchange',
+    async (route) => {
+      const action = route.request().postDataJSON().action
+      expect(action.type).toBe('approveAgent')
+      expect(action.hyperliquidChain).toBe('Testnet')
+      expect(action.agentAddress.toLowerCase()).toBe(
+        phone.agentAddress.toLowerCase(),
+      )
+      expect(action.agentName).toBe(
+        `${phone.agentName} valid_until ${phone.expiresAt}`,
+      )
+      signs++
+      approved = true
+      await route.fulfill({
+        json: { status: 'ok', response: { type: 'default' } },
+      })
+    },
+  )
+  await page
+    .getByRole('button', { name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i })
+    .click()
+  await page.getByRole('button', { name: '授权手机交易 / 管理设备' }).click()
+  await page.getByRole('button', { name: '生成手机授权二维码' }).click()
+  await expect(
+    page.locator('svg title', { hasText: '用 Hyperliquid 手机 App' }),
+  ).toHaveCount(1)
+  scanned = true
+  await expect(
+    page.getByText(`两端核对码：${pairingCode(offer, phone)}`),
+  ).toBeVisible()
+  const approve = page.getByRole('button', { name: '在主钱包确认授权' })
+  await expect(approve).toBeDisabled()
+  expect(signs).toBe(0)
+  await page.screenshot({
+    path: 'output-tdd/playwright/phone-agent-pairing/web-confirmation.png',
+    fullPage: true,
+  })
+  await page
+    .getByRole('checkbox', { name: '已在手机确认相同账户和六位码' })
+    .check()
+  await approve.click()
+  const retry = page.getByRole('button', { name: '查询授权结果（不重复签名）' })
+  await expect(retry).toBeEnabled()
+  await retry.click()
+  await expect(
+    page.getByText(
+      '交易所授权已核验，请在手机完成身份验证。此页面现在可以关闭。',
+    ),
+  ).toBeVisible()
+  expect(signs).toBe(1)
+  expect(publishCalls).toBe(2)
+  await page.getByRole('button', { name: '关闭钱包面板' }).click()
+  expect(deleted).toBe(0)
+  expect(exchange.writes).toHaveLength(0)
 })

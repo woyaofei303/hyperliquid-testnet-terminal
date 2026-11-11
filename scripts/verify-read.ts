@@ -8,7 +8,7 @@ import {
   loadAccount,
   loadMarkets,
   WS_URL,
-} from '../src/lib/hyperliquid.ts'
+} from '../src/shared/lib/hyperliquid.ts'
 
 // 此脚本只发 /info 查询与行情订阅，不接受密钥，也不调用 /exchange。
 const markets = await loadMarkets()

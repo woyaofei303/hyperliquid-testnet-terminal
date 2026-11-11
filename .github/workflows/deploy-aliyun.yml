@@ -28,6 +28,7 @@ jobs:
     timeout-minutes: 25
     env:
       HUSKY: '0'
+      NEXT_PUBLIC_PHONE_PAIRING_URL: https://app.fameex-testnet.xyz
     outputs:
       release_id: ${{ steps.build.outputs.release_id }}
     steps:

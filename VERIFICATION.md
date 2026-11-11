@@ -1,8 +1,32 @@
 # 验证记录
 
-验证日期：2026-11-02。以下按阶段保留当时的环境、结果与限制；最新一节优先，旧记录中的“未提交”“尚未入金”等描述只代表当时状态。
+记录始于 2026-11-02。以下按阶段保留当时的环境、结果与限制；最新一节优先，旧记录中的“未提交”“尚未入金”等描述只代表当时状态。
 
-## 真实测试网资金验收与到账追踪修复（2026-11-06，最新）
+## 全屏回归与自动化时序修复（2026-11-10，最新）
+
+环境为 Node.js 24.14.0、本机 Chrome 157.0.8103.39。旧版 Playwright 1.58.2 在不加载项目代码的原生按钮页面上也会拒绝 `requestFullscreen()`，返回 `not granted`；请求时用户激活、页面焦点和全屏能力标记均正常。同一个 Chrome 使用新版运行库后成功，因此将现有 `@playwright/test` 升至并锁定为 1.65.0，同步更新其两个运行库及 npm 锁文件。[官方 1.65.0 发布说明](https://github.com/microsoft/playwright/releases/tag/v1.65.0)也列明对 Chrome 157 的测试覆盖。
+
+三个原有全屏用例在升级前全部失败，升级后全部通过，继续检查浏览器原生全屏状态、深度图宽度、全屏中的菜单与指标弹窗、退出后的草稿和焦点，以及路由切换时退出全屏。
+
+完整回归还发现两处测试时序问题。金额清空用例现在先确认文本已全部选中，再发送退格，继续检查改价和点击盘口不会重新填入数量。仓位复查用例先等上一笔操作的弹窗关闭，再打开市价平仓弹窗并模拟远端仓位消失，避免前一单的账户刷新提前移除仓位行；提交时仍须提示仓位已关闭，且不能多发订单。相关 7 个用例连续执行 3 轮，共 21 次通过。
+
+最终验证：130 项单元测试、Biome、TypeScript 和静态构建通过；双 worker 完整浏览器回归 151 项通过、零失败；默认跳过的两项性能测试随后以单 worker 单独运行，2 项全部通过。性能测试覆盖持续行情负载、资源回收、连接复用，以及长任务触发降频后恢复。本轮执行的是模拟钱包和交易所的自动化测试，未执行真实账户签名或资金操作。
+
+在项目根目录可用以下命令复核；两个浏览器命令分别预期 151 项和 2 项通过：
+
+```sh
+cd /Users/julian/Documents/Codex/2026-11-02/hyperliquid-testnet-terminal
+npm run lint
+npm run typecheck
+npm test
+npm run build:static
+STATIC_EXPORT=1 npm run test:e2e -- --workers=2
+PERF_CHECK=1 STATIC_EXPORT=1 npm run test:e2e -- --workers=1 --grep @benchmark
+```
+
+证据位于 `output-tdd/playwright/fullscreen-fix/`：`before-results.json` 和 `after-results.json` 记录三个全屏用例的修复前后结果；`stability-final-results.json` 记录重复验证；`regression-final-results.json`、`benchmark-results.json` 分别记录完整回归和性能测试。首次回归中的失败记录也保留在该目录，最终结果以上述 `final` 记录为准。
+
+## 真实测试网资金验收与到账追踪修复（2026-11-06）
 
 使用账户 `0x000071424bb08b910f0786e04D964A63D64bF1Ba`，由用户在 MetaMask 逐笔确认。完成 10 USDC CCTP 存入（到账 9.8，费用 0.2，授权与存款 Gas 合计 0.000003358399246 测试 ETH）、1 USDC 合约与现货往返划转、5 USDC 提款（到账 4.8，费用 0.2，额外 Gas 0.00002 HYPE）。全部金额和费用在用户授权范围内。没有改动已有 BTC 仓位、杠杆和两笔委托，没有重新授权代理。
 
@@ -227,7 +251,7 @@ output-tdd/playwright/market-detail/live/
 ```sh
 cd /Users/julian/Documents/Codex/2026-11-02/hyperliquid-testnet-terminal
 git status --short
-git diff --no-index -- output-tdd/deposit-input/before/src/components/trading/market-selector.tsx src/components/trading/market-selector.tsx
+git diff --no-index -- output-tdd/deposit-input/before/src/components/trading/market-selector.tsx src/features/market/components/market-selector.tsx
 ```
 
 `git diff --no-index` 返回 1 表示有差异。回退应按差异逐项处理，不能整体覆盖后续工作区修改。

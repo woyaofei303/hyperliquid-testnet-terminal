@@ -1,6 +1,8 @@
 # 发布到阿里云
 
-网站使用 `https://app.fameex-testnet.xyz`。沿用原 `dy` 站点的方式：GitHub Actions 构建静态文件，阿里云 Nginx 提供文件，现有 Caddy 负责 HTTPS。行情和钱包请求由浏览器直接发往测试网，不经过应用服务器。生产机器不需要 Node，也不保存钱包密钥。
+网站使用 `https://app.fameex-testnet.xyz`。沿用原 `dy` 站点的方式：GitHub Actions 构建静态文件，阿里云 Nginx 提供文件，现有 Caddy 负责 HTTPS。行情和钱包请求由浏览器直接发往测试网，不经过应用服务器。扫码配对新增独立的 Node.js 容器，仅转发短时密文，不保存钱包密钥。
+
+`NEXT_PUBLIC_PHONE_PAIRING_URL` 在 CI 构建时固定为本站 HTTPS 地址；`/pairings` 与 `/pairings/…` 转给同一 Docker 网络的 `phone-pairing:3211`。配对容器由 RN 仓库的 `deploy/pairing.compose.yml` 管理，构建和安装见该仓库 `deploy/README.md`。首次安装需要管理员部署容器、备份并更新本站 Nginx 配置；普通 Web 发布账号没有 Docker 权限，日常静态发布也不会更新配对容器。
 
 域名迁移已于 2026-11-07 完成：`app.fameex-testnet.xyz`、`dy.fameex-testnet.xyz`、`live.fameex-testnet.xyz` 的 A 记录均指向 `47.80.28.238`，三个站点的 HTTPS 均返回 200。`hyperliquid.sunshinedairy.net` 保留为直达 `app.fameex-testnet.xyz` 的 301 跳转入口，保留路径和查询参数。旧 `dex`、`testnet`、`dy`、`live` 解析与代理入口已移除，运营商缓存需等待原 TTL 到期。
 

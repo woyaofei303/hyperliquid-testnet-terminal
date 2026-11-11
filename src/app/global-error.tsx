@@ -1,7 +1,7 @@
 'use client'
 
 import './globals.css'
-import { ErrorFallback } from '@/components/error-fallback'
+import { ErrorFallback } from '@/shared/components/error-fallback'
 
 export default function GlobalError({
   retry,
