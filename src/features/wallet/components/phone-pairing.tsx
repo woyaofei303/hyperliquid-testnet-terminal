@@ -54,7 +54,7 @@ export function PhonePairing({
             />
           </div>
           <p className="text-xs">
-            请用 App「扫描电脑授权二维码」扫描，五分钟内有效，请勿转发。
+            请用 App 钱包页的「扫码连接」扫描，五分钟内有效，请勿转发。
           </p>
         </div>
       )}
