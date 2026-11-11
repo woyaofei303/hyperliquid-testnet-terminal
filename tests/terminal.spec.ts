@@ -8216,180 +8216,226 @@ test('预测专用下单：默认市价 USDC、固定 Yes/No、保持草稿、�
   })
 })
 
-test('手机配对核对后才签名，通知丢失可重试且关闭不删除已授权配对', async ({
-  page,
-}) => {
-  test.skip(
-    !process.env.NEXT_PUBLIC_PHONE_PAIRING_URL,
-    '显式配置本地配对服务地址才运行扫码场景',
-  )
-  const { encryptPairing, decryptPairing, pairingCode } = await import(
-    '../src/features/wallet/lib/phone-pairing'
-  )
-  const exchange = await mockExchange(page)
-  await page.addInitScript(() => {
-    const original = crypto.getRandomValues.bind(crypto)
-    crypto.getRandomValues = <T extends ArrayBufferView | null>(
-      array: T,
-    ): T => {
-      if (array instanceof Uint8Array && array.length === 32) {
-        array.fill(7)
+for (const failure of ['通知丢失', '代理满额', '提交失败'] as const) {
+  test(`手机配对：${failure}可恢复，查询不重复签名`, async ({ page }) => {
+    test.skip(
+      !process.env.NEXT_PUBLIC_PHONE_PAIRING_URL,
+      '显式配置本地配对服务地址才运行扫码场景',
+    )
+    const { encryptPairing, decryptPairing, pairingCode } = await import(
+      '../src/features/wallet/lib/phone-pairing'
+    )
+    const exchange = await mockExchange(page)
+    await page.addInitScript(() => {
+      const original = crypto.getRandomValues.bind(crypto)
+      crypto.getRandomValues = <T extends ArrayBufferView | null>(
+        array: T,
+      ): T => {
+        if (array instanceof Uint8Array && array.length === 32) {
+          array.fill(7)
+          return array
+        }
+        if (array)
+          original(
+            new Uint8Array(array.buffer, array.byteOffset, array.byteLength),
+          )
         return array
       }
-      if (array)
-        original(
-          new Uint8Array(array.buffer, array.byteOffset, array.byteLength),
-        )
-      return array
+    })
+    const relay = process.env.NEXT_PUBLIC_PHONE_PAIRING_URL as string
+    const offer = {
+      version: 1 as const,
+      relay,
+      id: '1'.repeat(32),
+      token: '2'.repeat(64),
+      key: '07'.repeat(32),
+      account: address as `0x${string}`,
+      expiresAt: Date.now() + 300000,
     }
-  })
-  const relay = process.env.NEXT_PUBLIC_PHONE_PAIRING_URL as string
-  const offer = {
-    version: 1 as const,
-    relay,
-    id: '1'.repeat(32),
-    token: '2'.repeat(64),
-    key: '07'.repeat(32),
-    account: address as `0x${string}`,
-    expiresAt: Date.now() + 300000,
-  }
-  const phone = {
-    account: address as `0x${string}`,
-    agentAddress: `0x${'3'.repeat(40)}` as const,
-    agentName: 'Phone-3333333333',
-    expiresAt: Date.now() + 604800000,
-  }
-  let scanned = false
-  let approved = false
-  let signs = 0
-  let deleted = 0
-  let responseEnvelope = ''
-  let publishCalls = 0
-  await page.route(`${relay}/**`, async (route) => {
-    const request = route.request()
-    const headers = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    const phone = {
+      account: address as `0x${string}`,
+      agentAddress: `0x${'3'.repeat(40)}` as const,
+      agentName: 'Phone-3333333333',
+      expiresAt: Date.now() + 604800000,
     }
-    if (request.method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, headers })
-      return
-    }
-    if (request.url().endsWith('/pairings')) {
-      // 复现线上服务器比电脑快几秒，刚创建的二维码仍应显示。
-      offer.expiresAt = Date.now() + 302500
+    let scanned = false
+    let approved = false
+    let full = failure === '代理满额'
+    let signs = 0
+    let deleted = 0
+    let responseEnvelope = ''
+    let publishCalls = 0
+    await page.route(`${relay}/**`, async (route) => {
+      const request = route.request()
+      const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+      }
+      if (request.method() === 'OPTIONS') {
+        await route.fulfill({ status: 204, headers })
+        return
+      }
+      if (request.url().endsWith('/pairings')) {
+        // 复现线上服务器比电脑快几秒，刚创建的二维码仍应显示。
+        offer.expiresAt = Date.now() + 302500
+        await route.fulfill({
+          headers,
+          json: {
+            id: offer.id,
+            phoneToken: offer.token,
+            webToken: '4'.repeat(64),
+            expiresAt: offer.expiresAt,
+          },
+        })
+        return
+      }
+      if (request.method() === 'DELETE') {
+        deleted++
+        await route.fulfill({ headers, json: { ok: true } })
+        return
+      }
+      if (request.url().endsWith('/approval')) {
+        publishCalls++
+        const envelope = request.postDataJSON().envelope
+        expect(decryptPairing(offer, 'approval', envelope)).toEqual(phone)
+        if (!responseEnvelope) {
+          responseEnvelope = envelope
+          await route.abort('failed')
+          return
+        }
+        expect(envelope).toBe(responseEnvelope)
+        await route.fulfill({ headers, json: { ok: true } })
+        return
+      }
       await route.fulfill({
         headers,
         json: {
-          id: offer.id,
-          phoneToken: offer.token,
-          webToken: '4'.repeat(64),
-          expiresAt: offer.expiresAt,
+          ...(scanned
+            ? { request: encryptPairing(offer, 'request', phone) }
+            : {}),
         },
       })
-      return
-    }
-    if (request.method() === 'DELETE') {
-      deleted++
-      await route.fulfill({ headers, json: { ok: true } })
-      return
-    }
-    if (request.url().endsWith('/approval')) {
-      publishCalls++
-      const envelope = request.postDataJSON().envelope
-      expect(decryptPairing(offer, 'approval', envelope)).toEqual(phone)
-      if (!responseEnvelope) {
-        responseEnvelope = envelope
-        await route.abort('failed')
-        return
-      }
-      expect(envelope).toBe(responseEnvelope)
-      await route.fulfill({ headers, json: { ok: true } })
-      return
-    }
-    await route.fulfill({
-      headers,
-      json: {
-        ...(scanned
-          ? { request: encryptPairing(offer, 'request', phone) }
-          : {}),
-      },
     })
-  })
-  await page.goto('/')
-  await page.getByRole('button', { name: '连接钱包', exact: true }).click()
-  await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
-  await expect.poll(exchange.agentRegistrations).toBe(1)
-  await page.route(
-    'https://api.hyperliquid-testnet.xyz/info',
-    async (route) => {
-      if (approved && route.request().postDataJSON().type === 'extraAgents')
-        await route.fulfill({
-          json: [
-            {
-              address: phone.agentAddress,
-              name: phone.agentName,
+    await page.goto('/')
+    await page.getByRole('button', { name: '连接钱包', exact: true }).click()
+    await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+    await expect.poll(exchange.agentRegistrations).toBe(1)
+    await page.route(
+      'https://api.hyperliquid-testnet.xyz/info',
+      async (route) => {
+        const type = route.request().postDataJSON().type
+        if (type === 'subAccounts') {
+          await route.fulfill({ contentType: 'application/json', body: 'null' })
+          return
+        }
+        if (full && type === 'extraAgents') {
+          await route.fulfill({
+            json: [1, 2, 4].map((value) => ({
+              address: `0x${String(value).repeat(40)}`,
+              name: `Old-${value}`,
               validUntil: phone.expiresAt,
-            },
-          ],
+            })),
+          })
+          return
+        }
+        if (approved && type === 'extraAgents')
+          await route.fulfill({
+            json: [
+              {
+                address: phone.agentAddress,
+                name: phone.agentName,
+                validUntil: phone.expiresAt,
+              },
+            ],
+          })
+        else await route.fallback()
+      },
+    )
+    await page.route(
+      'https://api.hyperliquid-testnet.xyz/exchange',
+      async (route) => {
+        const action = route.request().postDataJSON().action
+        expect(action.type).toBe('approveAgent')
+        expect(action.hyperliquidChain).toBe('Testnet')
+        expect(action.agentAddress.toLowerCase()).toBe(
+          phone.agentAddress.toLowerCase(),
+        )
+        expect(action.agentName).toBe(
+          `${phone.agentName} valid_until ${phone.expiresAt}`,
+        )
+        signs++
+        if (failure === '提交失败' && signs === 1) {
+          await route.abort('failed')
+          return
+        }
+        approved = true
+        await route.fulfill({
+          json: { status: 'ok', response: { type: 'default' } },
         })
-      else await route.fallback()
-    },
-  )
-  await page.route(
-    'https://api.hyperliquid-testnet.xyz/exchange',
-    async (route) => {
-      const action = route.request().postDataJSON().action
-      expect(action.type).toBe('approveAgent')
-      expect(action.hyperliquidChain).toBe('Testnet')
-      expect(action.agentAddress.toLowerCase()).toBe(
-        phone.agentAddress.toLowerCase(),
-      )
-      expect(action.agentName).toBe(
-        `${phone.agentName} valid_until ${phone.expiresAt}`,
-      )
-      signs++
-      approved = true
-      await route.fulfill({
-        json: { status: 'ok', response: { type: 'default' } },
-      })
-    },
-  )
-  await page
-    .getByRole('button', { name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i })
-    .click()
-  await page.getByRole('button', { name: '授权手机交易 / 管理设备' }).click()
-  await page.getByRole('button', { name: '生成手机授权二维码' }).click()
-  await expect(
-    page.locator('svg title', { hasText: '用 Hyperliquid 手机 App' }),
-  ).toHaveCount(1)
-  scanned = true
-  await expect(
-    page.getByText(`两端核对码：${pairingCode(offer, phone)}`),
-  ).toBeVisible()
-  const approve = page.getByRole('button', { name: '在主钱包确认授权' })
-  await expect(approve).toBeDisabled()
-  expect(signs).toBe(0)
-  await page.screenshot({
-    path: 'output-tdd/playwright/phone-agent-pairing/web-confirmation.png',
-    fullPage: true,
+      },
+    )
+    await page
+      .getByRole('button', { name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i })
+      .click()
+    await page.getByRole('button', { name: '授权手机交易 / 管理设备' }).click()
+    await page.getByRole('button', { name: '生成手机授权二维码' }).click()
+    await expect(
+      page.locator('svg title', { hasText: '用 Hyperliquid 手机 App' }),
+    ).toHaveCount(1)
+    scanned = true
+    await expect(
+      page.getByText(`两端核对码：${pairingCode(offer, phone)}`),
+    ).toBeVisible()
+    const approve = page.getByRole('button', { name: '在主钱包确认授权' })
+    await expect(approve).toBeDisabled()
+    expect(signs).toBe(0)
+    await page.screenshot({
+      path: `output-tdd/playwright/phone-agent-pairing/web-confirmation-${failure}.png`,
+      fullPage: true,
+    })
+    await page
+      .getByRole('checkbox', { name: '已在手机确认相同账户和六位码' })
+      .check()
+    await approve.click()
+    const retry = page.getByRole('button', {
+      name: '查询授权结果（不重复签名）',
+    })
+    if (failure === '代理满额') {
+      await expect(
+        page
+          .getByRole('region', { name: '授权手机交易', exact: true })
+          .getByRole('alert'),
+      ).toContainText('命名代理已达到 3 个上限')
+      expect(signs).toBe(0)
+      await expect(approve).toBeEnabled()
+      await expect(
+        page.getByRole('button', { name: '生成手机授权二维码' }),
+      ).toBeEnabled()
+      full = false
+      await approve.click()
+    }
+    if (failure === '提交失败') {
+      await expect(retry).toBeEnabled()
+      await retry.click()
+      await expect(
+        page
+          .getByRole('region', { name: '授权手机交易', exact: true })
+          .getByRole('alert'),
+      ).toContainText('交易所尚未登记本次手机授权')
+      expect(signs).toBe(1)
+      await expect(approve).toBeEnabled()
+      await approve.click()
+    }
+    await expect(retry).toBeEnabled()
+    await retry.click()
+    await expect(
+      page.getByText('交易所授权已确认，手机将自动连接。此页面现在可以关闭。'),
+    ).toBeVisible()
+    expect(signs).toBe(failure === '提交失败' ? 2 : 1)
+    expect(publishCalls).toBe(2)
+    await page.getByRole('button', { name: '关闭钱包面板' }).click()
+    expect(deleted).toBe(0)
+    expect(exchange.writes).toHaveLength(0)
   })
-  await page
-    .getByRole('checkbox', { name: '已在手机确认相同账户和六位码' })
-    .check()
-  await approve.click()
-  const retry = page.getByRole('button', { name: '查询授权结果（不重复签名）' })
-  await expect(retry).toBeEnabled()
-  await retry.click()
-  await expect(
-    page.getByText(
-      '交易所授权已核验，请在手机完成身份验证。此页面现在可以关闭。',
-    ),
-  ).toBeVisible()
-  expect(signs).toBe(1)
-  expect(publishCalls).toBe(2)
-  await page.getByRole('button', { name: '关闭钱包面板' }).click()
-  expect(deleted).toBe(0)
-  expect(exchange.writes).toHaveLength(0)
-})
+}

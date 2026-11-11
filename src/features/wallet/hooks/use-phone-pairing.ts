@@ -4,7 +4,11 @@ import {
   isUserRejection,
   type WalletSession,
 } from '@/shared/lib/hyperliquid'
-import { approvePhoneAgent, verifyPhoneAgent } from '../lib/phone-authorization'
+import {
+  approvePhoneAgent,
+  PhoneApprovalBlockedError,
+  verifyPhoneAgent,
+} from '../lib/phone-authorization'
 import {
   decryptPairing,
   encryptPairing,
@@ -188,7 +192,7 @@ export function usePhonePairing(
       try {
         await approvePhoneAgent(wallet, request)
       } catch (e) {
-        if (isUserRejection(e)) {
+        if (isUserRejection(e) || e instanceof PhoneApprovalBlockedError) {
           preserve.current = false
           setStatus('waiting')
         } else
@@ -208,6 +212,17 @@ export function usePhonePairing(
     error,
     create,
     approve,
-    verify: () => run(publish),
+    verify: () =>
+      run(async () => {
+        try {
+          await publish()
+        } catch (e) {
+          if (e instanceof PhoneApprovalBlockedError) {
+            preserve.current = false
+            setStatus('waiting')
+          }
+          throw e
+        }
+      }),
   }
 }

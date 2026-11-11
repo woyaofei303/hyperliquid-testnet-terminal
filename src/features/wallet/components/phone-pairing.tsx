@@ -90,7 +90,7 @@ export function PhonePairing({
           )}
           {flow.status === 'done' && (
             <output className="block text-accent">
-              交易所授权已核验，请在手机完成身份验证。此页面现在可以关闭。
+              交易所授权已确认，手机将自动连接。此页面现在可以关闭。
             </output>
           )}
         </div>

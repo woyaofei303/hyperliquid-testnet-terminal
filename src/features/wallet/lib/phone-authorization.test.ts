@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { phoneApproval } from './phone-authorization.ts'
+import {
+  assertPhoneAgentCapacity,
+  PhoneApprovalBlockedError,
+  phoneApproval,
+} from './phone-authorization.ts'
 import { AGENT_DURATION } from './phone-pairing.ts'
 
 test('手机授权签名包含独立设备名与明确到期时间，拒绝超期及换账户', () => {
@@ -23,4 +27,11 @@ test('手机授权签名包含独立设备名与明确到期时间，拒绝超�
     ),
   )
   assert.throws(() => phoneApproval(request, request.agentAddress, now))
+})
+
+test('命名代理满额时先阻止签名，子账户提供的额外名额仍可使用', () => {
+  assert.doesNotThrow(() => assertPhoneAgentCapacity(2, 0))
+  assert.throws(() => assertPhoneAgentCapacity(3, 0), PhoneApprovalBlockedError)
+  assert.doesNotThrow(() => assertPhoneAgentCapacity(4, 1))
+  assert.throws(() => assertPhoneAgentCapacity(5, 1), /5 个上限/)
 })
