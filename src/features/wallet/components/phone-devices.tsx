@@ -7,7 +7,7 @@ export function PhoneDevices({ wallet }: { wallet: WalletSession }) {
     Awaited<ReturnType<typeof info.extraAgents>>
   >([])
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const refresh = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -27,9 +27,12 @@ export function PhoneDevices({ wallet }: { wallet: WalletSession }) {
     void refresh()
   }, [refresh])
   return (
-    <div className="space-y-2 border-t border-edge pt-3 text-xs">
+    <details className="space-y-2 border-t border-edge pt-3 text-xs">
+      <summary className="cursor-pointer rounded focus-visible:outline-2">
+        已授权设备{loading ? ' · 加载中' : error ? '' : `（${agents.length}）`}
+      </summary>
       <div className="flex items-center justify-between">
-        <span>手机设备 · 交易所授权</span>
+        <span>设备管理</span>
         <Button
           size="sm"
           variant="light"
@@ -50,7 +53,7 @@ export function PhoneDevices({ wallet }: { wallet: WalletSession }) {
           </p>
         </div>
       ))}
-      {!loading && !error && !agents.length && <p>当前没有手机代理授权。</p>}
+      {!loading && !error && !agents.length && <p>暂无已授权手机。</p>}
       <a
         href="https://app.hyperliquid-testnet.xyz/API"
         target="_blank"
@@ -60,14 +63,13 @@ export function PhoneDevices({ wallet }: { wallet: WalletSession }) {
         前往 Hyperliquid 测试网撤销授权 ↗
       </a>
       <p className="text-muted">
-        在官方 API
-        页面找到相同设备名和代理地址后撤销，再回此处刷新核验。删除手机密钥不会撤销授权。
+        撤销时请核对设备名和授权地址。删除手机密钥不会撤销授权。
       </p>
       {error && (
         <p role="alert" className="text-loss">
           {error}
         </p>
       )}
-    </div>
+    </details>
   )
 }

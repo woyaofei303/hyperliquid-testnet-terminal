@@ -20,26 +20,29 @@ export function PhonePairing({
       aria-label="授权手机交易"
       className="space-y-3 rounded-lg border border-edge p-3"
     >
-      <h3 className="font-medium">授权手机交易 · 仅测试网</h3>
-      <p className="text-xs leading-5 text-muted">
-        手机扫码后生成自己的代理密钥。确认一次后可下单和撤单，有效期 7
-        天。资产仍在当前账户，主钱包私钥不会传给手机。
-      </p>
+      <h3 className="font-medium">手机交易 · 测试网</h3>
+      {flow.status !== 'done' && (
+        <p className="text-xs leading-5 text-muted">
+          使用 App 扫码，授权后可在手机下单和撤单，有效期 7 天。
+        </p>
+      )}
       {!flow.configured && (
         <p className="text-xs">手机配对服务暂不可用，请稍后重试。</p>
       )}
-      <Button
-        className="w-full"
-        isDisabled={
-          !flow.configured || flow.busy || flow.status === 'submitted'
-        }
-        onPress={() => {
-          setMatched(false)
-          void flow.create()
-        }}
-      >
-        生成手机授权二维码
-      </Button>
+      {flow.status !== 'done' && (
+        <Button
+          className="w-full"
+          isDisabled={
+            !flow.configured || flow.busy || flow.status === 'submitted'
+          }
+          onPress={() => {
+            setMatched(false)
+            void flow.create()
+          }}
+        >
+          生成手机授权二维码
+        </Button>
+      )}
       {flow.pairing && !flow.request && (
         <div className="space-y-2">
           <div className="mx-auto w-fit rounded bg-white p-3">
@@ -51,20 +54,25 @@ export function PhonePairing({
             />
           </div>
           <p className="text-xs">
-            五分钟内有效。请用本项目手机 App 扫码，二维码不要转发。
+            请用 App「扫描电脑授权二维码」扫描，五分钟内有效，请勿转发。
           </p>
         </div>
       )}
-      {flow.pairing && flow.request && (
+      {flow.status !== 'done' && flow.pairing && flow.request && (
         <div className="space-y-2 text-xs">
           <p className="text-base font-semibold">
             两端核对码：{pairingCode(flow.pairing.offer, flow.request)}
           </p>
           <p className="break-all">账户：{flow.request.account}</p>
-          <p>{flow.request.agentName}</p>
-          <p className="break-all">手机代理：{flow.request.agentAddress}</p>
           <p>到期：{new Date(flow.request.expiresAt).toLocaleString()}</p>
           <p>代理可使用该账户资金交易，交易可能产生损失；不授予提款权限。</p>
+          <details className="text-muted">
+            <summary className="cursor-pointer rounded focus-visible:outline-2">
+              设备详情
+            </summary>
+            <p className="mt-2">{flow.request.agentName}</p>
+            <p className="break-all">授权地址：{flow.request.agentAddress}</p>
+          </details>
           <Checkbox
             isSelected={matched}
             onValueChange={setMatched}
@@ -88,11 +96,28 @@ export function PhonePairing({
               查询授权结果（不重复签名）
             </Button>
           )}
-          {flow.status === 'done' && (
-            <output className="block text-accent">
-              交易所授权已确认，手机将自动连接。此页面现在可以关闭。
-            </output>
+        </div>
+      )}
+      {flow.status === 'done' && (
+        <div className="space-y-3">
+          <output className="block text-sm text-accent">
+            手机已授权，有效期内无需重复扫码。
+          </output>
+          {flow.request && (
+            <p className="text-xs text-muted">
+              到期：{new Date(flow.request.expiresAt).toLocaleString()}
+            </p>
           )}
+          <Button
+            variant="light"
+            isDisabled={flow.busy}
+            onPress={() => {
+              setMatched(false)
+              void flow.create()
+            }}
+          >
+            连接其他手机
+          </Button>
         </div>
       )}
       {flow.error && (
@@ -100,7 +125,10 @@ export function PhonePairing({
           {flow.error}
         </p>
       )}
-      <PhoneDevices wallet={wallet} />
+      <PhoneDevices
+        key={flow.status === 'done' ? flow.request?.agentAddress : 'devices'}
+        wallet={wallet}
+      />
     </section>
   )
 }

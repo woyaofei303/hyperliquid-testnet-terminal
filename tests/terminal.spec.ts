@@ -8430,8 +8430,20 @@ for (const failure of ['通知丢失', '代理满额', '提交失败'] as const)
     await expect(retry).toBeEnabled()
     await retry.click()
     await expect(
-      page.getByText('交易所授权已确认，手机将自动连接。此页面现在可以关闭。'),
+      page.getByText('手机已授权，有效期内无需重复扫码。'),
     ).toBeVisible()
+    await expect(approve).toHaveCount(0)
+    await expect(page.getByText(/^两端核对码：/)).toHaveCount(0)
+    await expect(
+      page.getByText('已授权设备（1）', { exact: true }),
+    ).toBeVisible()
+    await page.getByText('已授权设备（1）', { exact: true }).click()
+    await expect(page.getByText(phone.agentName, { exact: true })).toBeVisible()
+    await expect(page.getByText('暂无已授权手机。')).toHaveCount(0)
+    await page.screenshot({
+      path: `output-tdd/playwright/phone-agent-pairing/web-done-${failure}.png`,
+      fullPage: true,
+    })
     expect(signs).toBe(failure === '提交失败' ? 2 : 1)
     expect(publishCalls).toBe(2)
     await page.getByRole('button', { name: '关闭钱包面板' }).click()

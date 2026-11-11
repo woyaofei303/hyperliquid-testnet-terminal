@@ -271,11 +271,6 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                   </a>
                 </div>
               </div>
-              <p className="text-xs leading-5 text-muted">
-                {t(
-                  '手机扫码入口：点击下方按钮生成授权二维码，再用 App 的「扫描电脑授权二维码」扫描。',
-                )}
-              </p>
               <Button
                 isDisabled={busy || phoneBusy}
                 onPress={() => setShowPhone(!showPhone)}
