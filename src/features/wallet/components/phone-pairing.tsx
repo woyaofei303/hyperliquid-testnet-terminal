@@ -26,6 +26,9 @@ export function PhonePairing({
           使用 App 扫码，授权后可在手机下单和撤单，有效期 7 天。
         </p>
       )}
+      <p className="text-xs leading-5 text-muted">
+        名额满时，生成二维码前会先请求主钱包撤销最早到期的手机授权；当前网页交易连接会保留。
+      </p>
       {!flow.configured && (
         <p className="text-xs">手机配对服务暂不可用，请稍后重试。</p>
       )}
@@ -125,9 +128,14 @@ export function PhonePairing({
           {flow.error}
         </p>
       )}
+      {flow.notice && (
+        <output className="block text-xs text-muted">{flow.notice}</output>
+      )}
       <PhoneDevices
-        key={flow.status === 'done' ? flow.request?.agentAddress : 'devices'}
+        key={`${flow.devicesVersion}-${flow.status === 'done' ? flow.request?.agentAddress : 'devices'}`}
         wallet={wallet}
+        disabled={flow.busy || flow.status === 'submitted'}
+        onRevoke={flow.revoke}
       />
     </section>
   )

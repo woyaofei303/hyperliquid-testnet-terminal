@@ -8292,6 +8292,216 @@ test('预测专用下单：默认市价 USDC、固定 Yes/No、保持草稿、�
   })
 })
 
+for (const mode of [
+  '自动清理',
+  '手动撤销',
+  '取消签名',
+  '撤销未生效',
+  '撤销回执丢失',
+  '旧密钥重用',
+] as const) {
+  test(`手机设备：${mode}，确认释放名额后才生成二维码`, async ({ page }) => {
+    test.skip(
+      !process.env.NEXT_PUBLIC_PHONE_PAIRING_URL,
+      '需要配置配对服务地址',
+    )
+    const exchange = await mockExchange(page)
+    if (mode === '旧密钥重用')
+      await page.addInitScript(() => {
+        const original = crypto.getRandomValues.bind(crypto)
+        crypto.getRandomValues = <T extends ArrayBufferView | null>(
+          array: T,
+        ): T => {
+          if (array instanceof Uint8Array && array.length === 32) array.fill(7)
+          else if (array)
+            original(
+              new Uint8Array(array.buffer, array.byteOffset, array.byteLength),
+            )
+          return array
+        }
+      })
+    if (mode === '取消签名')
+      await page.addInitScript(() => {
+        const provider = window.ethereum
+        if (!provider) throw new Error('Missing mock wallet')
+        const request = provider.request.bind(provider)
+        provider.request = (async (params: {
+          method: string
+          params?: unknown[]
+        }) => {
+          if (
+            params.method === 'eth_signTypedData_v4' &&
+            JSON.parse(String(params.params?.[1])).message.agentAddress ===
+              '0x0000000000000000000000000000000000000000'
+          )
+            throw { code: 4001, message: 'User rejected revocation' }
+          return request(params as Parameters<typeof request>[0])
+        }) as typeof provider.request
+      })
+    await page.goto('/')
+    await page.getByRole('button', { name: '连接钱包', exact: true }).click()
+    await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+    await expect.poll(exchange.agentRegistrations).toBe(1)
+    const oldest = {
+      name: 'Phone-2222222222',
+      address: `0x${'2'.repeat(40)}`,
+      validUntil: Date.now() + 60000,
+    }
+    const newest = {
+      name: 'Phone-4444444444',
+      address: `0x${'4'.repeat(40)}`,
+      validUntil: Date.now() + 120000,
+    }
+    const web = {
+      name: 'JulianTerminal',
+      address: `0x${'5'.repeat(40)}`,
+      validUntil: Date.now() + 180000,
+    }
+    let agents = [newest, web, oldest]
+    const revoked: string[] = []
+    let pairings = 0
+    await page.route(
+      'https://api.hyperliquid-testnet.xyz/info',
+      async (route) => {
+        const type = route.request().postDataJSON().type
+        if (type === 'extraAgents') await route.fulfill({ json: agents })
+        else if (type === 'subAccounts')
+          await route.fulfill({ body: 'null', contentType: 'application/json' })
+        else await route.fallback()
+      },
+    )
+    await page.route(
+      'https://api.hyperliquid-testnet.xyz/exchange',
+      async (route) => {
+        const { action } = route.request().postDataJSON()
+        expect(action.type).toBe('approveAgent')
+        expect(action.hyperliquidChain).toBe('Testnet')
+        expect(action.agentAddress).toBe(`0x${'0'.repeat(40)}`)
+        expect(action.agentName).toBe(oldest.name)
+        revoked.push(action.agentName)
+        expect(pairings).toBe(0)
+        if (mode !== '撤销未生效') agents = [newest, web]
+        if (mode === '撤销回执丢失') await route.abort('failed')
+        else
+          await route.fulfill({
+            json: { status: 'ok', response: { type: 'default' } },
+          })
+      },
+    )
+    const relay = process.env.NEXT_PUBLIC_PHONE_PAIRING_URL as string
+    const offer = {
+      version: 1 as const,
+      relay,
+      id: '1'.repeat(32),
+      token: '2'.repeat(64),
+      key: '07'.repeat(32),
+      account: address as `0x${string}`,
+      expiresAt: Date.now() + 300000,
+    }
+    await page.route(`${relay}/**`, async (route) => {
+      const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+      }
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({ status: 204, headers })
+        return
+      }
+      if (route.request().url().endsWith('/pairings')) {
+        pairings++
+        expect(agents).toEqual([newest, web])
+        await route.fulfill({
+          headers,
+          json: {
+            id: '1'.repeat(32),
+            phoneToken: '2'.repeat(64),
+            webToken: '4'.repeat(64),
+            expiresAt: offer.expiresAt,
+          },
+        })
+      } else if (mode === '旧密钥重用' && route.request().method() === 'GET') {
+        const { encryptPairing } = await import(
+          '../src/features/wallet/lib/phone-pairing'
+        )
+        await route.fulfill({
+          headers,
+          json: {
+            request: encryptPairing(offer, 'request', {
+              account: address,
+              agentAddress: oldest.address,
+              agentName: oldest.name,
+              expiresAt: oldest.validUntil,
+            }),
+          },
+        })
+      } else await route.fulfill({ headers, json: {} })
+    })
+    await page
+      .getByRole('button', { name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i })
+      .click()
+    await page.getByRole('button', { name: '授权手机交易 / 管理设备' }).click()
+    await expect(
+      page.getByText('已授权设备（2）', { exact: true }),
+    ).toBeVisible()
+    expect(revoked).toHaveLength(0)
+    const create = page.getByRole('button', { name: '生成手机授权二维码' })
+    if (mode === '手动撤销') {
+      await page.getByText('已授权设备（2）', { exact: true }).click()
+      await expect(page.getByRole('link', { name: /测试网撤销/ })).toHaveCount(
+        0,
+      )
+      await page
+        .getByRole('button', { name: `撤销授权 ${oldest.name}` })
+        .click()
+      await expect(
+        page.getByText('已授权设备（1）', { exact: true }),
+      ).toBeVisible()
+      expect(pairings).toBe(0)
+    }
+    await create.click()
+    const qr = page.locator('svg title', {
+      hasText: '用 fameex-testnet 手机 App',
+    })
+    if (mode === '取消签名' || mode === '撤销未生效') {
+      await expect(
+        page
+          .getByRole('region', { name: '授权手机交易', exact: true })
+          .getByRole('alert'),
+      ).toContainText(mode === '取消签名' ? '取消' : '尚未确认')
+      await expect(qr).toHaveCount(0)
+      expect(pairings).toBe(0)
+      expect(agents).toHaveLength(3)
+      expect(revoked).toHaveLength(mode === '取消签名' ? 0 : 1)
+    } else {
+      await expect(qr).toHaveCount(1)
+      await expect(
+        page.getByText('已授权设备（1）', { exact: true }),
+      ).toBeVisible()
+      expect(revoked).toEqual([oldest.name])
+      if (mode === '旧密钥重用') {
+        await expect(
+          page
+            .getByRole('region', { name: '授权手机交易', exact: true })
+            .getByRole('alert'),
+        ).toContainText('请在 App 删除旧密钥')
+        await expect(
+          page.getByRole('button', { name: '在主钱包确认授权' }),
+        ).toHaveCount(0)
+      }
+      await page.getByText('已授权设备（1）', { exact: true }).click()
+      await expect(page.getByText(newest.name, { exact: true })).toBeVisible()
+      await expect(page.getByText(oldest.name, { exact: true })).toHaveCount(0)
+      if (mode === '自动清理')
+        await page.screenshot({
+          path: 'output-tdd/playwright/phone-device-revoke/automatic.png',
+          fullPage: true,
+        })
+    }
+    expect(exchange.writes).toHaveLength(0)
+  })
+}
+
 for (const failure of ['通知丢失', '代理满额', '提交失败'] as const) {
   test(`手机配对：${failure}可恢复，查询不重复签名`, async ({ page }) => {
     test.skip(
@@ -8336,7 +8546,7 @@ for (const failure of ['通知丢失', '代理满额', '提交失败'] as const)
     }
     let scanned = false
     let approved = false
-    let full = failure === '代理满额'
+    let full = false
     let signs = 0
     let deleted = 0
     let responseEnvelope = ''
@@ -8460,6 +8670,7 @@ for (const failure of ['通知丢失', '代理满额', '提交失败'] as const)
       page.locator('svg title', { hasText: '用 fameex-testnet 手机 App' }),
     ).toHaveCount(1)
     scanned = true
+    full = failure === '代理满额'
     await expect(
       page.getByText(`两端核对码：${pairingCode(offer, phone)}`),
     ).toBeVisible()

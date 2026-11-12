@@ -5,8 +5,17 @@ import {
   info,
   type WalletSession,
 } from '@/shared/lib/fameex-testnet'
+import { type PhoneAgent, phoneDevices } from '../lib/phone-authorization'
 
-export function PhoneDevices({ wallet }: { wallet: WalletSession }) {
+export function PhoneDevices({
+  wallet,
+  disabled,
+  onRevoke,
+}: {
+  wallet: WalletSession
+  disabled: boolean
+  onRevoke: (device: PhoneAgent) => Promise<void>
+}) {
   const [agents, setAgents] = useState<
     Awaited<ReturnType<typeof info.extraAgents>>
   >([])
@@ -16,11 +25,7 @@ export function PhoneDevices({ wallet }: { wallet: WalletSession }) {
     setLoading(true)
     setError('')
     try {
-      setAgents(
-        (await info.extraAgents({ user: wallet.address })).filter((agent) =>
-          /^Phone-[a-f0-9]{10}$/.test(agent.name),
-        ),
-      )
+      setAgents(phoneDevices(await info.extraAgents({ user: wallet.address })))
     } catch (e) {
       setError(errorText(e))
     } finally {
@@ -40,7 +45,7 @@ export function PhoneDevices({ wallet }: { wallet: WalletSession }) {
         <Button
           size="sm"
           variant="light"
-          isDisabled={loading}
+          isDisabled={loading || disabled}
           onPress={() => void refresh()}
         >
           刷新授权
@@ -48,7 +53,19 @@ export function PhoneDevices({ wallet }: { wallet: WalletSession }) {
       </div>
       {agents.map((agent) => (
         <div key={agent.address} className="space-y-1 rounded bg-panel p-2">
-          <p>{agent.name}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p>{agent.name}</p>
+            <Button
+              size="sm"
+              variant="light"
+              className="text-loss"
+              isDisabled={loading || disabled}
+              aria-label={`撤销授权 ${agent.name}`}
+              onPress={() => void onRevoke(agent)}
+            >
+              撤销授权
+            </Button>
+          </div>
           <p className="break-all font-mono">{agent.address}</p>
           <p>
             {agent.validUntil
@@ -58,16 +75,9 @@ export function PhoneDevices({ wallet }: { wallet: WalletSession }) {
         </div>
       ))}
       {!loading && !error && !agents.length && <p>暂无已授权手机。</p>}
-      <a
-        href="https://app.hyperliquid-testnet.xyz/API"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-block rounded text-accent focus-visible:outline-2"
-      >
-        前往测试网撤销授权 ↗
-      </a>
       <p className="text-muted">
-        撤销时请核对设备名和授权地址。删除手机密钥不会撤销授权。
+        撤销需主钱包确认，该手机随后无法交易；已有委托不会取消。删除 App
+        内密钥不会撤销授权。
       </p>
       {error && (
         <p role="alert" className="text-loss">

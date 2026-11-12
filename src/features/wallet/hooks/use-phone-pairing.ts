@@ -6,7 +6,10 @@ import {
 } from '@/shared/lib/fameex-testnet'
 import {
   approvePhoneAgent,
+  type PhoneAgent,
   PhoneApprovalBlockedError,
+  phoneAgentToReplace,
+  revokePhoneAgent,
   verifyPhoneAgent,
 } from '../lib/phone-authorization'
 import {
@@ -35,6 +38,9 @@ export function usePhonePairing(
     'idle' | 'waiting' | 'submitted' | 'done'
   >('idle')
   const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [devicesVersion, setDevicesVersion] = useState(0)
+  const retired = useRef(new Set<string>())
   const active = useRef<Pairing | null>(null)
   const version = useRef(0)
   const locked = useRef(false)
@@ -69,14 +75,17 @@ export function usePhonePairing(
           pairing.webToken,
         )
         if (cancelled) return
-        if (result.request)
-          setRequest(
-            parsePhoneRequest(
-              decryptPairing(pairing.offer, 'request', result.request),
-              wallet.address,
-            ),
+        if (result.request) {
+          const next = parsePhoneRequest(
+            decryptPairing(pairing.offer, 'request', result.request),
+            wallet.address,
           )
-        else timer = setTimeout(poll, 2000)
+          if (retired.current.has(next.agentAddress.toLowerCase()))
+            throw new Error(
+              '该手机密钥已进入撤销流程，请在 App 删除旧密钥，再生成二维码重新扫码。',
+            )
+          setRequest(next)
+        } else timer = setTimeout(poll, 2000)
       } catch (e) {
         if (!cancelled) setError(errorText(e))
       }
@@ -97,7 +106,7 @@ export function usePhonePairing(
       try {
         await operation()
       } catch (e) {
-        setError(errorText(e))
+        setError(isUserRejection(e) ? '已取消钱包确认。' : errorText(e))
       } finally {
         locked.current = false
         setBusy(false)
@@ -106,6 +115,25 @@ export function usePhonePairing(
     },
     [onBusy],
   )
+  const retire = async (device: PhoneAgent) => {
+    setNotice(`请在主钱包确认撤销 ${device.name}，该手机随后将无法交易。`)
+    const wasRetired = retired.current.has(device.address.toLowerCase())
+    // 结果不明时也不重新授权旧密钥，避免恢复已清除的防重放状态。
+    retired.current.add(device.address.toLowerCase())
+    try {
+      await revokePhoneAgent(wallet, device)
+      setNotice(
+        `已撤销 ${device.name}。该手机重新连接时，请先在 App 删除旧密钥。`,
+      )
+    } catch (e) {
+      if (isUserRejection(e) && !wasRetired)
+        retired.current.delete(device.address.toLowerCase())
+      setNotice('')
+      throw e
+    } finally {
+      setDevicesVersion((value) => value + 1)
+    }
+  }
   const create = () =>
     run(async () => {
       const attempt = ++version.current
@@ -129,6 +157,14 @@ export function usePhonePairing(
         !endpoint.startsWith('https://')
       )
         throw new Error('正式环境的配对服务必须使用 HTTPS')
+      const oldest = await phoneAgentToReplace(wallet)
+      if (attempt !== version.current) return
+      if (oldest) {
+        await retire(oldest)
+        if (await phoneAgentToReplace(wallet))
+          throw new Error('授权名额仍未释放，请刷新设备列表后重试。')
+      }
+      if (attempt !== version.current) return
       const result = await pairingFetch(
         endpoint,
         '/pairings',
@@ -185,6 +221,10 @@ export function usePhonePairing(
   const approve = () =>
     run(async () => {
       if (!pairing || !request || status !== 'waiting') return
+      if (retired.current.has(request.agentAddress.toLowerCase()))
+        throw new Error(
+          '请在 App 删除旧密钥后重新扫码，不要重新授权已撤销的密钥。',
+        )
       if (Date.now() >= pairing.offer.expiresAt)
         throw new Error('二维码已过期，请重新生成；不要签署旧请求')
       preserve.current = true
@@ -210,8 +250,22 @@ export function usePhonePairing(
     status,
     busy,
     error,
+    notice,
+    devicesVersion,
     create,
     approve,
+    revoke: (device: PhoneAgent) =>
+      run(async () => {
+        if (status === 'submitted') return
+        await retire(device)
+        if (
+          request?.agentAddress.toLowerCase() === device.address.toLowerCase()
+        ) {
+          setPairing(null)
+          setRequest(null)
+          setStatus('idle')
+        }
+      }),
     verify: () =>
       run(async () => {
         try {
