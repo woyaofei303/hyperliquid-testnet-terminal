@@ -12,6 +12,8 @@
 
 本站使用独立的 `/srv/hyperliquid` 目录、`hyperliquid-deploy` 普通账号、`hyperliquid` Compose 项目及 `127.0.0.1:8089` 端口。原 `dy` 和 `live` 站点继续使用各自的服务。新增的代理片段写入 `shared/extra-sites.caddy`，避免原 Streamlab 发布时丢失本站配置。
 
+页面和 npm 包统一命名为 `fameex-testnet`。以上部署资源、旧域名跳转和 GitHub 仓库地址保留现状；项目更名不迁移服务器目录或账号，发布与回滚继续使用原路径。
+
 ## 一次发布的过程
 
 例如修改下单按钮后，先把代码提交并推送至 GitHub。推送 `main` 只运行检查；在 Actions 的 **CI & Production** 中选择 `main`、`deploy`，才会发布。

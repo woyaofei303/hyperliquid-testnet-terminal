@@ -4439,7 +4439,7 @@ test('Web3 存款：切换测试链、一次点击连续授权和存款、核对
   )
   expect(BigInt(`0x${funds.transactions[0].data.slice(-64)}`)).toBe(10000000n)
   await expect(
-    dialog.getByText('源链已确认 · 等待 Hyperliquid 到账'),
+    dialog.getByText('源链已确认 · 等待 fameex-testnet 到账'),
   ).toBeVisible()
   expect(funds.transactions).toHaveLength(2)
   expect(funds.transactions[1].to.toLowerCase()).toBe(
@@ -4447,10 +4447,10 @@ test('Web3 存款：切换测试链、一次点击连续授权和存款、核对
   )
   funds.setCredited()
   await expect(
-    dialog.getByText('源链已确认 · 等待 Hyperliquid 到账'),
+    dialog.getByText('源链已确认 · 等待 fameex-testnet 到账'),
   ).toBeVisible()
   funds.setLedger()
-  await expect(dialog.getByText('Hyperliquid 到账已核验')).toBeVisible({
+  await expect(dialog.getByText('fameex-testnet 到账已核验')).toBeVisible({
     timeout: 15000,
   })
   await page.screenshot({
@@ -5318,7 +5318,7 @@ test('Web3 交易所返回 Must deposit 时转为存款引导，不保留错误�
     page
       .getByRole('region', { name: '全局通知' })
       .getByText(
-        'Hyperliquid 账户尚未激活。请先存入 USDC 并等待到账，再完成钱包连接。',
+        'fameex-testnet 账户尚未激活。请先存入 USDC 并等待到账，再完成钱包连接。',
         { exact: true },
       ),
   ).toBeVisible()
@@ -6744,7 +6744,16 @@ test('语言和动态元数据跟随币对，切换不刷新、不丢失下单�
   await expect(page.getByRole('button', { name: '交易市场' })).toContainText(
     'BTC',
   )
-  await expect(page).toHaveTitle(/BTC \/ USDC.*永续/)
+  await expect(page).toHaveTitle(/BTC \/ USDC.*永续.*fameex-testnet$/)
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('testnet')
+  await expect(page.locator('meta[name="application-name"]')).toHaveAttribute(
+    'content',
+    'fameex-testnet',
+  )
+  await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute(
+    'content',
+    'fameex-testnet',
+  )
   const icon = page.locator('head link[rel="icon"][type="image/png"]')
   await expect(icon).toHaveAttribute('sizes', '48x48')
   const iconPath = await icon.getAttribute('href')
@@ -6773,7 +6782,18 @@ test('语言和动态元数据跟随币对，切换不刷新、不丢失下单�
   await expect(page.getByLabel('Size (BTC)', { exact: true })).toHaveValue(
     '0.123',
   )
-  await expect(page).toHaveTitle(/BTC \/ USDC.*Perpetual/)
+  await expect(page).toHaveTitle(/BTC \/ USDC.*Perpetual.*fameex-testnet$/)
+  await page.setViewportSize({ width: 375, height: 812 })
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  expect(
+    await page
+      .locator('header')
+      .evaluate((el) => el.scrollWidth <= el.clientWidth),
+  ).toBe(true)
+  await expect(
+    page.getByRole('link', { name: 'Faucet', exact: true }),
+  ).toBeInViewport()
+  await page.setViewportSize({ width: 1280, height: 720 })
   expect(
     await page.locator('meta[property="og:title"]').getAttribute('content'),
   ).toBe(await page.title())
@@ -7965,6 +7985,52 @@ test('完整账户区：独立余额与预测、历史委托字段筛选、全�
   expect(exchange.writes).toHaveLength(0)
 })
 
+test('预测市场加载时显示骨架，完成后展示市场，空结果与错误不保留骨架', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  const loaded = Promise.withResolvers<void>()
+  let result = 'markets'
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/info',
+    async (route) => {
+      if (route.request().postDataJSON().type !== 'outcomeMeta')
+        return route.fallback()
+      await loaded.promise
+      if (result === 'empty')
+        return route.fulfill({
+          json: { outcomes: [], questions: [], feeScale: '1' },
+        })
+      if (result === 'error')
+        return route.fulfill({ status: 400, body: 'offline' })
+      return route.fallback()
+    },
+  )
+  await page.goto('/outcomes')
+  const markets = page.getByRole('region', { name: '预测市场', exact: true })
+  const loading = markets.getByRole('status', { name: '正在加载预测市场…' })
+  await expect(loading).toBeVisible()
+  await expect(markets).toHaveAttribute('aria-busy', 'true')
+  await expect(markets.getByText('没有匹配的市场')).toHaveCount(0)
+  loaded.resolve()
+  await expect(
+    markets.getByRole('link', { name: 'BTC 达到目标价？', exact: true }),
+  ).toBeVisible()
+  await expect(loading).toHaveCount(0)
+  await expect(markets).toHaveAttribute('aria-busy', 'false')
+  await expect(page).toHaveTitle('预测市场 | fameex-testnet')
+  result = 'empty'
+  await page.reload()
+  await expect(markets.getByText('没有匹配的市场')).toBeVisible()
+  await expect(loading).toHaveCount(0)
+  result = 'error'
+  await page.reload()
+  await expect(markets.getByRole('alert')).toContainText('预测市场加载失败：')
+  await expect(loading).toHaveCount(0)
+  await expect(markets.getByText('没有匹配的市场')).toHaveCount(0)
+  expect(exchange.writes).toHaveLength(0)
+})
+
 test('预测落地页进入指定结果，转换确认重读余额并提交已校验的原生动作', async ({
   page,
 }) => {
@@ -8391,7 +8457,7 @@ for (const failure of ['通知丢失', '代理满额', '提交失败'] as const)
     await page.getByRole('button', { name: '授权手机交易 / 管理设备' }).click()
     await page.getByRole('button', { name: '生成手机授权二维码' }).click()
     await expect(
-      page.locator('svg title', { hasText: '用 Hyperliquid 手机 App' }),
+      page.locator('svg title', { hasText: '用 fameex-testnet 手机 App' }),
     ).toHaveCount(1)
     scanned = true
     await expect(

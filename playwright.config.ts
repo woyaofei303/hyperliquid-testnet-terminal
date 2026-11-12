@@ -12,11 +12,11 @@ export default defineConfig({
     [
       'json',
       {
-        outputFile: `output-tdd/playwright/hyperliquid/${process.env.LIVE_CHECK ? 'live-results' : 'results'}.json`,
+        outputFile: `output-tdd/playwright/fameex-testnet/${process.env.LIVE_CHECK ? 'live-results' : 'results'}.json`,
       },
     ],
   ],
-  outputDir: 'output-tdd/playwright/hyperliquid/test-results',
+  outputDir: 'output-tdd/playwright/fameex-testnet/test-results',
   use: {
     baseURL,
     trace: 'retain-on-failure',

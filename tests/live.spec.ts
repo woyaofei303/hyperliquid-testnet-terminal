@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('真实测试网双图表、分层成交量及 Hyperliquid 布局 @live', async ({
+test('真实测试网双图表、分层成交量及 fameex-testnet 布局 @live', async ({
   page,
 }) => {
   test.setTimeout(120000)

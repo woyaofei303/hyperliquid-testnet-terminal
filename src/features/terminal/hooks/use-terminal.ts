@@ -58,7 +58,6 @@ import {
   type FeedbackTone,
   notify,
 } from '@/shared/components/notifications'
-import { fundingFeedback, tradeFeedbackTone } from '@/shared/lib/feedback'
 import {
   assertSession,
   authorizeTrading,
@@ -72,7 +71,8 @@ import {
   type OpenOrder,
   restoreTrading,
   type WalletSession,
-} from '@/shared/lib/hyperliquid'
+} from '@/shared/lib/fameex-testnet'
+import { fundingFeedback, tradeFeedbackTone } from '@/shared/lib/feedback'
 import { useFunding } from '../../assets/hooks/use-funding'
 import { useChaseOrders } from '../../trading/hooks/use-chase-orders'
 import { useWalletProviders } from '../../wallet/hooks/use-wallet-providers'

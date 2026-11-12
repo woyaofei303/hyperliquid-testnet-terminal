@@ -10,7 +10,7 @@ import {
 import { createChartFeed } from '@/features/chart/lib/chart-feed'
 import type { ChartInterval } from '@/features/chart/lib/chart-periods'
 import type { Candle } from '@/features/market/lib/market-data'
-import { info } from '@/shared/lib/hyperliquid'
+import { info } from '@/shared/lib/fameex-testnet'
 
 export function useChartFeed({
   coin,

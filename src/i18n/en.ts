@@ -131,8 +131,8 @@ export const en: Record<string, string> = {
     'Deposit USDC from Arbitrum Sepolia, then continue connecting to trade once credited.',
   '完成钱包连接后可提交调整，无需逐笔钱包确认。':
     'Complete wallet connection to submit changes without confirming each action in your wallet.',
-  'Hyperliquid 账户尚未激活。请先存入 USDC 并等待到账，再完成钱包连接。':
-    'Your Hyperliquid account is not activated. Deposit USDC and wait for credit before completing wallet connection.',
+  'fameex-testnet 账户尚未激活。请先存入 USDC 并等待到账，再完成钱包连接。':
+    'Your fameex-testnet account is not activated. Deposit USDC and wait for credit before completing wallet connection.',
   ' 根蜡烛，时间使用本地时区': ' candles, local time zone',
   水龙头: 'Faucet',
   交易设置: 'Trading settings',
@@ -358,7 +358,7 @@ export const en: Record<string, string> = {
     'Cross positions share account margin. PnL from other cross positions affects available margin.',
   '逐仓持仓使用分配给该仓位的保证金。此处只调整模式，不执行追加或移除保证金。':
     'Isolated positions use allocated margin. This changes the mode only; it does not add or remove margin.',
-  '该 Hyperliquid 市场仅支持逐仓。':
+  '该 fameex-testnet 市场仅支持逐仓。':
     'This market supports isolated margin only.',
   杠杆倍数: 'Leverage',
   当前市场上限: 'Market maximum ',
@@ -659,7 +659,7 @@ export const en: Record<string, string> = {
   领取: 'Get ',
   'Circle 测试 USDC ↗': 'Circle test USDC ↗',
   '和 Arbitrum Sepolia ETH。': ' and Arbitrum Sepolia ETH.',
-  'Hyperliquid 水龙头 ↗': 'Hyperliquid faucet ↗',
+  '测试网水龙头 ↗': 'Testnet faucet ↗',
   '要求同一地址已有主网存款历史。':
     ' requires mainnet deposit history for the same address.',
   '在您的合约和现货余额之间划转 USDC。':
@@ -680,9 +680,9 @@ export const en: Record<string, string> = {
   'USDC 提款': 'USDC withdrawal',
   'USDC 存款': 'USDC deposit',
   'Arbitrum Sepolia 到账已核验': 'Arbitrum Sepolia credit verified',
-  'Hyperliquid 到账已核验': 'Hyperliquid credit verified',
-  '源链已确认 · 等待 Hyperliquid 到账':
-    'Source confirmed · awaiting Hyperliquid credit',
+  'fameex-testnet 到账已核验': 'fameex-testnet credit verified',
+  '源链已确认 · 等待 fameex-testnet 到账':
+    'Source confirmed · awaiting fameex-testnet credit',
   '目标链交易已找到 · 等待到账核验':
     'Destination transaction found · verifying credit',
   '操作已确认，请核对最新余额': 'Confirmed. Check the latest balance.',

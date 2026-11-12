@@ -1,4 +1,7 @@
-import { type AccountSnapshot, info } from '../../../shared/lib/hyperliquid.ts'
+import {
+  type AccountSnapshot,
+  info,
+} from '../../../shared/lib/fameex-testnet.ts'
 import { isCash } from '../../market/lib/market-catalog.ts'
 import { prepareTicket, type Ticket, type TicketInput } from './order-ticket.ts'
 import {

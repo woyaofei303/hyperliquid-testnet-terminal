@@ -36,7 +36,7 @@ import {
   isUserRejection,
   masterExchange,
   type WalletSession,
-} from '@/shared/lib/hyperliquid'
+} from '@/shared/lib/fameex-testnet'
 
 export function useFunding(
   wallet: WalletSession | null,

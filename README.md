@@ -1,8 +1,12 @@
-# Hyperliquid 测试网交易终端
+# fameex-testnet
+
+项目统一命名为 `fameex-testnet`，页头为 FameEX Logo 加 `testnet` 标识。行情和交易仍接入 Hyperliquid 测试网：SDK 包名、HTTP / WebSocket / RPC 地址、签名字段和会话中的网络标识保留协议原值。文档中提到 Hyperliquid 时，指底层交易所或官方资料。
 
 阿里云发布地址：`https://app.fameex-testnet.xyz`。旧地址 `https://hyperliquid.sunshinedairy.net` 保留为 301 跳转入口，路径和查询参数保持不变。构建、发布与回滚操作见 [部署说明](docs/aliyun-deployment.md)。
 
 这个项目把行情、委托和仓位管理放在一个页面里。打开页面就能查看测试网订单簿和 K 线；准备好有测试 USDC 的钱包后，可启用交易、挂单、撤单、开仓、减仓和平仓。
+
+预测市场首次加载时显示六张卡片骨架，随屏幕宽度排列为三栏、两栏或单栏。请求完成后展示市场或空结果，失败时显示错误；系统开启减少动画后，骨架保持静止。
 
 技术栈是 Next.js、React、TypeScript、Tailwind CSS、FameEX UI、KLineChart、TradingView Charting Library，以及社区维护的 `@nktkas/hyperliquid` SDK。市场包含默认永续、HIP-3 独立合约、现货和 HIP-4 预测。合约下单区支持限价、市价、止损市价/限价、止盈市价/限价、阶梯单、TWAP、追价和原生移动止损；限价可选 GTC、IOC、ALO。
 
@@ -83,7 +87,7 @@ npm start
 1. 点击切换到 Arbitrum Sepolia；钱包不认识该网络时，页面请求添加固定的测试网配置。
 2. 点击“存款”，页面重新查询源链 USDC、ETH 和授权额度。额度不足时，先在钱包确认 ERC-20 `approve`，仅授权本次金额给固定 TokenMessenger 合约，不申请无限额度；已有足够额度则跳过授权。
 3. 源链授权确认后，页面接着请求钱包确认存款，不用再次点击页面按钮。这一步调用 `depositForBurnWithHook`，目标固定为 HyperEVM 测试网，再由官方 Forwarder 转入**当前钱包地址的默认合约账户**。不是向任意地址发送 USDC，也不是直接 ERC-20 转账到 HyperEVM 钱包。
-4. 源链确认后，页面显示“等待 Hyperliquid 到账”。页面用源链哈希查询 Circle CCTP 消息，核对网络、收款信息、金额和费用，再校验目标链成功回执中的消息、转发与入账事件，以及同秒唯一匹配的 HyperCore 收款流水，才显示“到账已核验”。CCTP nonce 与 HyperCore nonce 不是同一个编号；余额增加本身也不能作为这笔充值完成的证据。证据不全或同秒存在多笔同额流水时继续等待核对。
+4. 源链确认后，页面显示“等待 fameex-testnet 到账”。页面用源链哈希查询 Circle CCTP 消息，核对网络、收款信息、金额和费用，再校验目标链成功回执中的消息、转发与入账事件，以及同秒唯一匹配的 HyperCore 收款流水，才显示“到账已核验”。CCTP nonce 与 HyperCore nonce 不是同一个编号；余额增加本身也不能作为这笔充值完成的证据。证据不全或同秒存在多笔同额流水时继续等待核对。
 5. 到账后关闭存款弹窗；已有会话可直接下单，尚未完成连接时通过下单区“完成钱包连接”继续签名。
 
 当前实现单笔至少 5 USDC、小于 10,000,000 USDC、最多 6 位小数。跨链费用上限为 0.20 USDC，另付源链 Gas；新 HyperCore 账户还可能扣除 1 USDC 激活费。实际费用和到账金额以链上及交易所回报为准。合约地址与流程依据 [Hyperliquid USDC 说明](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/usdc)、[Circle CCTP 合约列表](https://developers.circle.com/cctp/references/contract-addresses)及 [Forwarder 数据格式](https://github.com/circlefin/hyperevm-circle-contracts/blob/master/src/messages/CctpForwarderHookData.sol)。旧 USDC Bridge 已标为弃用，因此未接入旧桥充值。
@@ -236,7 +240,7 @@ npm run test:live
 npm run verify:read -- 0x替换为你的40位十六进制公开地址
 ```
 
-原始行情回执位于 `output-tdd/hyperliquid/read-only.json`，浏览器结果位于 `output-tdd/playwright/hyperliquid/`，本轮截图位于 `output-tdd/playwright/web3-onboarding/`。这些本地验收文件通过 `.git/info/exclude` 排除，没有加入源码提交。`npm ci` 会安装 Husky；pre-commit 对暂存文件运行 Biome，再做类型检查和单元测试。
+新的只读核验写入 `output-tdd/fameex-testnet/read-only.json`，浏览器结果写入 `output-tdd/playwright/fameex-testnet/`。更名前的回执仍保留在原目录，历史截图见 [VERIFICATION.md](./VERIFICATION.md)。这些本地验收文件通过 `.git/info/exclude` 排除，没有加入源码提交。`npm ci` 会安装 Husky；pre-commit 对暂存文件运行 Biome，再做类型检查和单元测试。
 
 ## 有测试余额后补齐真实验收
 
@@ -248,7 +252,7 @@ npm run verify:read -- 0x替换为你的40位十六进制公开地址
 4. 减少一部分仓位，确认剩余数量；再平掉剩余仓位，确认没有本次新增持仓或遗留委托。
 5. 在当前委托、成交记录和操作记录核对结果；操作记录仅保留在当前页面内存，刷新后清空。
 
-随后用官方测试网页面或 `/info` 再核对订单状态、成交和最终仓位。只有这一步确实通过，才把项目以“个人 Hyperliquid 测试网项目”写入简历，并描述实际完成的模块与验收结果。不能据此声称生产环境交易经验、量化收益或清算引擎研发经验。
+随后用官方测试网页面或 `/info` 再核对订单状态、成交和最终仓位。只有这一步确实通过，才把项目以“个人 fameex-testnet 项目”写入简历，并描述实际完成的模块与验收结果。不能据此声称生产环境交易经验、量化收益或清算引擎研发经验。
 
 ## 对照源码理解状态变化
 
@@ -272,9 +276,9 @@ src/
 
 以连接钱包后买入 BTC 为例：`app/page.tsx` 渲染 `terminal/components/terminal.tsx`，`use-terminal.ts` 协调钱包选择与连接。`assets/hooks/use-account.ts` 读取并订阅当前账户，`market/hooks/use-market.ts` 接收行情，`trading` 中的下单表单生成草稿与确认参数。用户确认后，交易逻辑通过共享的 Hyperliquid 适配器签名和提交；回报再更新委托、仓位和余额。账户订阅失败保留错误状态，结果不明的订单继续沿用未确认记录保护，不自动重发。
 
-功能模块之间直接引用实际文件；`shared/lib/hyperliquid.ts` 继续集中处理测试网客户端、账户读取和签名适配，没有另加转发入口。`packages/` 仍提供 FameEX 通用组件、图表和工具。端到端测试保留在 `tests/`，覆盖多个模块一起运行的流程；`npm test` 递归发现 `src/` 内所有 `*.test.ts`。
+功能模块之间直接引用实际文件；`shared/lib/fameex-testnet.ts` 继续集中处理测试网客户端、账户读取和签名适配，没有另加转发入口。`packages/` 仍提供 FameEX 通用组件、图表和工具。端到端测试保留在 `tests/`，覆盖多个模块一起运行的流程；`npm test` 递归发现 `src/` 内所有 `*.test.ts`。
 
-- `src/shared/lib/hyperliquid.ts`：固定测试网连接、读取主账户数据、钱包连接和可恢复交易会话。浏览器扩展签交易授权及资金划转，订单使用已登记 API 钱包的 L1 签名，避免混淆两种协议；参见 [官方签名说明](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/signing)。
+- `src/shared/lib/fameex-testnet.ts`：固定测试网连接、读取主账户数据、钱包连接和可恢复交易会话。浏览器扩展签交易授权及资金划转，订单使用已登记 API 钱包的 L1 签名，避免混淆两种协议；参见 [官方签名说明](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/signing)。
 - `src/features/assets/lib/funding.ts`：固定测试链和 CCTP 合约、校验 USDC 金额、模拟合约调用、提交源链授权/充值，构造 CCTP 提款参数、预留 Gas/激活费，并匹配跨链到账证据。
 - `src/features/assets/lib/cctp.ts`：查询和校验 CCTP 消息，解析目标链事件，将存款与 HyperCore 流水关联，并核对提款原 nonce、收款人和实际到账净额。
 - `src/features/wallet/hooks/use-wallet-providers.ts` 负责扩展发现；`src/features/assets/hooks/use-funding.ts` 管理余额、待确认资金记录和轮询。`wallet/components/web3-dialog.tsx` 是钱包与资金弹窗入口，提款表单位于 `assets/components/withdrawal-form.tsx`。

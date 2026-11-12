@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { MarketContext } from '../../../shared/lib/hyperliquid.ts'
+import type { MarketContext } from '../../../shared/lib/fameex-testnet.ts'
 import {
   preparePositionAction,
   protectionPrice,

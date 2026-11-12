@@ -20,7 +20,7 @@ import {
   assertSession,
   info,
   type WalletSession,
-} from '../../../shared/lib/hyperliquid.ts'
+} from '../../../shared/lib/fameex-testnet.ts'
 import { Money, positiveDecimal } from '../../trading/lib/orders.ts'
 
 export const DEPOSIT_CHAIN = arbitrumSepolia

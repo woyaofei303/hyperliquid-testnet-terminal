@@ -10,7 +10,7 @@ import type { TerminalModel } from '@/features/terminal/hooks/use-terminal'
 import type { Market } from '@/features/trading/lib/orders'
 import type { Action } from '@/features/trading/lib/trading'
 import { t } from '@/i18n'
-import { errorText } from '@/shared/lib/hyperliquid'
+import { errorText } from '@/shared/lib/fameex-testnet'
 
 export function OutcomeConversion({
   model,

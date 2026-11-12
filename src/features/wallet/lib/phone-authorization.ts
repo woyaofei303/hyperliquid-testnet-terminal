@@ -3,7 +3,7 @@ import {
   info,
   masterExchange,
   type WalletSession,
-} from '../../../shared/lib/hyperliquid.ts'
+} from '../../../shared/lib/fameex-testnet.ts'
 import {
   type PhoneRequest,
   parsePhoneRequest,

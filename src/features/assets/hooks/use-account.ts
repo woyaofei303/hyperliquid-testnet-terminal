@@ -2,13 +2,13 @@
 
 import { SubscriptionClient, WebSocketTransport } from '@nktkas/hyperliquid'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createFrameBatch } from '@/shared/lib/frame-batch'
 import {
   type AccountSnapshot,
   errorText,
   loadAccount,
   WS_URL,
-} from '@/shared/lib/hyperliquid'
+} from '@/shared/lib/fameex-testnet'
+import { createFrameBatch } from '@/shared/lib/frame-batch'
 import { performanceMetrics } from '@/shared/lib/performance'
 
 export function useAccount(address: `0x${string}` | null, dex = '') {

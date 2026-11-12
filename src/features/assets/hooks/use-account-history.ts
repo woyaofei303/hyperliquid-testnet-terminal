@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fundingPages } from '@/features/assets/lib/account-records'
-import { errorText, type Fill, info } from '@/shared/lib/hyperliquid'
+import { errorText, type Fill, info } from '@/shared/lib/fameex-testnet'
 
 type History = {
   orders: Awaited<ReturnType<typeof info.historicalOrders>>

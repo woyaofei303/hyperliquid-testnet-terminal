@@ -66,6 +66,7 @@ export function PredictionMarkets({ model }: { model: TerminalModel }) {
   return (
     <section
       aria-label={t('预测市场')}
+      aria-busy={model.catalogLoading}
       className="min-h-0 flex-1 overflow-auto bg-background"
     >
       <div className="mx-auto max-w-[1440px] px-4 py-8 md:px-8">
@@ -119,6 +120,39 @@ export function PredictionMarkets({ model }: { model: TerminalModel }) {
             {t('预测市场加载失败：')}
             {model.catalogError}
           </p>
+        )}
+        {model.catalogLoading && !events.length && (
+          <output className="block" aria-label={t('正在加载预测市场…')}>
+            <span className="sr-only">{t('正在加载预测市场…')}</span>
+            <span
+              aria-hidden="true"
+              className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            >
+              {[0, 1, 2, 3, 4, 5].map((card) => (
+                <span
+                  key={card}
+                  className="block rounded-xl border border-edge bg-panel p-4 motion-safe:animate-pulse md:p-5"
+                >
+                  <span className="mb-4 flex min-h-12 gap-3">
+                    <span className="size-7 shrink-0 rounded-full bg-fill-1" />
+                    <span className="flex-1 space-y-2 py-1">
+                      <span className="block h-4 w-4/5 rounded bg-fill-1" />
+                      <span className="block h-4 w-3/5 rounded bg-fill-1" />
+                    </span>
+                  </span>
+                  <span className="mb-4 block h-3 w-1/3 rounded bg-fill-1" />
+                  <span className="mb-4 block space-y-1.5">
+                    <span className="block h-11 rounded-lg bg-fill-1" />
+                    <span className="block h-11 rounded-lg bg-fill-1" />
+                  </span>
+                  <span className="flex justify-between border-t border-edge pt-3">
+                    <span className="block h-3 w-16 rounded bg-fill-1" />
+                    <span className="block h-3 w-20 rounded bg-fill-1" />
+                  </span>
+                </span>
+              ))}
+            </span>
+          </output>
         )}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.slice(0, limit).map((event) => (
@@ -234,10 +268,8 @@ export function PredictionMarkets({ model }: { model: TerminalModel }) {
             </article>
           ))}
         </div>
-        {!filtered.length && (
-          <p className="py-20 text-center text-muted">
-            {t(model.catalogLoading ? '正在加载预测市场…' : '没有匹配的市场')}
-          </p>
+        {!filtered.length && !model.catalogLoading && !model.catalogError && (
+          <p className="py-20 text-center text-muted">{t('没有匹配的市场')}</p>
         )}
         {filtered.length > limit && (
           <div className="mt-6 text-center">

@@ -351,8 +351,8 @@ export function createChartFeed(initial: ChartFeedContext) {
     type: 'crypto',
     session: '24x7',
     timezone: 'Etc/UTC',
-    exchange: 'Hyperliquid',
-    listed_exchange: 'Hyperliquid',
+    exchange: 'fameex-testnet',
+    listed_exchange: 'fameex-testnet',
     pricescale: 10 ** (priceDecimals ?? Math.max(0, 6 - szDecimals)),
     minmov: 1,
     volume_precision: szDecimals,
@@ -382,7 +382,7 @@ export function createChartFeed(initial: ChartFeedContext) {
       setTimeout(() => {
         if (!active) return
         if (name === symbol.ticker) callback(symbol)
-        else error('未知 Hyperliquid 市场')
+        else error('未知 fameex-testnet 市场')
       }, 0)
     },
     getBars: (symbol, selectedResolution, params, callback, error) => {

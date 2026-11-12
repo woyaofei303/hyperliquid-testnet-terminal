@@ -5,7 +5,7 @@ import type { TerminalModel } from '@/features/terminal/hooks/use-terminal'
 import { formatOrderPrice, Money } from '@/features/trading/lib/orders'
 import type { PositionActionKind } from '@/features/trading/lib/position-actions'
 import { t, useLocale } from '@/i18n'
-import type { AccountState } from '@/shared/lib/hyperliquid'
+import type { AccountState } from '@/shared/lib/fameex-testnet'
 import { HelpLabel } from '../../../shared/components/help-label'
 import { OrderAmount } from './order-amount'
 

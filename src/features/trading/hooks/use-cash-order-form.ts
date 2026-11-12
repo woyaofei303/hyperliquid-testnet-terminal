@@ -31,7 +31,11 @@ import {
   predictionScale,
   preparePredictionTicket,
 } from '@/features/trading/lib/prediction-order'
-import { errorText, info, type MarketContext } from '@/shared/lib/hyperliquid'
+import {
+  errorText,
+  info,
+  type MarketContext,
+} from '@/shared/lib/fameex-testnet'
 import type { TerminalModel } from '../../terminal/hooks/use-terminal'
 
 export function useCashOrderForm(model: TerminalModel, market: MarketContext) {

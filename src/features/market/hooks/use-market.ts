@@ -6,7 +6,6 @@ import type {
   ActiveSpotAssetCtxEvent,
 } from '@nktkas/hyperliquid/api/subscription'
 import { useEffect, useMemo, useState } from 'react'
-import { createFrameBatch } from '../../../shared/lib/frame-batch.ts'
 import {
   type Book,
   errorText,
@@ -15,7 +14,8 @@ import {
   loadMarkets,
   type MarketContext,
   WS_URL,
-} from '../../../shared/lib/hyperliquid.ts'
+} from '../../../shared/lib/fameex-testnet.ts'
+import { createFrameBatch } from '../../../shared/lib/frame-batch.ts'
 import { performanceMetrics } from '../../../shared/lib/performance.ts'
 import type { ChartInterval } from '../../chart/lib/chart-periods.ts'
 import { createLiveBook } from '../lib/live-book.ts'

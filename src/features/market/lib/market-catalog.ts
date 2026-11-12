@@ -1,4 +1,4 @@
-import type { info, MarketContext } from '../../../shared/lib/hyperliquid.ts'
+import type { info, MarketContext } from '../../../shared/lib/fameex-testnet.ts'
 import type { Market } from '../../trading/lib/orders.ts'
 
 type SpotMeta = Awaited<ReturnType<typeof info.spotMetaAndAssetCtxs>>

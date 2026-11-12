@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { Book } from '../../../shared/lib/hyperliquid.ts'
+import type { Book } from '../../../shared/lib/fameex-testnet.ts'
 import { createLiveBook } from './live-book.ts'
 
 const book = (time: number, count: number, price = 100): Book => ({

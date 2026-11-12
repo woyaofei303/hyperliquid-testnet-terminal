@@ -3,7 +3,7 @@ import test from 'node:test'
 import type {
   AccountState,
   OpenOrder,
-} from '../../../shared/lib/hyperliquid.ts'
+} from '../../../shared/lib/fameex-testnet.ts'
 import {
   assertProtectionUnchanged,
   positionProtections,

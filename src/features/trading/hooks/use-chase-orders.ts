@@ -12,7 +12,11 @@ import {
 import type { Ticket } from '@/features/trading/lib/order-ticket'
 import { Money } from '@/features/trading/lib/orders'
 import { loadPending, type PendingOrder } from '@/features/trading/lib/trading'
-import { errorText, info, type WalletSession } from '@/shared/lib/hyperliquid'
+import {
+  errorText,
+  info,
+  type WalletSession,
+} from '@/shared/lib/fameex-testnet'
 
 type ChaseTicket = Extract<Ticket, { kind: 'chase' }>
 type Chase = {

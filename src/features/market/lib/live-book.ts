@@ -1,4 +1,4 @@
-import type { Book } from '../../../shared/lib/hyperliquid.ts'
+import type { Book } from '../../../shared/lib/fameex-testnet.ts'
 import { Money } from '../../trading/lib/orders.ts'
 
 export function createLiveBook(coin: string) {

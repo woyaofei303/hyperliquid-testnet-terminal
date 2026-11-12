@@ -24,7 +24,7 @@ import { baseName, quoteName } from '@/features/market/lib/market-catalog'
 import type { TerminalModel } from '@/features/terminal/hooks/use-terminal'
 import { formatOrderPrice, Money } from '@/features/trading/lib/orders'
 import { t, useLocale } from '@/i18n'
-import type { OpenOrder } from '@/shared/lib/hyperliquid'
+import type { OpenOrder } from '@/shared/lib/fameex-testnet'
 import { PositionClose } from '../../trading/components/position-close'
 import { PositionProtection } from '../../trading/components/position-protection'
 

@@ -12,7 +12,7 @@ export default function GlobalError({
   return (
     <html lang="zh-CN" className="dark">
       <body>
-        <title>页面异常 · Hyperliquid</title>
+        <title>页面异常 · fameex-testnet</title>
         <ErrorFallback name="应用" onRetry={retry} className="h-dvh" />
       </body>
     </html>

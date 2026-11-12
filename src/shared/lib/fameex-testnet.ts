@@ -242,7 +242,7 @@ export function masterExchange(session: WalletSession, nonce?: number) {
 }
 
 export const DEPOSIT_REQUIRED_MESSAGE =
-  'Hyperliquid 账户尚未激活。请先存入 USDC 并等待到账，再完成钱包连接。'
+  'fameex-testnet 账户尚未激活。请先存入 USDC 并等待到账，再完成钱包连接。'
 
 export function isDepositRequired(error: unknown) {
   const text = errorText(error)

@@ -2,7 +2,7 @@ import {
   addressOf,
   assertSession,
   info,
-} from '../../../shared/lib/hyperliquid.ts'
+} from '../../../shared/lib/fameex-testnet.ts'
 import {
   type ConversionKind,
   conversionKinds,
@@ -113,7 +113,7 @@ export function validateLeverage(
 }
 
 export async function submitTrade(
-  wallet: import('../../../shared/lib/hyperliquid').WalletSession,
+  wallet: import('../../../shared/lib/fameex-testnet').WalletSession,
   next: Action,
   hasPending: boolean,
   onPending: (pending: PendingOrder | null) => void,

@@ -4,7 +4,7 @@ import type { EIP1193Provider } from 'viem'
 import {
   assertSession,
   connectWallet,
-} from '../../../shared/lib/hyperliquid.ts'
+} from '../../../shared/lib/fameex-testnet.ts'
 import { assertDepositSession } from '../../assets/lib/funding.ts'
 
 const address = '0x1111111111111111111111111111111111111111'

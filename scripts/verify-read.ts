@@ -8,7 +8,7 @@ import {
   loadAccount,
   loadMarkets,
   WS_URL,
-} from '../src/shared/lib/hyperliquid.ts'
+} from '../src/shared/lib/fameex-testnet.ts'
 
 // 此脚本只发 /info 查询与行情订阅，不接受密钥，也不调用 /exchange。
 const markets = await loadMarkets()
@@ -86,9 +86,9 @@ const evidence = {
   webSocketBook: liveBook,
   account,
 }
-await mkdir('output-tdd/hyperliquid', { recursive: true })
+await mkdir('output-tdd/fameex-testnet', { recursive: true })
 await writeFile(
-  'output-tdd/hyperliquid/read-only.json',
+  'output-tdd/fameex-testnet/read-only.json',
   JSON.stringify(evidence, null, 2),
 )
 console.log(
@@ -96,6 +96,6 @@ console.log(
     checks: evidence.checks,
     market: evidence.market,
     candles: candles.length,
-    evidence: 'output-tdd/hyperliquid/read-only.json',
+    evidence: 'output-tdd/fameex-testnet/read-only.json',
   }),
 )

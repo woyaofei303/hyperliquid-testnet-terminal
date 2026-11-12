@@ -24,10 +24,10 @@ export function marketMetadata(
       )
     : ''
   return {
-    title: `${formatted ? `${formatted} | ` : ''}${pair} ${product} | Hyperliquid`,
+    title: `${formatted ? `${formatted} | ` : ''}${pair} ${product} | fameex-testnet`,
     description: english
-      ? `${pair} ${product} trading on Hyperliquid: live order book, charts, orders and positions.`
-      : `Hyperliquid ${pair} ${product}交易：实时订单簿、K 线、订单与仓位管理。`,
-    keywords: `${pair}, ${product}, Hyperliquid, Perp DEX, Web3`,
+      ? `${pair} ${product} trading on fameex-testnet: live order book, charts, orders and positions.`
+      : `fameex-testnet ${pair} ${product}交易：实时订单簿、K 线、订单与仓位管理。`,
+    keywords: `${pair}, ${product}, fameex-testnet, Perp DEX, Web3`,
   }
 }

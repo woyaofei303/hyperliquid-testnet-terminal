@@ -8,7 +8,7 @@ import {
   marginDelta,
 } from '@/features/trading/lib/isolated-margin'
 import { t, useLocale } from '@/i18n'
-import { errorText } from '@/shared/lib/hyperliquid'
+import { errorText } from '@/shared/lib/fameex-testnet'
 import { HelpLabel } from '../../../shared/components/help-label'
 
 export function IsolatedMargin({

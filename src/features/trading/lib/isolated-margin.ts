@@ -1,4 +1,4 @@
-import { info, type MarketContext } from '../../../shared/lib/hyperliquid.ts'
+import { info, type MarketContext } from '../../../shared/lib/fameex-testnet.ts'
 import {
   parseAccountMode,
   sharedAccount,

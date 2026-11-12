@@ -586,10 +586,10 @@ function FundingStatus({ model }: { model: TerminalModel }) {
         {record.status === 'credited'
           ? record.kind === 'withdraw'
             ? t('Arbitrum Sepolia 到账已核验')
-            : t('Hyperliquid 到账已核验')
+            : t('fameex-testnet 到账已核验')
           : record.status === 'confirmed'
             ? record.kind === 'deposit'
-              ? t('源链已确认 · 等待 Hyperliquid 到账')
+              ? t('源链已确认 · 等待 fameex-testnet 到账')
               : record.kind === 'withdraw'
                 ? t('目标链交易已找到 · 等待到账核验')
                 : t('操作已确认')

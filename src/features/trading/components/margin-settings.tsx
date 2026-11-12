@@ -4,7 +4,7 @@ import { Button, ChartIcon, Input, Modal, Tooltip } from '@fameex/ui'
 import type { ReactNode } from 'react'
 import type { useMarginSettings } from '@/features/trading/hooks/use-margin-settings'
 import { t, useLocale } from '@/i18n'
-import type { MarketContext } from '@/shared/lib/hyperliquid'
+import type { MarketContext } from '@/shared/lib/fameex-testnet'
 
 export function MarginSettings(props: {
   market: MarketContext
@@ -108,7 +108,7 @@ export function MarginSettings(props: {
               </p>
               {isolatedOnly && (
                 <p className="mt-2 text-xs text-muted">
-                  {t('该 Hyperliquid 市场仅支持逐仓。')}
+                  {t('该 fameex-testnet 市场仅支持逐仓。')}
                 </p>
               )}
             </>

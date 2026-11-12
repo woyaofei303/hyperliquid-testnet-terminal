@@ -1,4 +1,4 @@
-import type { MarketContext } from '../../../shared/lib/hyperliquid.ts'
+import type { MarketContext } from '../../../shared/lib/fameex-testnet.ts'
 import { defaultOrderFields } from './order-form-fields.ts'
 import { prepareTicket, type Ticket } from './order-ticket.ts'
 import { Money, positiveDecimal } from './orders.ts'

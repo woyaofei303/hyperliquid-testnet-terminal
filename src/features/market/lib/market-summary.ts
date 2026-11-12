@@ -1,4 +1,4 @@
-import type { AssetContext } from '../../../shared/lib/hyperliquid.ts'
+import type { AssetContext } from '../../../shared/lib/fameex-testnet.ts'
 import { Money } from '../../trading/lib/orders.ts'
 export function marketSummary(context: AssetContext | undefined) {
   if (!context?.markPx || !context.prevDayPx) return null

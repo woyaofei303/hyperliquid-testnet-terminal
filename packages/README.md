@@ -6,7 +6,7 @@
 
 ## 一次操作怎样调用这些代码
 
-例如输入 BTC 数量并预览订单：页面使用 `@fameex/ui` 的 Input 接收文本，再由原有 `prepareOrder` 按 Hyperliquid 市场元数据检查数量和价格精度。Button 打开确认框；实际授权、签名、发送仍走 `src/shared/lib/hyperliquid.ts`。组件只负责交互，不替换资金或订单规则。
+例如输入 BTC 数量并预览订单：页面使用 `@fameex/ui` 的 Input 接收文本，再由原有 `prepareOrder` 按 Hyperliquid 市场元数据检查数量和价格精度。Button 打开确认框；实际授权、签名、发送仍走 `src/shared/lib/fameex-testnet.ts`。组件只负责交互，不替换资金或订单规则。
 
 - `ui`：复用 Button、Input、Select、Checkbox、Spinner、Tabs、Slider、SmartPopover、Modal 的实际实现及样式，保留原工程的 HeroUI 2.8.5。Motion 依赖采用原锁文件中的 Framer Motion 12.7.4、motion-dom 12.7.4 和 motion-utils 12.7.2，并锁定配套版本，避免新版子依赖导致生产构建缺少导出。Input 的标签补齐关联及原生输入属性；Select 修复一处无效 CSS 选择器并移除多余背景色；SVG 补齐无障碍属性。Select 允许调用方配置 slot 尺寸；Tabs 保留原实现及动画，避免全局禁用动画后丢失自定义选中条。Slider 使用原样式与拖动交互，将 `es-toolkit/union` 换成原生 Set，刻度按钮补齐键盘与禁用状态，未为去重新增依赖。SmartPopover 沿用原状态 hook，点击型弹层不随鼠标离开关闭，触发器改为可键盘操作的按钮，并在卸载时清理计时器。市场列表的搜索、分类和排序参考 `TradeHeader/MarketList`，数据及下单规则由本项目提供。其余差异主要是 Biome 格式和无用导入清理。
 - `utils`：复用 `classNames/cn`、`getColorByCssVar`、`createCssVar`、`withAlpha`。它们实际用于组件样式合并和图表颜色。类名合并保留默认字号组，再追加 FameEX 的自定义字号，修复 `text-xs` 被 `text-1` 覆盖的问题。没有引入 FameEX 的请求鉴权、密码处理或 CEX 签名工具。

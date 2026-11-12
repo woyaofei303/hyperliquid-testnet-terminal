@@ -1,7 +1,7 @@
 import type {
   AccountState,
   OpenOrder,
-} from '../../../shared/lib/hyperliquid.ts'
+} from '../../../shared/lib/fameex-testnet.ts'
 import { Money } from '../../trading/lib/orders.ts'
 
 export type ProtectionKind = 'tp' | 'sl'

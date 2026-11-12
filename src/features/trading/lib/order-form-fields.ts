@@ -1,4 +1,4 @@
-import type { MarketContext } from '../../../shared/lib/hyperliquid.ts'
+import type { MarketContext } from '../../../shared/lib/fameex-testnet.ts'
 import type { TicketInput } from './order-ticket.ts'
 import { formatOrderPrice } from './orders.ts'
 

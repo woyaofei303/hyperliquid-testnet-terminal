@@ -15,9 +15,10 @@ test('metadata follows the selected pair, product, language and live price', () 
   )
   assert.match(meta.description, /实时订单簿/)
   for (const locale of ['zh-CN', 'en-US']) {
-    assert.doesNotMatch(
-      JSON.stringify(marketMetadata('BTC / USDC', 'perp', '79423.5', locale)),
-      /测试网|测试资产|testnet|test assets/i,
-    )
+    const localized = marketMetadata('BTC / USDC', 'perp', '79423.5', locale)
+    assert.match(localized.title, /\| fameex-testnet$/)
+    assert.match(localized.description, /fameex-testnet/)
+    assert.match(localized.keywords, /fameex-testnet/)
+    assert.doesNotMatch(JSON.stringify(localized), /hyperliquid/i)
   }
 })

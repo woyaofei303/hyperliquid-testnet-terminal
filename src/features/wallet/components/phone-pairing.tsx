@@ -1,7 +1,7 @@
 import { Button, Checkbox } from '@fameex/ui'
 import { QRCodeSVG } from 'qrcode.react'
 import { useState } from 'react'
-import type { WalletSession } from '@/shared/lib/hyperliquid'
+import type { WalletSession } from '@/shared/lib/fameex-testnet'
 import { usePhonePairing } from '../hooks/use-phone-pairing'
 import { pairingCode, pairingQR } from '../lib/phone-pairing'
 import { PhoneDevices } from './phone-devices'
@@ -50,7 +50,7 @@ export function PhonePairing({
               value={pairingQR(flow.pairing.offer)}
               size={260}
               level="M"
-              title="用 Hyperliquid 手机 App 扫描此授权二维码"
+              title="用 fameex-testnet 手机 App 扫描此授权二维码"
             />
           </div>
           <p className="text-xs">

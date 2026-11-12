@@ -3,7 +3,7 @@ import {
   errorText,
   isUserRejection,
   type WalletSession,
-} from '@/shared/lib/hyperliquid'
+} from '@/shared/lib/fameex-testnet'
 import {
   approvePhoneAgent,
   PhoneApprovalBlockedError,

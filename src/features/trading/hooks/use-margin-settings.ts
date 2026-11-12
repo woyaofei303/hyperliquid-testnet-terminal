@@ -1,7 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { validateLeverage } from '@/features/trading/lib/trading'
-import { errorText, info, type MarketContext } from '@/shared/lib/hyperliquid'
+import {
+  errorText,
+  info,
+  type MarketContext,
+} from '@/shared/lib/fameex-testnet'
 
 type Settings = Awaited<ReturnType<typeof info.activeAssetData>>
 export function useMarginSettings({

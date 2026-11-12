@@ -9,7 +9,7 @@ import type { BookPriceSelection } from '@/features/trading/lib/order-form-field
 import type { Ticket } from '@/features/trading/lib/order-ticket'
 import { t, useLocale } from '@/i18n'
 import { display } from '@/shared/lib/display'
-import type { Book, MarketContext } from '@/shared/lib/hyperliquid'
+import type { Book, MarketContext } from '@/shared/lib/fameex-testnet'
 import { HelpLabel } from '../../../shared/components/help-label'
 import { MarginSettings } from './margin-settings'
 import { OrderAmount } from './order-amount'

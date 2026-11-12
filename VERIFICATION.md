@@ -262,4 +262,4 @@ git diff --no-index -- output-tdd/deposit-input/before/src/components/trading/ma
 
 本阶段未新增依赖，也未重新执行依赖审计；之前的低严重度 HeroUI/deepmerge 记录保留在 `output-tdd/fameex-components/audit.log`，不能视为已修复。
 
-简历未修改。只有真实账户验收通过后，才能据实写入“个人 Hyperliquid 测试网项目”，不能写成生产交易平台、量化收益或撮合/清算引擎研发经验。
+简历未修改。只有真实账户验收通过后，才能据实写入“个人 fameex-testnet 项目”，不能写成生产交易平台、量化收益或撮合/清算引擎研发经验。

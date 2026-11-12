@@ -1,6 +1,10 @@
 import { Button } from '@fameex/ui'
 import { useCallback, useEffect, useState } from 'react'
-import { errorText, info, type WalletSession } from '@/shared/lib/hyperliquid'
+import {
+  errorText,
+  info,
+  type WalletSession,
+} from '@/shared/lib/fameex-testnet'
 
 export function PhoneDevices({ wallet }: { wallet: WalletSession }) {
   const [agents, setAgents] = useState<
@@ -60,7 +64,7 @@ export function PhoneDevices({ wallet }: { wallet: WalletSession }) {
         rel="noopener noreferrer"
         className="inline-block rounded text-accent focus-visible:outline-2"
       >
-        前往 Hyperliquid 测试网撤销授权 ↗
+        前往测试网撤销授权 ↗
       </a>
       <p className="text-muted">
         撤销时请核对设备名和授权地址。删除手机密钥不会撤销授权。

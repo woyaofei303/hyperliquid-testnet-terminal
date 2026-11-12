@@ -1,5 +1,5 @@
 import { ApiRequestError } from '@nktkas/hyperliquid/api/exchange'
-import type { Book, WalletSession } from '../../../shared/lib/hyperliquid.ts'
+import type { Book, WalletSession } from '../../../shared/lib/fameex-testnet.ts'
 import { chasePrice } from './order-ticket.ts'
 import { type Market, Money, type prepareOrder } from './orders.ts'
 import {

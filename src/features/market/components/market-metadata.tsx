@@ -18,7 +18,7 @@ export function MarketMetadata({
     : (feed.trades[0]?.px ?? market?.context.markPx)
   const meta = marketMetadata(pair, market?.kind ?? 'perp', price, locale)
   if (outcomes) {
-    meta.title = `${t('预测市场')} | FameEX`
+    meta.title = `${t('预测市场')} | fameex-testnet`
     meta.description = t('预测市场')
   }
   // React 19 将标签提升到 head；只保留一个所有者，避免与异步注入的 Next 元数据重复。
@@ -30,7 +30,7 @@ export function MarketMetadata({
       <meta property="og:title" content={meta.title} />
       <meta property="og:description" content={meta.description} />
       <meta property="og:type" content="website" />
-      <meta property="og:site_name" content="Hyperliquid Terminal" />
+      <meta property="og:site_name" content="fameex-testnet" />
       <meta name="twitter:card" content="summary" />
       <meta name="twitter:title" content={meta.title} />
       <meta name="twitter:description" content={meta.description} />

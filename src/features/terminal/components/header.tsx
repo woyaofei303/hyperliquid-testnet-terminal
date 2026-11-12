@@ -16,8 +16,8 @@ export function Header({
   const { wallet, busy, connect } = model
   return (
     <header className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-edge bg-panel px-4 py-2">
-      <div className="flex items-center gap-4 sm:gap-8">
-        <h1 className="shrink-0">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 sm:gap-x-8">
+        <h1 className="flex shrink-0 items-center gap-2">
           <Image
             src="/fameex-logo.svg"
             alt="FameEX"
@@ -25,6 +25,9 @@ export function Header({
             height={20}
             className="h-6 w-auto"
           />
+          <span className="rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-xs font-medium leading-4 text-accent">
+            testnet
+          </span>
         </h1>
         <nav
           aria-label={t('产品导航')}

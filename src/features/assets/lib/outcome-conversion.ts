@@ -1,5 +1,5 @@
 import type { UserOutcomeParameters } from '@nktkas/hyperliquid/api/exchange'
-import type { AccountSnapshot } from '../../../shared/lib/hyperliquid.ts'
+import type { AccountSnapshot } from '../../../shared/lib/fameex-testnet.ts'
 import { availableBalance } from '../../trading/lib/cash-order.ts'
 import {
   type Market,

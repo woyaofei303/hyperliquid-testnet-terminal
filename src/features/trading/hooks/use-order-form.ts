@@ -26,7 +26,7 @@ import {
   errorText,
   info,
   type MarketContext,
-} from '@/shared/lib/hyperliquid'
+} from '@/shared/lib/fameex-testnet'
 import type { useMarginSettings } from './use-margin-settings'
 
 export function useOrderForm({

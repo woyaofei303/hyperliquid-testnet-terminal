@@ -2,7 +2,7 @@ import {
   ApiRequestError,
   type OrderResponse,
 } from '@nktkas/hyperliquid/api/exchange'
-import type { WalletSession } from '../../../shared/lib/hyperliquid.ts'
+import type { WalletSession } from '../../../shared/lib/fameex-testnet.ts'
 import type { Ticket, WireOrder } from './order-ticket.ts'
 import { orderResult } from './orders.ts'
 import type { JournalEntry, PendingOrder } from './trading.ts'
