@@ -48,16 +48,18 @@ export function PhonePairing({
       )}
       {flow.pairing && !flow.request && (
         <div className="space-y-2">
-          <div className="mx-auto w-fit rounded bg-white p-3">
+          <div className="mx-auto w-fit max-w-full rounded bg-white p-3">
             <QRCodeSVG
               value={pairingQR(flow.pairing.offer)}
               size={260}
+              className="h-auto max-w-full"
               level="M"
               title="用 fameex-testnet 手机 App 扫描此授权二维码"
             />
           </div>
           <p className="text-xs">
-            请用 App 钱包页的「扫码连接」扫描，五分钟内有效，请勿转发。
+            请打开 App → 资产 → 连接钱包 →
+            扫码连接，扫描后核对两端账户和六位码。二维码五分钟内有效，请勿转发。
           </p>
         </div>
       )}

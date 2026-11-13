@@ -4605,7 +4605,7 @@ test('Web3 未安装钱包仍显示列表，点击进入对应官方安装页', 
   await expect(
     dialog.getByRole('heading', { name: '在手机 App 上交易' }),
   ).toBeVisible()
-  await expect(dialog.getByText(/先连接下方电脑钱包，再点/)).toBeVisible()
+  await expect(dialog.getByText(/前往手机连接页，按步骤/)).toBeVisible()
   for (const [name, url] of downloads) {
     const link = dialog.getByRole('link', {
       name: `${name} 未安装，前往官网安装`,
@@ -4631,7 +4631,12 @@ test('Web3 未安装钱包仍显示列表，点击进入对应官方安装页', 
   await expect(
     dialog.getByText('安装并启用扩展后，刷新本页即可连接。'),
   ).toBeVisible()
-  await expect(dialog.getByRole('link')).toHaveCount(downloads.length)
+  await expect(
+    dialog.getByRole('link', { name: /未安装，前往官网安装/ }),
+  ).toHaveCount(downloads.length)
+  await expect(
+    dialog.getByRole('link', { name: '前往手机连接页 →' }),
+  ).toHaveAttribute('href', '/connect')
   await dialog.getByRole('link').first().scrollIntoViewIfNeeded()
   await page.screenshot({
     path: 'output-tdd/playwright/wallet-catalog/desktop.png',
@@ -8440,7 +8445,9 @@ for (const mode of [
     await page
       .getByRole('button', { name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i })
       .click()
-    await page.getByRole('button', { name: '授权手机交易 / 管理设备' }).click()
+    await page.getByRole('link', { name: '连接手机 App / 管理设备' }).click()
+    await expect(page).toHaveURL(/\/connect$/)
+    await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
     await expect(
       page.getByText('已授权设备（2）', { exact: true }),
     ).toBeVisible()
@@ -8664,7 +8671,9 @@ for (const failure of ['通知丢失', '代理满额', '提交失败'] as const)
     await page
       .getByRole('button', { name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/i })
       .click()
-    await page.getByRole('button', { name: '授权手机交易 / 管理设备' }).click()
+    await page.getByRole('link', { name: '连接手机 App / 管理设备' }).click()
+    await expect(page).toHaveURL(/\/connect$/)
+    await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
     await page.getByRole('button', { name: '生成手机授权二维码' }).click()
     await expect(
       page.locator('svg title', { hasText: '用 fameex-testnet 手机 App' }),
@@ -8733,8 +8742,67 @@ for (const failure of ['通知丢失', '代理满额', '提交失败'] as const)
     })
     expect(signs).toBe(failure === '提交失败' ? 2 : 1)
     expect(publishCalls).toBe(2)
-    await page.getByRole('button', { name: '关闭钱包面板' }).click()
+    await page.getByRole('link', { name: '返回交易', exact: true }).click()
+    await expect(page).toHaveURL('/')
     expect(deleted).toBe(0)
     expect(exchange.writes).toHaveLength(0)
   })
 }
+
+test('手机连接页可直接访问，只连接账户不提前签名，换账户后清除配对', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  await page.goto('/connect')
+  await expect(
+    page.getByRole('heading', { name: '连接手机 App', exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByText('2. App 扫描本页二维码', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: '生成手机授权二维码' }),
+  ).toHaveCount(0)
+  await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+  await expect(page.getByText('电脑钱包已连接 · 浏览器钱包')).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: '生成手机授权二维码' }),
+  ).toBeVisible()
+  expect(exchange.agentRegistrations()).toBe(0)
+  expect(exchange.writes).toHaveLength(0)
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event('test-account-change')),
+  )
+  await expect(
+    page.getByRole('region', { name: '连接与授权' }).getByRole('alert'),
+  ).toContainText('钱包账户已变化或断开')
+  await expect(
+    page.getByRole('button', { name: '生成手机授权二维码' }),
+  ).toHaveCount(0)
+  await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+  await expect(
+    page.getByText('0x2222222222222222222222222222222222222222', {
+      exact: true,
+    }),
+  ).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true)
+})
+
+test('手机连接页没有钱包时展示安装与电脑操作说明', async ({ page }) => {
+  await page.goto('/connect')
+  await expect(page.getByText(/未检测到浏览器钱包/)).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: 'MetaMask', exact: true }),
+  ).toHaveAttribute('href', 'https://metamask.com/download')
+  await expect(
+    page.getByText('https://app.fameex-testnet.xyz/connect', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: '生成手机授权二维码' }),
+  ).toHaveCount(0)
+})

@@ -2,6 +2,7 @@
 
 import { Button, Checkbox, Input, Modal, Select } from '@fameex/ui'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { formatUnits } from 'viem'
 import { sharedAccount } from '@/features/assets/lib/account-types'
@@ -18,7 +19,6 @@ import {
   FundingRoute,
   WithdrawalForm,
 } from '../../assets/components/withdrawal-form'
-import { PhonePairing } from './phone-pairing'
 
 const walletDownloads = [
   {
@@ -72,8 +72,6 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
       ),
   )
   const [amount, setAmount] = useState('')
-  const [phoneBusy, setPhoneBusy] = useState(false)
-  const [showPhone, setShowPhone] = useState(false)
   const [copied, setCopied] = useState(false)
   const [persist, setPersist] = useState(false)
   const [popoverContainer, setPopoverContainer] = useState<HTMLElement | null>(
@@ -93,7 +91,6 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
     setTransferToPerp,
   } = model
   const close = () => {
-    if (phoneBusy) return
     f.cancelWithdrawal()
     setWeb3Panel(null)
   }
@@ -142,7 +139,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
           : undefined
       }
       onClose={close}
-      busy={busy || model.connecting || phoneBusy}
+      busy={busy || model.connecting}
       closeLabel={t('关闭钱包面板')}
     >
       {!wallet ? (
@@ -151,9 +148,15 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
             <h3 className="font-medium">{t('在手机 App 上交易')}</h3>
             <p className="mt-2 text-xs leading-5 text-muted">
               {t(
-                '先连接下方电脑钱包，再点「授权手机交易 / 管理设备」生成二维码。用 App 扫码并核对授权后，手机即可独立交易。',
+                '前往手机连接页，按步骤连接电脑钱包、生成二维码，再用 App 扫码确认授权。',
               )}
             </p>
+            <Link
+              href="/connect"
+              className="mt-3 inline-block text-accent underline"
+            >
+              前往手机连接页 →
+            </Link>
           </section>
           <div className="flex flex-col gap-3">
             {providers.map((item) => (
@@ -271,15 +274,12 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                   </a>
                 </div>
               </div>
-              <Button
-                isDisabled={busy || phoneBusy}
-                onPress={() => setShowPhone(!showPhone)}
+              <Link
+                href="/connect"
+                className="rounded-lg bg-accent px-4 py-3 text-center text-sm font-medium text-white"
               >
-                {showPhone ? '收起手机授权' : '授权手机交易 / 管理设备'}
-              </Button>
-              {showPhone && (
-                <PhonePairing wallet={wallet} onBusy={setPhoneBusy} />
-              )}
+                连接手机 App / 管理设备
+              </Link>
               <dl className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-muted">{t('合约可提余额')}</dt>
@@ -309,13 +309,13 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                   <Checkbox
                     isSelected={persist}
                     onValueChange={setPersist}
-                    isDisabled={busy || phoneBusy}
+                    isDisabled={busy}
                   >
                     {t('保持连接')}
                   </Checkbox>
                   <Button
                     className="w-full"
-                    isDisabled={busy || phoneBusy}
+                    isDisabled={busy}
                     onPress={() =>
                       void model.connectProvider(
                         wallet.provider,
@@ -342,7 +342,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                       key={panel}
                       color={panel === 'deposit' ? 'primary' : 'default'}
                       className="min-w-0 px-3"
-                      isDisabled={busy || phoneBusy}
+                      isDisabled={busy}
                       onPress={() => setWeb3Panel(panel)}
                     >
                       {t(
@@ -357,7 +357,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 variant="light"
                 color="default"
                 className="w-full hover:!text-loss"
-                isDisabled={busy || phoneBusy}
+                isDisabled={busy}
                 onPress={model.disconnect}
               >
                 {t('断开钱包')}
@@ -378,7 +378,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 labelPlacement="outside"
                 selectedKeys={['USDC']}
                 items={[{ key: 'USDC', label: 'USDC' }]}
-                isDisabled={busy || phoneBusy}
+                isDisabled={busy}
                 popoverProps={{
                   portalContainer: popoverContainer ?? undefined,
                   shouldCloseOnScroll: false,
@@ -402,7 +402,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 labelPlacement="outside"
                 selectedKeys={['arbitrum']}
                 items={[{ key: 'arbitrum', label: t('Arbitrum Sepolia') }]}
-                isDisabled={busy || phoneBusy}
+                isDisabled={busy}
                 popoverProps={{
                   portalContainer: popoverContainer ?? undefined,
                   shouldCloseOnScroll: false,
@@ -459,7 +459,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
               {f.chain !== DEPOSIT_CHAIN.id ? (
                 <Button
                   className="w-full"
-                  isDisabled={busy || phoneBusy}
+                  isDisabled={busy}
                   onPress={f.switchChain}
                 >
                   {t('切换至 Arbitrum Sepolia')}
@@ -510,7 +510,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
                 onChange={setAmount}
                 inputMode="decimal"
                 placeholder={t('输入划转金额')}
-                isDisabled={busy || phoneBusy}
+                isDisabled={busy}
                 isInvalid={!!transferError}
                 errorMessage={transferError}
                 endContent={

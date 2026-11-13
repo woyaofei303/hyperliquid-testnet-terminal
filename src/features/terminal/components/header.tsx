@@ -47,6 +47,12 @@ export function Header({
           >
             {t('预测')}
           </Link>
+          <Link
+            href="/connect"
+            className="flex h-10 items-center px-1 text-muted hover:text-ink"
+          >
+            连接手机 App
+          </Link>
         </nav>
         <a
           href="https://app.hyperliquid-testnet.xyz/drip"
