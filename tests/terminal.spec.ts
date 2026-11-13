@@ -6525,6 +6525,25 @@ test('不存在的路由可返回交易页', async ({ page }) => {
   await mockExchange(page)
   await page.goto('/missing-feedback-page')
   await expect(page.getByRole('heading', { name: '页面不存在' })).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: '连接手机 App', exact: true }),
+  ).toHaveAttribute('href', '/connect')
+  await page.screenshot({
+    path: 'output-tdd/playwright/connect-404/desktop.png',
+  })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.getByRole('link', { name: '返回交易页' })).toBeInViewport()
+  await expect(
+    page.getByRole('link', { name: '连接手机 App', exact: true }),
+  ).toBeInViewport()
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true)
+  await page.screenshot({
+    path: 'output-tdd/playwright/connect-404/mobile.png',
+  })
   await page.getByRole('link', { name: '返回交易页' }).click()
   await expect(
     page.getByRole('region', { name: '行情图表', exact: true }),
