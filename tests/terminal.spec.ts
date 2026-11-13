@@ -4716,7 +4716,11 @@ test('Web3 多钱包发现与断开：主动弹出连接列表，重新选择前
     page.getByRole('button', { name: 'MetaMask 连接 →' }),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Rabby 连接 →' })).toBeVisible()
-  await expect(page.getByRole('dialog').getByRole('link')).toHaveCount(6)
+  await expect(
+    page
+      .getByRole('dialog')
+      .getByRole('link', { name: /未安装，前往官网安装/ }),
+  ).toHaveCount(6)
   await expect(
     page.getByRole('dialog').getByRole('link', { name: /MetaMask|Rabby/ }),
   ).toHaveCount(0)
