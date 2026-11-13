@@ -85,110 +85,74 @@ export function PhoneConnect() {
           返回交易
         </Link>
       </header>
-      <main className="mx-auto max-w-4xl px-5 py-8 sm:py-14">
-        <p className="text-sm text-accent">电脑与手机配对</p>
-        <h1 className="mt-3 text-3xl font-semibold">连接手机 App</h1>
-        <p className="mt-3 leading-7 text-muted">
-          在电脑上保持此页打开，用 fameex-testnet App
-          扫码。完成一次授权后，手机可独立使用测试网交易。
+      <main className="mx-auto max-w-md px-5 py-8 sm:py-12">
+        <h1 className="text-center text-2xl font-semibold">连接手机 App</h1>
+        <p className="mb-6 mt-3 text-center text-sm leading-6 text-muted">
+          使用 App 的「扫码连接」，核对六位码后确认授权。
         </p>
-        <ol className="my-7 grid gap-3 sm:grid-cols-3">
-          {[
-            '1. 电脑连接测试钱包',
-            '2. App 扫描本页二维码',
-            '3. 核对六位码并确认授权',
-          ].map((step) => (
-            <li
-              key={step}
-              className="rounded-xl border border-edge bg-panel p-4 text-sm"
-            >
-              {step}
-            </li>
-          ))}
-        </ol>
-        <div className="grid items-start gap-5 md:grid-cols-[1fr_280px]">
-          <section
-            className="min-w-0 space-y-4 rounded-2xl border border-edge bg-panel p-5"
-            aria-label="连接与授权"
-          >
-            {wallet ? (
-              <>
-                <div className="space-y-2 text-sm">
-                  <p className="text-mint">电脑钱包已连接 · {wallet.name}</p>
-                  <p className="break-all font-mono text-xs">
-                    {wallet.address}
-                  </p>
-                  <Button
-                    variant="light"
-                    size="sm"
-                    isDisabled={busy}
-                    onPress={() => setWallet(null)}
-                  >
-                    更换钱包
-                  </Button>
-                </div>
-                <PhonePairing
-                  key={wallet.address}
-                  wallet={wallet}
-                  onBusy={setBusy}
-                />
-              </>
-            ) : (
-              <>
-                <h2 className="text-lg font-medium">先连接电脑钱包</h2>
-                <p className="text-sm leading-6 text-muted">
-                  选择浏览器里的测试钱包。此步仅获取账户地址；手机交易授权会在扫码核对后单独确认。
-                </p>
-                {providers.map((item) => (
-                  <Button
-                    key={item.id}
-                    className="w-full"
-                    isDisabled={!!connecting}
-                    onPress={() => void connect(item)}
-                  >
-                    {item.name}{' '}
-                    {connecting === item.id ? '等待钱包确认…' : '连接 →'}
-                  </Button>
-                ))}
-                {!providers.length && (
-                  <p className="text-sm leading-6 text-muted">
-                    未检测到浏览器钱包。请在电脑安装并解锁{' '}
-                    <a
-                      className="text-accent underline"
-                      href="https://metamask.com/download"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      MetaMask
-                    </a>{' '}
-                    或已有的钱包扩展，再刷新此页。
-                  </p>
-                )}
-              </>
-            )}
-            {error && (
-              <p role="alert" className="text-sm text-loss">
-                {error}
+        <section
+          className="min-w-0 space-y-4 rounded-2xl bg-panel p-5"
+          aria-label="连接与授权"
+        >
+          {wallet ? (
+            <>
+              <div className="space-y-2 text-sm">
+                <p className="text-xs text-muted">{wallet.name}</p>
+                <p className="break-all font-mono text-xs">{wallet.address}</p>
+                <Button
+                  variant="light"
+                  size="sm"
+                  isDisabled={busy}
+                  onPress={() => setWallet(null)}
+                >
+                  更换钱包
+                </Button>
+              </div>
+              <PhonePairing
+                key={wallet.address}
+                wallet={wallet}
+                onBusy={setBusy}
+              />
+            </>
+          ) : (
+            <>
+              <h2 className="text-lg font-medium">先连接电脑钱包</h2>
+              <p className="text-sm leading-6 text-muted">
+                请在电脑连接测试钱包，再用 App 扫码。
               </p>
-            )}
-          </section>
-          <aside className="space-y-4 rounded-2xl bg-panel p-5 text-sm leading-6">
-            <h2 className="font-medium">手机上怎么操作？</h2>
-            <p className="text-muted">
-              打开 App → 资产 → 连接钱包 → 扫码连接。相机对准左侧生成的二维码。
+              {providers.map((item) => (
+                <Button
+                  key={item.id}
+                  className="w-full"
+                  isDisabled={!!connecting}
+                  onPress={() => void connect(item)}
+                >
+                  {item.name}{' '}
+                  {connecting === item.id ? '等待钱包确认…' : '连接 →'}
+                </Button>
+              ))}
+              {!providers.length && (
+                <p className="text-sm leading-6 text-muted">
+                  未检测到浏览器钱包。请在电脑安装并解锁{' '}
+                  <a
+                    className="text-accent underline"
+                    href="https://metamask.com/download"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    MetaMask
+                  </a>{' '}
+                  或已有的钱包扩展，再刷新此页。
+                </p>
+              )}
+            </>
+          )}
+          {error && (
+            <p role="alert" className="text-sm text-loss">
+              {error}
             </p>
-            <p className="text-muted">
-              扫描后，在手机和电脑核对相同账户及六位码，再回到电脑点击「在主钱包确认授权」。
-            </p>
-            <p className="text-muted">
-              只使用测试钱包。二维码五分钟有效，请勿转发；手机授权有效期七天，不含提款权限。
-            </p>
-            <p className="text-muted">如果正在手机浏览器查看，请在电脑打开：</p>
-            <p className="break-all font-mono text-xs text-accent">
-              https://app.fameex-testnet.xyz/connect
-            </p>
-          </aside>
-        </div>
+          )}
+        </section>
       </main>
     </div>
   )

@@ -8684,15 +8684,18 @@ for (const failure of ['通知丢失', '代理满额', '提交失败'] as const)
       page.getByText(`两端核对码：${pairingCode(offer, phone)}`),
     ).toBeVisible()
     const approve = page.getByRole('button', { name: '在主钱包确认授权' })
-    await expect(approve).toBeDisabled()
+    await expect(approve).toBeEnabled()
+    await expect(page.getByRole('checkbox')).toHaveCount(0)
+    await expect(
+      page
+        .getByRole('region', { name: '授权手机交易', exact: true })
+        .getByRole('button'),
+    ).toHaveCount(1)
     expect(signs).toBe(0)
     await page.screenshot({
       path: `output-tdd/playwright/phone-agent-pairing/web-confirmation-${failure}.png`,
       fullPage: true,
     })
-    await page
-      .getByRole('checkbox', { name: '已在手机确认相同账户和六位码' })
-      .check()
     await approve.click()
     const retry = page.getByRole('button', {
       name: '查询授权结果（不重复签名）',
@@ -8758,13 +8761,15 @@ test('手机连接页可直接访问，只连接账户不提前签名，换账�
     page.getByRole('heading', { name: '连接手机 App', exact: true }),
   ).toBeVisible()
   await expect(
-    page.getByText('2. App 扫描本页二维码', { exact: true }),
+    page.getByText('使用 App 的「扫码连接」，核对六位码后确认授权。', {
+      exact: true,
+    }),
   ).toBeVisible()
   await expect(
     page.getByRole('button', { name: '生成手机授权二维码' }),
   ).toHaveCount(0)
   await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
-  await expect(page.getByText('电脑钱包已连接 · 浏览器钱包')).toBeVisible()
+  await expect(page.getByText(address, { exact: true })).toBeVisible()
   await expect(
     page.getByRole('button', { name: '生成手机授权二维码' }),
   ).toBeVisible()
@@ -8800,7 +8805,7 @@ test('手机连接页没有钱包时展示安装与电脑操作说明', async ({
     page.getByRole('link', { name: 'MetaMask', exact: true }),
   ).toHaveAttribute('href', 'https://metamask.com/download')
   await expect(
-    page.getByText('https://app.fameex-testnet.xyz/connect', { exact: true }),
+    page.getByText('请在电脑连接测试钱包，再用 App 扫码。', { exact: true }),
   ).toBeVisible()
   await expect(
     page.getByRole('button', { name: '生成手机授权二维码' }),
