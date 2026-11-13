@@ -8484,7 +8484,7 @@ for (const mode of [
           page
             .getByRole('region', { name: '授权手机交易', exact: true })
             .getByRole('alert'),
-        ).toContainText('请在 App 删除旧密钥')
+        ).toContainText('请使用最新版 App 重新扫码')
         await expect(
           page.getByRole('button', { name: '在主钱包确认授权' }),
         ).toHaveCount(0)

@@ -81,9 +81,7 @@ export function usePhonePairing(
             wallet.address,
           )
           if (retired.current.has(next.agentAddress.toLowerCase()))
-            throw new Error(
-              '该手机密钥已进入撤销流程，请在 App 删除旧密钥，再生成二维码重新扫码。',
-            )
+            throw new Error('该手机密钥已失效，请使用最新版 App 重新扫码。')
           setRequest(next)
         } else timer = setTimeout(poll, 2000)
       } catch (e) {
@@ -123,7 +121,7 @@ export function usePhonePairing(
     try {
       await revokePhoneAgent(wallet, device)
       setNotice(
-        `已撤销 ${device.name}。该手机重新连接时，请先在 App 删除旧密钥。`,
+        `已撤销 ${device.name}。App 会自动清理旧密钥，重新扫码即可连接。`,
       )
     } catch (e) {
       if (isUserRejection(e) && !wasRetired)
@@ -222,9 +220,7 @@ export function usePhonePairing(
     run(async () => {
       if (!pairing || !request || status !== 'waiting') return
       if (retired.current.has(request.agentAddress.toLowerCase()))
-        throw new Error(
-          '请在 App 删除旧密钥后重新扫码，不要重新授权已撤销的密钥。',
-        )
+        throw new Error('该手机密钥已失效，请使用最新版 App 重新扫码。')
       if (Date.now() >= pairing.offer.expiresAt)
         throw new Error('二维码已过期，请重新生成；不要签署旧请求')
       preserve.current = true
