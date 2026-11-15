@@ -1,0 +1,18 @@
+[Unit]
+Description=FameEX mainnet read-only opportunity campaign
+
+[Service]
+Type=exec
+WorkingDirectory=/srv/hyperliquid/shared/opportunity-collector
+ExecStartPre=/usr/bin/cat /srv/hyperliquid/collector/current/version.txt
+ExecStart=/srv/hyperliquid/collector/node/bin/node /srv/hyperliquid/collector/current/scripts/campaign-opportunities.ts
+Environment=NODE_OPTIONS=--max-old-space-size=256
+UMask=0077
+NoNewPrivileges=true
+MemoryMax=384M
+CPUQuota=50%
+RuntimeMaxSec=6h
+TimeoutStopSec=30
+KillSignal=SIGTERM
+Restart=no
+SuccessExitStatus=130

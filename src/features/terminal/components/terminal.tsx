@@ -205,7 +205,7 @@ export function Terminal({ view = 'trade' }: { view?: 'trade' | 'outcomes' }) {
             <span className={feed.stale ? 'text-amber-300' : 'text-accent'}>
               ● {feed.stale ? t('行情未就绪 / 已过期') : t(feed.status)}
             </span>
-            {process.env.NEXT_PUBLIC_PERF_CHECK === '1' && <PerformancePanel />}
+            <PerformancePanel />
           </footer>
         </div>
       )}

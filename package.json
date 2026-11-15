@@ -18,6 +18,8 @@
     "test:e2e": "playwright test --grep-invert @live",
     "test:live": "LIVE_CHECK=1 playwright test --grep @live --workers=1",
     "verify:read": "node scripts/verify-read.ts",
+    "collect:opportunities": "node scripts/collect-opportunities.ts",
+    "campaign:opportunities": "node scripts/campaign-opportunities.ts",
     "prepare": "husky"
   },
   "dependencies": {

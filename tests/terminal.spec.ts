@@ -4189,16 +4189,11 @@ test('现货高级订单：确认期间切换账户会中止余额查询后的�
   expect(writes).toHaveLength(0)
 })
 
-test('正式页面隐藏性能调试入口，性能验收模式保留键盘操作', async ({ page }) => {
+test('普通构建恢复性能面板，并保留键盘操作和指标导出', async ({ page }) => {
   await mockExchange(page)
   await page.goto('/')
   const trigger = page.getByRole('button', { name: /性能 ·/ })
-  if (process.env.PERF_CHECK !== '1') {
-    await expect(page.getByText('实时连接', { exact: false })).toBeVisible()
-    await expect(trigger).toHaveCount(0)
-    await expect(page.getByText('· 以交易所返回为准')).toHaveCount(0)
-    return
-  }
+  await expect(trigger).toBeVisible()
   const dialog = page.getByRole('dialog', { name: '性能监测', exact: true })
   const exportButton = dialog.getByRole('button', {
     name: '导出指标',
@@ -4210,6 +4205,20 @@ test('正式页面隐藏性能调试入口，性能验收模式保留键盘操�
   await expect(exportButton).toBeFocused()
   await expect(exportButton).toHaveCSS('outline-style', 'none')
   await expect(exportButton).toHaveCSS('box-shadow', 'none')
+  await expect(dialog.getByRole('table')).toContainText('订单簿数据')
+  const metricsDownload = page.waitForEvent('download')
+  await exportButton.click()
+  const metricsPath = await (await metricsDownload).path()
+  if (!metricsPath) throw new Error('性能指标未导出')
+  const metrics = JSON.parse(await readFile(metricsPath, 'utf8'))
+  expect(metrics.fps).toBeGreaterThan(0)
+  expect(
+    metrics.modules.find((row: { id: string }) => row.id === 'book').totalInput,
+  ).toBeGreaterThan(0)
+  await page.screenshot({
+    path: 'output-tdd/playwright/opportunity-followups/terminal-performance.png',
+    fullPage: true,
+  })
   await closeButton.click()
   await expect(dialog).toBeHidden()
   await expect(trigger).toBeFocused()

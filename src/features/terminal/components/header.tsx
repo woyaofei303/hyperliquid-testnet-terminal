@@ -48,6 +48,12 @@ export function Header({
             {t('预测')}
           </Link>
           <Link
+            href="/opportunities"
+            className="flex h-10 items-center px-1 text-muted hover:text-ink"
+          >
+            主网观察
+          </Link>
+          <Link
             href="/connect"
             className="flex h-10 items-center px-1 text-muted hover:text-ink"
           >

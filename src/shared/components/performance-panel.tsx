@@ -111,33 +111,38 @@ export function PerformancePanel() {
               </tr>
             </thead>
             <tbody>
-              {data.modules.map((row) => (
-                <tr
-                  key={row.id}
-                  className="border-b border-edge/60 hover:bg-surface"
-                >
-                  <td className="px-2 py-3 text-left">{t(row.name)}</td>
-                  {[
-                    row.inputRate.toFixed(1),
-                    row.updateRate.toFixed(1),
-                    row.p95.toFixed(2),
-                    row.max.toFixed(2),
-                    row.pending,
-                    row.retained,
-                    row.coalesced,
-                    row.dropped,
-                    row.age ? row.age.toFixed(0) : '—',
-                  ].map((value, index) => (
-                    <td key={`${row.id}-${index}`} className="px-2">
-                      {value}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {data.modules
+                .filter((row) => row.totalInput > 0 || row.totalUpdates > 0)
+                .map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-b border-edge/60 hover:bg-surface"
+                  >
+                    <td className="px-2 py-3 text-left">{t(row.name)}</td>
+                    {[
+                      row.inputRate.toFixed(1),
+                      row.updateRate.toFixed(1),
+                      row.p95.toFixed(2),
+                      row.max.toFixed(2),
+                      row.pending,
+                      row.retained,
+                      row.coalesced,
+                      row.dropped,
+                      row.age ? row.age.toFixed(0) : '—',
+                    ].map((value, index) => (
+                      <td key={`${row.id}-${index}`} className="px-2">
+                        {value}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
         <div className="mt-4 space-y-2 text-xs leading-5 text-muted">
+          <p>
+            表格只展示已产生数据或更新的模块，导出包含全部模块。机会页每秒汇总行情一次；机会仓位核验的耗时只计算成交处理，不包含网络等待。数据年龄按最近收到的数据时间计算，不是纯网络延迟。
+          </p>
           <p>
             {t(
               '每秒汇总一次，各模块最多保留 120 个耗时样本。P95 是 95% 的同步处理耗时不超过的值；React 行记录渲染耗时，图表行记录同步调用耗时，不代表 GPU 绘制耗时。',
