@@ -11,6 +11,9 @@ export const performanceModules = {
   bookReact: '盘口 React',
   orderReact: '下单 React',
   recordsReact: '记录 React',
+  opportunityStream: '机会行情采样',
+  opportunityScan: '机会仓位核验',
+  opportunityReact: '机会页面 React',
 } as const
 export type PerformanceModule = keyof typeof performanceModules
 export type PerformanceLevel = 0 | 1 | 2

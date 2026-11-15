@@ -62,6 +62,57 @@ Secrets:
 
 私钥只放本地 SSH 目录和 GitHub 环境 Secret；服务器只接收公钥。SSH 使用已核对的主机指纹，不能关闭主机校验。环境只允许 `main` 分支部署。
 
+## 主网只读采集任务
+
+`deploy/opportunity-collector.service` 使用现有 `hyperliquid-deploy` 普通账号运行，无需 Docker 权限，也不开放 HTTP 端口。它执行既有三批计划：每批入组 30 分钟，间隔 2 小时启动，约 4 小时 45 分钟后退出。服务不自动重启、不设循环定时器；需要下一轮时再显式启动，避免重启机器或部署代码悄悄产生新样本。
+
+代码放在 `/srv/hyperliquid/collector/releases/<提交号>/`，`current` 指向当前版本。Node 24.14.0 放在 `/srv/hyperliquid/collector/node/`，使用官方 Linux x64 发行包，下载后核对官方 SHA-256；运行依赖只需项目已锁定的 `decimal.js`。打包时保留 `scripts/campaign-opportunities.ts`、`scripts/collect-opportunities.ts`、`src/features/opportunities/lib/*.ts` 及 `node_modules/decimal.js/`，包根设置 `package.json` 的 `type` 为 `module`，`version.txt` 记录实际提交号。不要上传 `.env`、钱包存储、整个 `node_modules` 或本机试采数据。
+
+代码提交且依赖按锁文件安装后，在本机仓库根目录打包已提交版本：
+
+```bash
+mkdir -p output-tdd/opportunity-release
+task_revision=$(git rev-parse HEAD)
+task_bundle=$(mktemp -d "$PWD/output-tdd/opportunity-release/package.XXXXXX")
+git archive HEAD scripts/campaign-opportunities.ts scripts/collect-opportunities.ts src/features/opportunities/lib deploy/opportunity-collector.service | tar -x -C "$task_bundle"
+mkdir -p "$task_bundle/node_modules"
+cp -R node_modules/decimal.js "$task_bundle/node_modules/decimal.js"
+printf '{"private":true,"type":"module"}\n' > "$task_bundle/package.json"
+printf '%s\n' "$task_revision" > "$task_bundle/version.txt"
+tar -czf "output-tdd/opportunity-release/collector-$task_revision.tgz" -C "$task_bundle" .
+```
+
+产物只包含已提交的采集源码、服务配置和最小依赖。使用现有 SSH 发布凭据上传到服务器的新提交目录，解压后先核对 `version.txt`，执行 `node scripts/campaign-opportunities.ts --help` 和 `node --test 'src/features/opportunities/lib/*.test.ts'`；两者通过才切换 `current`。首次安装尚无旧版本时创建软链接即可，后续更新使用临时链接加原子替换，并保留原链接目标供回滚。
+
+运行目录为 `/srv/hyperliquid/shared/opportunity-collector`，采集器会在其中的 `output-tdd/opportunity-campaign/<启动时间>/` 保存协议、检查点、证据和汇总。该目录不挂到网页路由，也不与本机批次合并。网页仍在浏览器中读取公共行情，服务器任务只用于独立验证；本次没有新增让前端读取服务器结果的 API。
+
+首次安装，在服务器以 `hyperliquid-deploy` 身份执行，先放好对应版本代码和 Node：
+
+```bash
+loginctl enable-linger
+install -d -m 700 /srv/hyperliquid/shared/opportunity-collector
+install -d -m 700 ~/.config/systemd/user
+install -m 600 /srv/hyperliquid/collector/current/deploy/opportunity-collector.service ~/.config/systemd/user/opportunity-collector.service
+systemd-analyze --user verify ~/.config/systemd/user/opportunity-collector.service
+systemctl --user daemon-reload
+systemctl --user start opportunity-collector.service
+```
+
+`enable-linger` 让账号退出 SSH 后任务仍可运行，不代表设置了开机自动采集。单次任务内存上限 384 MB、CPU 配额 50%，最长运行 6 小时；异常停止保留已有文件，不续写旧批次。
+
+上线新版本时先上传到新的提交目录，用服务器 Node 运行 `--help` 和库单测验证，再原子切换 `current`。正在采集的进程继续使用启动时加载的代码；不要为了更新而中断已固定的批次。确认上一轮已退出后，`start` 才会启动新版本。现有前端 Actions 只发布静态文件，后端任务按此独立更新。
+
+以下命令在服务器查询任务、停止任务及重算本地报告。停止会向采集器发送 SIGTERM，并保存未完成状态和取消未来批次；重算报告的目录需替换为实际启动目录。
+
+```bash
+systemctl --user status opportunity-collector.service --no-pager
+journalctl --user -u opportunity-collector.service -n 30 --no-pager
+systemctl --user stop opportunity-collector.service
+/srv/hyperliquid/collector/node/bin/node /srv/hyperliquid/collector/current/scripts/campaign-opportunities.ts --report /srv/hyperliquid/shared/opportunity-collector/output-tdd/opportunity-campaign/替换为启动目录
+```
+
+回滚后端时，将 `current` 原子切回之前保留的提交目录，下一轮使用旧代码；不要删除或覆盖共享数据。前端仍按下面的 Actions 回滚流程操作。
+
 ## 检查和回滚
 
 ```bash
