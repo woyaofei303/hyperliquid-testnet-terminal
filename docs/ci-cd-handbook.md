@@ -4,11 +4,11 @@
 
 配套的[完整代码附录](ci-cd-code.md)直接包含最终 YAML、Python、Shell、运行配置和部署冒烟测试。它不是独立示例项目。CI 检查附录与源码一致；修改实现时运行 `python3 scripts/sync-delivery-code.py`。日常简短命令见[部署入口](aliyun-deployment.md)。本次实际门禁、产物、预发布和恢复结果见[交付验收记录](delivery-record-2026-11-16.md)。
 
-> **实施状态必须与设计分开。** 2026-11-16 14:58（首次本地验收快照）本次代码在 `codex/ai-delivery-pipeline` 隔离工作区，基线为 `a88634ec062a15a43b08859a4c2e07db656924fa`。原业务工作区的未提交修改没有混入。本次已创建预发布账号、目录、Nginx、HTTPS、独立 GitHub Environment 和凭据；开启 Secret scanning、Push protection、Dependabot 安全更新，生产设置了本人审批、禁止管理员绕过。新工作流尚未提交到远端运行，Ruleset 文件目前为 `disabled`，不能说主分支门禁已经验收通过。受控发布、预发布故障演练及生产回滚演练待发布分支进入 GitHub 后执行。
+> **当前状态（2026-11-16 21:03）：** 主分支 PR/CI/CodeQL 门禁、秘密检测、独立预发布环境、唯一产物、来源证明、发布校验和失败恢复均已实施。iPhone 真机扫码、本人授权、后台恢复、撤销与识别失效均由用户确认；30 分钟配对窗口已自动关闭。已批准的同一产物已经部署生产，15 分钟观察、生产手动回滚及恢复新版本均已实测通过。完整时间线和未验证项保存在[交付验收记录](delivery-record-2026-11-16.md)。
 
-截至 2026-11-16 15:23 的远端补充证据：实现 [PR #3](https://github.com/woyaofei303/hyperliquid-testnet-terminal/pull/3) 已合并，main 为 `e2201a9061c9b90bc12ec97497d3e24226fbb3e3`，代码树与独立审查提交 `52e04f68ff542499ed5c402ccfada63f9429ff04` 完全相同。[远端 CI](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43821616634) 实测 188 单元测试、18 发布器测试、174 浏览器交互通过，2 项性能场景显式跳过。Ruleset `27355251` 已 active、无绕过名单；仓库 JSON 保留 disabled 作为安装模板，启用步骤仍要求先验证检查存在。
+[最新发布运行](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43867010843) 实测 188 项单元、20 项部署、174 项浏览器测试通过，2 项性能场景显式跳过；安全检查、CodeQL、来源证明与预发布只读冒烟通过。原业务工作区的未提交改动没有混入 Web 发布产物。部署依据源码 SHA 和发布 ID，不把后来合并的文档提交误认为线上代码版本。
 
-[门禁演练 PR #4](https://github.com/woyaofei303/hyperliquid-testnet-terminal/pull/4) 的单测、合成秘密检测和 CodeQL Critical 告警分别产生失败，非草稿状态实测 BLOCKED；该 PR 已关闭、没有合并。[生产审批演练](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43823265887) 在 Environment 审批处 waiting、部署 steps 为空，随后取消。它使用不能通过发布器校验的无效版本名，没有操作生产链接。仓库级 Secrets 为空，部署 SSH 凭据只在对应 Environment。
+Ruleset `27355251` 已 active、无日常绕过名单；仓库 JSON 中的 disabled 只是安装模板。[失败门禁 PR #4](https://github.com/woyaofei303/hyperliquid-testnet-terminal/pull/4) 已证明单测、合成秘密与 CodeQL Critical 告警会阻断合并，随后关闭且未合并。生产 Environment 仅允许 main，要求本人审批且禁止管理员绕过；[审批门禁演练](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43825873782) 实际停在 waiting、部署 steps 为空。仓库级 Secrets 为空，各环境使用独立部署凭据。
 
 ## 01 当前系统：请求、文件、账号和秘密在哪里
 
@@ -46,7 +46,7 @@ gh api repos/woyaofei303/hyperliquid-testnet-terminal/commits/main --jq '.sha'
 curl --fail --silent --show-error https://app.fameex-testnet.xyz/version.txt
 ```
 
-本次原工作区 HEAD 是 `838900642b17730c99d6a80e6c8db7c0a357c46b`，远端 main 和生产源码是 `a88634ec062a15a43b08859a4c2e07db656924fa`。线上完整版本为 `a88634ec062a15a43b08859a4c2e07db656924fa-43708795815-1`。这些是本次核查值，不是下次发布应复制的预期版本。保存输出到发布记录；生产 version 与预期不一致时停止，不重试覆盖。
+实施前基线核查时，原工作区 HEAD 是 `838900642b17730c99d6a80e6c8db7c0a357c46b`，远端 main 和生产源码是 `a88634ec062a15a43b08859a4c2e07db656924fa`。线上完整版本为 `a88634ec062a15a43b08859a4c2e07db656924fa-43708795815-1`。这些是实施前的历史基线，不是当前线上值或下次发布应复制的预期版本；本次最终版本见交付验收记录。保存输出到发布记录；生产 version 与预期不一致时停止，不重试覆盖。
 
 ## 02 从需求得到验收条件与风险等级
 
@@ -130,7 +130,7 @@ STATIC_EXPORT=1 npm run test:e2e -- --workers=2 --grep '响应丢失|账户切�
 
 现有测试覆盖数量/价格边界、舍入预算、HTTP 成功但拒单、批量部分失败、预览后余额变化、账户切换、响应丢失刷新恢复。新增测试覆盖配对配置故障和待确认存储失败。每次金融逻辑变更仍须补充其实际触发场景：行情过期、返回结构变化、签名期间市场/模式变化、超时、模块重挂载、未知回执。不能把测试标题相似当成完整覆盖，更不能把模拟当成真实交易。
 
-真实测试网验收必须由你逐笔授权，记录公开账户、资产、具体动作、金额上限、手续费/滑点约束、预期结果和授权期限。自动 CI 不连接真实钱包，不自动下测试单。本次没有执行任何真实签名或交易。
+真实测试网验收必须由你逐笔授权，记录公开账户、资产、具体动作、金额上限、手续费/滑点约束、预期结果和授权期限。自动 CI 不连接真实钱包，不自动下测试单。本次配对专项的授权与撤销由用户本人签名完成；自动化没有代签，也没有执行真实交易或资金操作。
 
 ## 05 独立 AI 审查与人工复核
 
@@ -371,7 +371,7 @@ python3 /home/hyperliquid-deploy/ai-delivery-tools-20261116/release.py \
 
 若恢复失败，不删除 journal 后盲目再发。检查磁盘/inode、目录所有者、manifest 和 Nginx 错误日志；先恢复被验证的旧文件/配置，再用 recover 重试。current 指向目录外或版本名称异常仍拒绝恢复；被撤下 current 的文件损坏不再阻止 rollback/recover。将启用的旧版本必须完整通过清单和健康检查，不能手工跳过。恢复后需保留损坏版本证据并调查原因。
 
-演练分两步：先在预发布准备两个已校验来源的真实版本，只对候选版本注入本机健康检查失败，使发布器真实切换后恢复；旧版恢复仍调用正常 HTTP 健康检查，并记录实际耗时。不要把健康 URL 整体改错：那会同时使恢复后的检查失败，属于“恢复失败”演练。再在生产批准的候选上线后，用独立 rollback 入口回到事先确认的 previous，做相同 smoke，记录恢复耗时。演练需要真实已发布版本；Python 临时目录测试只证明实现分支，不等于现场演练。本次预发布现场演练已完成，生产回滚仍待具体版本审批；实际版本和耗时见交付验收记录。生产运行配置迁移曾因 reload 交接时的短暂 404 自动恢复，修正有限重试后成功；这是配置恢复证据，不能替代应用版本回滚演练。
+演练分两步：先在预发布准备两个已校验来源的真实版本，只对候选版本注入本机健康检查失败，使发布器真实切换后恢复；旧版恢复仍调用正常 HTTP 健康检查，并记录实际耗时。不要把健康 URL 整体改错：那会同时使恢复后的检查失败，属于“恢复失败”演练。再在生产批准的候选上线后，用独立 rollback 入口回到事先确认的 previous，做相同 smoke，记录恢复耗时。演练需要真实已发布版本；Python 临时目录测试只证明实现分支，不等于现场演练。本次预发布现场恢复、生产手动回滚和恢复同一新版本均已完成；实际版本和耗时见交付验收记录。生产运行配置迁移曾因 reload 交接时的短暂 404 自动恢复，修正有限重试后成功；这是配置恢复证据，不能替代应用版本回滚演练。
 
 **可重复的预发布恢复演练（实际切换，限预发布）：**`deploy/drill-staging-recovery.py` 与 `release.py` 放在同一目录。它固定使用 `/srv/hyperliquid-staging` 和 `127.0.0.1:8090`，没有生产参数。输入必须是两份已经校验清单和来源的真实版本，且候选与当前不同。它先验证当前 HTTP，切到候选后仅注入一次候选健康失败，再由原发布器恢复 current/previous；恢复 HTTP、两个链接、journal 任一不符合预期都会非零退出。报告中的秒数覆盖整次发布尝试至恢复验证，包含切换前的校验与共享资源检查，不是检测真实故障的时间或可用性承诺。
 
@@ -436,7 +436,7 @@ readlink /srv/hyperliquid/previous
 
 本次本机验证证据保存于隔离工作区 `output-tdd/ai-delivery/`。已运行：Node 单测、Python 发布/迁移测试、静态构建、类型、Biome、Actionlint、ShellCheck、Compose 配置、Gitleaks、High 阈值 audit、完整模拟交互与新增专项、独立部署 smoke。实际只读契约验证市场元数据、HTTP/WebSocket 盘口与历史 K 线；未配置钱包地址的 accountRead 为 false，exchangeWrites 为 false，不能写成账户/交易验收通过。
 
-本次最终本机结果：188 项 Node 单测、18 项 Python 发布/迁移/恢复测试、174 项模拟浏览器交互通过，2 项性能场景按显式开关跳过；独立部署 smoke 在本机和原生产版本各通过 1 项。独立审查发现并修复了“损坏 current 阻断回滚”问题，新增 2 个回归先失败后通过。实际 pre-commit 脚本、独立临时 index 的 lint-staged、构建、类型、Biome、ShellCheck、Actionlint、Compose、Gitleaks 和 audit High 阈值均通过。
+首批本机结果为 188 项 Node 单测、18 项 Python 发布/迁移/恢复测试、174 项模拟浏览器交互通过，2 项性能场景按显式开关跳过；独立部署 smoke 在本机和原生产版本各通过 1 项。独立审查发现并修复了“损坏 current 阻断回滚”问题，新增 2 个回归先失败后通过。实际 pre-commit 脚本、独立临时 index 的 lint-staged、构建、类型、Biome、ShellCheck、Actionlint、Compose、Gitleaks 和 audit High 阈值均通过。后续配对探针回归将部署测试增至 20 项；最新实际发布运行的数量以上文和交付记录为准。
 
 发布前用当次最终报告覆盖记录里的测试数量；曾经通过的日志不代表后续差异也通过。若不能完成 GitHub 门禁演练、生产审批或真机/资金验收，保留“待完成”和具体阻塞，不能把操作手册改写成全部实施完成。
 
