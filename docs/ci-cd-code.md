@@ -4,7 +4,7 @@
 
 ## `.github/workflows/deploy-aliyun.yml`
 
-SHA-256：`27c447b9e5fe8a8333133f849d0fe7278a1dc24ebd3289279d49cd9a3c01cfad`
+SHA-256：`780f950c0867a8674fe0582a1abbd6e20b90c8cf002976d6603226c0ddbf718f`
 
 ````yaml
 name: CI & Production
@@ -134,6 +134,7 @@ jobs:
           python3 scripts/sync-delivery-code.py --check
           docker compose -f deploy/compose.yml config --quiet
           docker compose -f deploy/staging/compose.yml config --quiet
+          docker compose -f deploy/staging/pairing.compose.yml config --quiet
       - name: Scan the candidate commit and its complete history
         run: output-tdd/ci-tools/gitleaks git --log-opts="$GITHUB_SHA" --redact --no-banner
 
@@ -1396,6 +1397,255 @@ export async function loadPairingOrigin(origin: string): Promise<string> {
   if (!response.ok) throw new Error('手机配对配置读取失败')
   return pairingOrigin(await response.json(), origin)
 }
+````
+
+## `deploy/staging/pairing.compose.yml`
+
+SHA-256：`d2e28825dc6cef949e49e0c96d3c0f7893b4d2cb3025a2f5be50bd81f468fe3b`
+
+````yaml
+name: hyperliquid-staging-pairing
+
+services:
+  staging-phone-pairing:
+    # 复用已部署的官方 Node 镜像摘要；不读取生产目录或会话。
+    image: node@sha256:a34ab6d7f6f4813f4d0c5469d74685604b962fbdbf5793a7bc7b4998ecb867c8
+    command: ['node', '/app/server.mjs']
+    user: '1000:1000'
+    read_only: true
+    restart: 'no'
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      PAIRING_HOST: 0.0.0.0
+      PAIRING_PORT: '3211'
+      PAIRING_ORIGINS: https://staging-app.fameex-testnet.xyz
+    volumes:
+      - /srv/hyperliquid-staging-pairing:/app:ro
+    networks: [staging]
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 64
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3211/pairings').then(r=>process.exit(r.status===404?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    logging:
+      options:
+        max-size: '1m'
+        max-file: '2'
+
+networks:
+  staging:
+    external: true
+    name: hyperliquid-staging_default
+````
+
+## `deploy/probe-staging-pairing.mjs`
+
+SHA-256：`f43c5254dd092e26624342d3af848c366b60718bee7b83473a3e58e951fa2796`
+
+````text
+// 仅创建短时合成密文，不连接钱包、交易所，也不输出会话凭据。
+import assert from 'node:assert/strict'
+
+const base = process.argv[2]
+assert.ok(
+  ['http://127.0.0.1:3211', 'https://staging-app.fameex-testnet.xyz'].includes(
+    base,
+  ),
+  '只允许容器内环回地址或预发布域名',
+)
+let checks = 0
+async function request(
+  path,
+  status,
+  method = 'GET',
+  token,
+  body,
+  origin = 'https://staging-app.fameex-testnet.xyz',
+) {
+  const response = await fetch(`${base}${path}`, {
+    method,
+    headers: {
+      Origin: origin,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(5000),
+    redirect: 'error',
+  })
+  assert.equal(response.status, status, `${method} 配对请求状态不符`)
+  assert.equal(response.headers.get('cache-control'), 'no-store')
+  checks++
+  return response.json()
+}
+
+async function main() {
+  await request(
+    '/pairings',
+    403,
+    'POST',
+    undefined,
+    undefined,
+    'https://app.fameex-testnet.xyz',
+  )
+  const session = await request('/pairings', 200, 'POST')
+  assert.match(session.id, /^[a-f0-9]{32}$/)
+  assert.ok(/^[a-f0-9]{64}$/.test(session.webToken), 'Web 令牌格式无效')
+  assert.ok(/^[a-f0-9]{64}$/.test(session.phoneToken), '手机令牌格式无效')
+  assert.ok(session.webToken !== session.phoneToken, '两端令牌不能相同')
+  assert.ok(
+    session.expiresAt > Date.now() && session.expiresAt <= Date.now() + 300000,
+  )
+  const path = `/pairings/${session.id}`
+  try {
+    await request(path, 401)
+    await request(`${path}/approval`, 409, 'POST', session.webToken, {
+      envelope: 'ab'.repeat(28),
+    })
+    await request(`${path}/request`, 401, 'POST', session.webToken, {
+      envelope: 'ab'.repeat(28),
+    })
+    await request(`${path}/request`, 400, 'POST', session.phoneToken, {
+      envelope: 'invalid',
+    })
+    const envelope = 'ab'.repeat(28)
+    await request(`${path}/request`, 200, 'POST', session.phoneToken, {
+      envelope,
+    })
+    await request(`${path}/request`, 200, 'POST', session.phoneToken, {
+      envelope,
+    })
+    await request(`${path}/request`, 409, 'POST', session.phoneToken, {
+      envelope: 'cd'.repeat(28),
+    })
+    assert.equal(
+      (await request(path, 200, 'GET', session.webToken)).request,
+      envelope,
+    )
+    await request(`${path}/approval`, 401, 'POST', session.phoneToken, {
+      envelope,
+    })
+    await request(`${path}/approval`, 200, 'POST', session.webToken, {
+      envelope,
+    })
+    assert.equal(
+      (await request(path, 200, 'GET', session.phoneToken)).approval,
+      envelope,
+    )
+  } finally {
+    await request(path, 200, 'DELETE', session.webToken)
+  }
+  await request(path, 410, 'GET', session.webToken)
+  console.log(
+    JSON.stringify({
+      checks,
+      syntheticOnly: true,
+      walletActions: 0,
+      sessionRemoved: true,
+    }),
+  )
+}
+
+void main().catch(() => {
+  console.error(
+    JSON.stringify({
+      passedChecks: checks,
+      error: '配对探针失败；响应和会话凭据不写入日志',
+    }),
+  )
+  process.exitCode = 1
+})
+````
+
+## `deploy/staging-pairing-window.sh`
+
+SHA-256：`89e88bce48a9fc66403efa9a78ec0c1bc790bb3d1c3a58dde79934aa3d9864fe`
+
+````bash
+#!/usr/bin/env bash
+# 只操作预发布；开启前必须已确认真机验收窗口。定时关闭不等于撤销交易所授权。
+set -euo pipefail
+[[ $EUID -eq 0 && $# -eq 1 && ($1 == on || $1 == off) ]] || { echo '用法：sudo bash staging-pairing-window.sh on|off'; exit 1; }
+config=/etc/hyperliquid-staging
+relay=/etc/hyperliquid-staging-pairing
+exec 9>/run/hyperliquid-staging-pairing.lock
+flock -n 9 || { echo '配对窗口正在切换'; exit 1; }
+web=(docker compose -f "$config/compose.yml" exec -T web)
+pairing=(docker compose -f "$relay/pairing.compose.yml")
+expect_status() {
+  local status _attempt
+  for _attempt in 1 2 3 4 5; do
+    status=$(curl --silent --show-error --max-time 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:8090/pairings) || status=000
+    [[ $status == "$1" ]] && return 0
+    sleep 1
+  done
+  echo "配对入口状态异常：期望 $1，实际 $status" >&2
+  return 1
+}
+close_window() {
+  local failed=0
+  if [[ -f $config/runtime-config.json && ! -L $config/runtime-config.json ]]; then
+    printf '{ "schemaVersion": 1, "phonePairingEnabled": false }\n' > "$config/runtime-config.json" || failed=1
+  else failed=1; fi
+  # 未知配置不覆盖；仍要关开关并停止 relay，使过期窗口不能继续配对。
+  if [[ ! -L $config/nginx.conf ]] && { cmp -s "$config/nginx.conf" "$relay/nginx.disabled.conf" || cmp -s "$config/nginx.conf" "$relay/nginx.enabled.conf"; }; then
+    # 保留 bind mount 的 inode，确保容器立即读到配置。
+    cat "$relay/nginx.disabled.conf" > "$config/nginx.conf" || failed=1
+    if ! "${web[@]}" nginx -t || ! "${web[@]}" nginx -s reload; then failed=1; fi
+  else failed=1; fi
+  "${pairing[@]}" stop staging-phone-pairing || failed=1
+  expect_status 503 || failed=1
+  if ! curl --fail --silent --show-error --max-time 10 http://127.0.0.1:8090/runtime-config.json | python3 -c 'import json,sys; sys.exit(json.load(sys.stdin) != {"schemaVersion":1,"phonePairingEnabled":False})'; then failed=1; fi
+  [[ $failed == 0 ]] || { echo '关闭或恢复失败，检查预发布 Nginx、运行配置及容器' >&2; return 1; }
+  echo '预发布配对已关闭：runtime=false，/pairings=503；容器已停止。'
+}
+if [[ $1 == off ]]; then close_window; exit; fi
+[[ ! -L $config/nginx.conf && ! -L $config/runtime-config.json ]]
+[[ -f $relay/nginx.disabled.conf && -f $relay/nginx.enabled.conf ]]
+systemctl is-enabled --quiet hyperliquid-staging-pairing-reset.service
+cmp "$config/nginx.conf" "$relay/nginx.disabled.conf"
+curl --fail --silent --show-error --max-time 10 http://127.0.0.1:8090/runtime-config.json | python3 -c 'import json,sys; sys.exit(json.load(sys.stdin) != {"schemaVersion":1,"phonePairingEnabled":False})'
+# 不允许并行窗口，避免旧定时器提前关闭新一轮验收。
+if systemctl is-active --quiet hyperliquid-staging-pairing-close.timer; then echo '上个窗口定时器仍在，先等待关闭或按手册停止它'; exit 1; fi
+backup="/root/hyperliquid-deploy-backups/pairing-$(date +%Y%m%d-%H%M%S)"
+install -d -m 700 "$backup"
+cp -p "$config/nginx.conf" "$config/runtime-config.json" "$backup/"
+trap 'trap - ERR; close_window || exit 2; exit 1' ERR
+"${pairing[@]}" up -d --pull never --wait --wait-timeout 30
+"${pairing[@]}" exec -T staging-phone-pairing node --input-type=module - http://127.0.0.1:3211 < "$relay/probe-staging-pairing.mjs"
+systemd-run --unit=hyperliquid-staging-pairing-close --on-active=30m --collect \
+  /bin/bash "$relay/staging-pairing-window.sh" off
+cat "$relay/nginx.enabled.conf" > "$config/nginx.conf"
+"${web[@]}" nginx -t
+"${web[@]}" nginx -s reload
+printf '{ "schemaVersion": 1, "phonePairingEnabled": true }\n' > "$config/runtime-config.json"
+curl --fail --silent --show-error --max-time 10 http://127.0.0.1:8090/runtime-config.json | python3 -c 'import json,sys; sys.exit(json.load(sys.stdin) != {"schemaVersion":1,"phonePairingEnabled":True})'
+# 不创建额外会话，GET 集合路径由 relay 返回 404。
+expect_status 404
+trap - ERR
+printf '配对已开启，30 分钟后自动关闭；备份：%s\n' "$backup"
+````
+
+## `deploy/staging/pairing-reset.service`
+
+SHA-256：`fa206fb6979b24549778b50fa40e08c3860dbb0ce11c4e46386e031a7f497fc5`
+
+````text
+[Unit]
+Description=Close the staging phone pairing window after boot
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /etc/hyperliquid-staging-pairing/staging-pairing-window.sh off
+
+[Install]
+WantedBy=multi-user.target
 ````
 
 ## `playwright.smoke.config.ts`

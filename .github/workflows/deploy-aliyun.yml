@@ -125,6 +125,7 @@ jobs:
           python3 scripts/sync-delivery-code.py --check
           docker compose -f deploy/compose.yml config --quiet
           docker compose -f deploy/staging/compose.yml config --quiet
+          docker compose -f deploy/staging/pairing.compose.yml config --quiet
       - name: Scan the candidate commit and its complete history
         run: output-tdd/ci-tools/gitleaks git --log-opts="$GITHUB_SHA" --redact --no-banner
 

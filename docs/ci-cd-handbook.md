@@ -280,7 +280,7 @@ sudo -n bash /root/hyperliquid-setup-20261116/deploy/bootstrap-staging.sh /root/
 sudo -n bash /root/hyperliquid-setup-20261116/deploy/upgrade-production.sh
 ```
 
-环境配置独立提供，不进入 Artifact：生产 true，预发布 false，均 `Cache-Control: no-store`。Web 只用本站 origin 的 `/pairings`，HTTPS 正式域名；配置失败、schema 非 1、非布尔 true 都关闭。`create` 和 `approve` 在任何自动撤销/授权签名前再次读取。预发布 Nginx 的配对路由固定 503，不代理到生产。RN 消息 version 仍为 1；真机联调必须另建隔离 relay 并逐笔授权，不能靠把预发布开关改 true 直接连生产服务。
+环境配置独立提供，不进入 Artifact：生产 true，预发布默认 false，均 `Cache-Control: no-store`。Web 只用本站 origin 的 `/pairings`，HTTPS 正式域名；配置失败、schema 非 1、非布尔 true 都关闭。`create` 和 `approve` 在任何自动撤销/授权签名前再次读取。预发布默认 Nginx 的配对路由为 503，不代理到生产。RN 消息 version 仍为 1；隔离 relay 已准备好，真机验收时才临时开放，并由本人逐笔确认授权。完整安装、30 分钟窗口、手机步骤及关闭命令见[隔离配对操作](PHONE-AGENT-PAIRING.md#隔离配对服务准备开放关闭)。真实扫码和授权结果单独记录，不把合成协议检查当作真机通过。
 
 旧生产版本没有 manifest。`adopt-legacy.py` 只给指定 current/previous 补当前文件哈希清单：同时核对链接、version 和全目录，生成 `.legacy-adoption.json`，标记 `legacy-server-baseline-not-attested`。它不改变链接，不补造来源证明。这是首次改造的迁移边界；新候选仍必须通过签名证明。若两个版本或文件有异常，停止并人工调查。
 

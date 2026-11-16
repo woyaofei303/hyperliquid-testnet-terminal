@@ -1,0 +1,36 @@
+name: hyperliquid-staging-pairing
+
+services:
+  staging-phone-pairing:
+    # 复用已部署的官方 Node 镜像摘要；不读取生产目录或会话。
+    image: node@sha256:a34ab6d7f6f4813f4d0c5469d74685604b962fbdbf5793a7bc7b4998ecb867c8
+    command: ['node', '/app/server.mjs']
+    user: '1000:1000'
+    read_only: true
+    restart: 'no'
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      PAIRING_HOST: 0.0.0.0
+      PAIRING_PORT: '3211'
+      PAIRING_ORIGINS: https://staging-app.fameex-testnet.xyz
+    volumes:
+      - /srv/hyperliquid-staging-pairing:/app:ro
+    networks: [staging]
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 64
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3211/pairings').then(r=>process.exit(r.status===404?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    logging:
+      options:
+        max-size: '1m'
+        max-file: '2'
+
+networks:
+  staging:
+    external: true
+    name: hyperliquid-staging_default
