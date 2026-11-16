@@ -15,6 +15,12 @@ export const en: Record<string, string> = {
     'Available funds include exchange-approved borrowing capacity. Fills may create debt and interest. Repayment sells only release existing collateral.',
   '上一笔划转结果待确认，请先核对资金记录':
     'The previous transfer is unconfirmed. Check the funding record first.',
+  '资金记录已变化，未发送请求，请先核对':
+    'The funding record changed. No request was sent. Check the record first.',
+  '当前浏览器不支持资金操作锁，请使用新版浏览器':
+    'This browser cannot lock funding operations. Use an up-to-date browser.',
+  '资金操作正在处理，请稍候':
+    'A funding operation is in progress. Please wait.',
   '滑点必须在 0% 至 100% 之间，最多两位小数':
     'Slippage must be between 0% and 100%, with up to two decimals',
   '滑点必须在 0% 至 100% 之间': 'Slippage must be between 0% and 100%',

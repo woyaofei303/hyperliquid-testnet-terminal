@@ -32,7 +32,7 @@ import {
   loadTransferQuote,
   type TransferQuote,
 } from '@/features/assets/lib/internal-transfer'
-import { Money } from '@/features/trading/lib/orders'
+import { isOrderNotSent, Money } from '@/features/trading/lib/orders'
 import {
   assertSession,
   errorText,
@@ -88,7 +88,7 @@ export function useFunding(
       setError(errorText(e))
     }
   }, [owner])
-  const save = useCallback((next: FundingRecord) => {
+  const save = useCallback((next: FundingRecord, beforeSend = false) => {
     // 划转回报未知时保留 nonce，直到账本核对完成。
     let stored: FundingRecord | null = null
     try {
@@ -103,8 +103,10 @@ export function useFunding(
       stored &&
       (stored.at > next.at ||
         (stored.at === next.at && stored.status === 'credited'))
-    )
+    ) {
+      if (beforeSend) throw new Error('资金记录已变化，未发送请求，请先核对')
       return
+    }
     if (JSON.stringify(stored) === JSON.stringify(next)) return
     localStorage.setItem(fundingKey(next.account), JSON.stringify(next))
     if (current.current?.address === next.account) {
@@ -303,13 +305,28 @@ export function useFunding(
     setError('')
     setNotification(null)
     try {
-      if (
-        record?.kind === 'transfer' &&
-        record.nonce != null &&
-        isFundingPending(record)
+      if (!navigator.locks)
+        throw new Error('当前浏览器不支持资金操作锁，请使用新版浏览器')
+      await navigator.locks.request(
+        fundingKey(wallet.address),
+        { ifAvailable: true },
+        async (acquired) => {
+          if (!acquired) throw new Error('资金操作正在处理，请稍候')
+          const pending = parseFundingRecord(
+            localStorage.getItem(fundingKey(wallet.address)),
+            wallet.address,
+          )
+          if (
+            pending?.kind === 'transfer' &&
+            pending.nonce != null &&
+            isFundingPending(pending)
+          ) {
+            setRecord(pending)
+            throw new Error('上一笔划转结果待确认，请先核对资金记录')
+          }
+          await action()
+        },
       )
-        throw new Error('上一笔划转结果待确认，请先核对资金记录')
-      await action()
       return true
     } catch (e) {
       setError(
@@ -340,7 +357,7 @@ export function useFunding(
         let submitted = false
         try {
           const hash = await sendDeposit(wallet, amount, kind, () => {
-            save(next)
+            save(next, true)
             submitted = true
           })
           next = { ...next, hash, status: 'submitted' }
@@ -404,7 +421,7 @@ export function useFunding(
           at: Date.now(),
           status: 'unknown',
         }
-        save(next)
+        save(next, true)
         await masterExchange(wallet, nonce).sendAsset({
           destination: wallet.address,
           sourceDex: fresh.sourceDex,
@@ -420,6 +437,7 @@ export function useFunding(
         if (
           next &&
           (isUserRejection(e) ||
+            isOrderNotSent(e) ||
             (e instanceof ApiRequestError &&
               !/nonce|already|timed? ?out/i.test(e.message)))
         )
@@ -485,7 +503,7 @@ export function useFunding(
           at: nonce,
           status: 'unknown',
         }
-        save(next)
+        save(next, true)
         await masterExchange(wallet, nonce).sendToEvmWithData(
           withdrawalParameters(wallet.address, amount, preview.sourceDex),
         )

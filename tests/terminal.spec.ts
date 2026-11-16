@@ -5167,6 +5167,96 @@ test('HIP-3 独立划转：抵押币过滤、同钱包目标、非 USDC 精度�
     amount: '2.12345678',
   })
 })
+test('发布回归：划转签名前钱包故障不留下未知锁，修正后可重试', async ({
+  page,
+}) => {
+  const { writes } = await mockExchange(page)
+  await mockFunding(page)
+  await openFunds(page)
+  await openFundOperation(page, '划转')
+  await page.evaluate(() => {
+    const provider = window.ethereum
+    if (!provider) throw new Error('模拟钱包未注入')
+    const request = provider.request.bind(provider)
+    let failed = false
+    provider.request = (async (args: {
+      method: string
+      params?: unknown[]
+    }) => {
+      if (args.method === 'eth_signTypedData_v4' && !failed) {
+        failed = true
+        throw new Error('模拟签名前钱包断线')
+      }
+      return request(args as Parameters<typeof provider.request>[0])
+    }) as typeof provider.request
+  })
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('划转金额（USDC）').fill('10')
+  await dialog.getByRole('button', { name: '确认划转' }).click()
+  await expect(
+    dialog.getByText('操作已取消或失败', { exact: true }),
+  ).toBeVisible()
+  expect(writes).toEqual([])
+  await dialog.getByLabel('划转金额（USDC）').fill('11')
+  await dialog.getByRole('button', { name: '确认划转' }).click()
+  await expect.poll(() => writes.length).toBe(1)
+  expect(writes[0]).toMatchObject({ type: 'sendAsset', amount: '11' })
+})
+
+test('发布回归：另一标签页不能覆盖未知划转或再次请求签名', async ({
+  page,
+  context,
+}) => {
+  test.slow()
+  const first = await mockExchange(page)
+  await mockFunding(page)
+  const other = await context.newPage()
+  const second = await mockExchange(other)
+  await mockFunding(other)
+  await openFunds(page)
+  await openFunds(other)
+  await openFundOperation(page, '划转')
+  await openFundOperation(other, '划转')
+  let sentNonce: number | undefined
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/exchange',
+    async (route) => {
+      const { action } = route.request().postDataJSON()
+      if (action.type !== 'sendAsset') return route.fallback()
+      sentNonce = action.nonce
+      await route.abort('failed')
+    },
+  )
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('划转金额（USDC）').fill('10')
+  await dialog.getByRole('button', { name: '确认划转' }).click()
+  await expect(
+    dialog.getByText('资金结果待确认', { exact: true }),
+  ).toBeVisible()
+  expect(sentNonce).toBeDefined()
+  const signsBefore = await other.evaluate(() =>
+    sessionStorage.getItem('mock-wallet-signs'),
+  )
+  const secondDialog = other.getByRole('dialog')
+  await secondDialog.getByLabel('划转金额（USDC）').fill('11')
+  await secondDialog.getByRole('button', { name: '确认划转' }).click()
+  await expect(
+    secondDialog.getByText('上一笔划转结果待确认，请先核对资金记录').first(),
+  ).toBeVisible()
+  expect(second.writes).toEqual([])
+  expect(first.writes).toEqual([])
+  expect(
+    await other.evaluate(() => sessionStorage.getItem('mock-wallet-signs')),
+  ).toBe(signsBefore)
+  expect(
+    await other.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key) ?? 'null')?.nonce,
+      `hl-testnet-funding:${address}`,
+    ),
+  ).toBe(sentNonce)
+  await other.close()
+})
+
 for (const reply of ['Nonce already used', 'Insufficient balance'] as const) {
   test(`HIP-3 划转拒绝分类：${reply}`, async ({ page }) => {
     await mockExchange(page)
@@ -7400,7 +7490,7 @@ test('Web3 提款：主钱包确认、固定测试网 CCTP 路由、目标链真
   })
   await expect(
     dialog.getByRole('link', { name: /查看链上交易/ }),
-  ).toHaveAttribute('href', /^https:\/\/sepolia.arbiscan.io\/tx\/0x/)
+  ).toHaveAttribute('href', /^https:\/\/sepolia\.arbiscan\.io\/tx\/0x/)
 })
 
 test('Web3 提款未知响应刷新后不锁表单，按 nonce 自动恢复查询且不自动重发', async ({
