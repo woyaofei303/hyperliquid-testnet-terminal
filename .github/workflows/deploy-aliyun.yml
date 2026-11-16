@@ -7,147 +7,243 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: 检查并发布 main，或回滚到上一成功版本
+        description: 发布候选到预发并等待生产批准，或回滚
         type: choice
         required: true
         default: deploy
         options: [deploy, rollback]
+      expected_current:
+        description: 当前生产 version.txt 的完整值；首次发布填 none
+        required: true
+        type: string
+      rollback_target:
+        description: 回滚时必填：服务器 previous 的完整发布 ID
+        type: string
+      reviewed_sha:
+        description: deploy 必填：独立审查覆盖的完整 main SHA
+        type: string
+      review_url:
+        description: deploy 必填：本仓库 PR 中的审查与测试证据链接
+        type: string
+      risk:
+        description: 本次变更风险
+        type: choice
+        options: [low, medium, high]
+        default: high
+      specialized_checks:
+        description: 高风险涉及资金或配对时，专项验收已完成；不涉及则审查记录已解释
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+  actions: read
+  attestations: read
 
+# 手动发布不互相取消；服务器短锁和 expected_current 阻止过期候选覆盖。
 concurrency:
-  group: ${{ github.ref == 'refs/heads/main' && 'aliyun-production' || format('fameex-testnet-ci-{0}', github.ref) }}
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'workflow_dispatch' && format('release-{0}', github.run_id) || format('ci-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 jobs:
   verify:
-    name: CI
     if: inputs.operation != 'rollback'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       HUSKY: '0'
-      NEXT_PUBLIC_PHONE_PAIRING_URL: https://app.fameex-testnet.xyz
     outputs:
-      release_id: ${{ steps.build.outputs.release_id }}
+      release_id: ${{ steps.release.outputs.release_id }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
           cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Check deployment rollback
-        run: python3 -m unittest discover -s deploy -p 'test_*.py'
-      - name: Check source
-        run: npm run lint
-      - name: Check business rules
-        run: npm test
-      - name: Build static site
-        run: npm run build:static
-      - name: Check types
-        run: npm run typecheck
-      - name: Install test browser
-        run: npx playwright install --with-deps chrome
-      - name: Check exported interactions
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:deploy
+      - run: npm run build:static
+      - run: npm run typecheck
+      - run: npx playwright install --with-deps chrome
+      - name: Static mocked interactions
         env:
           STATIC_EXPORT: '1'
         run: npm run test:e2e -- --workers=2
-      - name: Build server assets
-        id: build
+      - name: Create and verify manifest
+        id: release
         run: |
           release="$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          printf '%s\n' "$release" > out/version.txt
-          printf 'release_id=%s\n' "$release" >> "$GITHUB_OUTPUT"
-      - name: Save failed browser traces
-        if: failure()
+          python3 deploy/release.py "$release" --manifest out
+          python3 deploy/release.py "$release" --verify out
+          echo "release_id=$release" >> "$GITHUB_OUTPUT"
+      - name: Save the immutable candidate
+        id: upload
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: failed-browser-${{ github.run_id }}-${{ github.run_attempt }}
-          path: output-tdd/playwright/fameex-testnet/test-results
+          name: release-${{ steps.release.outputs.release_id }}
+          path: out/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Save test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: output-tdd/playwright/fameex-testnet/
           retention-days: 7
           if-no-files-found: ignore
-      - name: Save the CI build
-        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.operation == 'deploy'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: release-${{ github.sha }}
-          path: out/
-          retention-days: 7
-          if-no-files-found: error
-          overwrite: true
 
-  deploy:
-    name: ${{ inputs.operation == 'rollback' && 'Rollback' || 'Deploy' }}
-    needs: verify
-    if: >-
-      !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' &&
-      ((inputs.operation == 'rollback' && needs.verify.result == 'skipped') ||
-       (inputs.operation != 'rollback' && needs.verify.result == 'success'))
+  security:
+    if: inputs.operation != 'rollback'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment:
-      name: aliyun-production
-      url: https://app.fameex-testnet.xyz
     env:
-      OPERATION: ${{ inputs.operation || 'deploy' }}
-      RELEASE_ID: ${{ needs.verify.outputs.release_id }}
-      DEPLOY_HOST: ${{ vars.ALIYUN_HOST }}
-      DEPLOY_USER: ${{ vars.ALIYUN_USER }}
-      DEPLOY_PORT: ${{ vars.ALIYUN_PORT || '22' }}
+      HUSKY: '0'
     steps:
-      - name: Check deployment configuration
-        env:
-          PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
-          KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || { echo 'Configure ALIYUN_HOST'; exit 1; }
-          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo 'Configure ALIYUN_USER'; exit 1; }
-          [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]] || { echo 'Invalid ALIYUN_PORT'; exit 1; }
-          [[ -n "$PRIVATE_KEY" && -n "$KNOWN_HOSTS" ]] || { echo 'Configure SSH key and verified known_hosts'; exit 1; }
-
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Download the CI build
-        if: inputs.operation != 'rollback'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: release-${{ github.sha }}
-          path: out/
-
-      - name: Publish or roll back the release
-        env:
-          PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
-          KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
-        shell: bash
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=high
+      - run: bash scripts/install-ci-tools.sh
+      - name: Workflow and shell checks
         run: |
-          set -euo pipefail
-          ssh_dir="$(mktemp -d "$RUNNER_TEMP/fameex-testnet-ssh.XXXXXX")"
-          trap 'rm -rf "$ssh_dir"' EXIT
-          chmod 700 "$ssh_dir"
-          printf '%s\n' "$PRIVATE_KEY" > "$ssh_dir/key"
-          printf '%s\n' "$KNOWN_HOSTS" > "$ssh_dir/known_hosts"
-          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
-          unset PRIVATE_KEY KNOWN_HOSTS
-          ssh_options=(-i "$ssh_dir/key" -p "$DEPLOY_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" -o ConnectTimeout=15)
-          target="$DEPLOY_USER@$DEPLOY_HOST"
-          if [[ "$OPERATION" == rollback ]]; then
-            release="$(ssh "${ssh_options[@]}" "$target" 'cat /srv/hyperliquid/previous/version.txt')"
-            [[ "$release" =~ ^[0-9a-f]{40}-[0-9]+-[0-9]+$ ]] || { echo 'No valid previous release'; exit 1; }
-            ssh "${ssh_options[@]}" "$target" 'python3 - --rollback' < deploy/release.py
-          else
-            release="$RELEASE_ID"
-            [[ "$release" =~ ^[0-9a-f]{40}-[0-9]+-[0-9]+$ ]] || { echo 'Invalid CI release'; exit 1; }
-            [[ "$(cat out/version.txt)" == "$release" && "$release" == "$GITHUB_SHA-"* ]] || { echo 'CI artifact does not match this commit'; exit 1; }
-            ssh "${ssh_options[@]}" "$target" "mkdir -p /srv/hyperliquid/releases/$release"
-            printf -v transport '%q ' ssh "${ssh_options[@]}"
-            rsync -rzc --perms --chmod=D755,F644 -e "$transport" \
-              out/ "$target:/srv/hyperliquid/releases/$release/"
-            ssh "${ssh_options[@]}" "$target" "python3 - '$release'" < deploy/release.py
+          output-tdd/ci-tools/actionlint
+          shellcheck deploy/*.sh scripts/install-ci-tools.sh
+          for script in deploy/*.sh scripts/install-ci-tools.sh; do bash -n "$script"; done
+          python3 scripts/sync-delivery-code.py --check
+          docker compose -f deploy/compose.yml config --quiet
+          docker compose -f deploy/staging/compose.yml config --quiet
+          docker compose -f deploy/staging/pairing.compose.yml config --quiet
+      - name: Scan the candidate commit and its complete history
+        run: output-tdd/ci-tools/gitleaks git --log-opts="$GITHUB_SHA" --redact --no-banner
+
+  codeql:
+    if: inputs.operation != 'rollback'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, python, actions]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@5895b2c9be147bc7f1c75ce72c5cb577febb1907 # v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+      - uses: github/codeql-action/analyze@5895b2c9be147bc7f1c75ce72c5cb577febb1907 # v4
+        with:
+          category: /language:${{ matrix.language }}
+
+  ci-required:
+    name: ci-required
+    if: always() && inputs.operation != 'rollback'
+    needs: [verify, security, codeql]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every check to succeed
+        env:
+          VERIFY: ${{ needs.verify.result }}
+          SECURITY: ${{ needs.security.result }}
+          CODEQL: ${{ needs.codeql.result }}
+        run: test "$VERIFY" = success && test "$SECURITY" = success && test "$CODEQL" = success
+
+  attest:
+    needs: [ci-required, verify]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.operation == 'deploy'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Validate review identity
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          REVIEW_URL: ${{ inputs.review_url }}
+        run: |
+          test "$REVIEWED_SHA" = "$GITHUB_SHA"
+          [[ "$REVIEW_URL" =~ ^https://github.com/woyaofei303/hyperliquid-testnet-terminal/pull/[0-9]+([/#].*)?$ ]]
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.verify.outputs.artifact_id }}
+          path: candidate
+          merge-multiple: true
+      - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: candidate/release-manifest.json
+
+  staging:
+    needs: [attest, verify]
+    uses: ./.github/workflows/release-environment.yml
+    secrets:
+      ALIYUN_SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
+      ALIYUN_SSH_KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
+    with:
+      environment: aliyun-staging
+      operation: deploy
+      release_id: ${{ needs.verify.outputs.release_id }}
+      artifact_id: ${{ needs.verify.outputs.artifact_id }}
+      expected_current: auto-staging
+      review_url: ${{ inputs.review_url }}
+      production_current: ${{ inputs.expected_current }}
+
+  production-ready:
+    needs: staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require specialized acceptance before production approval
+        env:
+          RISK: ${{ inputs.risk }}
+          SPECIALIZED: ${{ inputs.specialized_checks }}
+        run: |
+          if [[ "$RISK" == high && "$SPECIALIZED" != true ]]; then
+            echo '预发布已验收；高风险专项确认尚未完成，生产放行已阻断。'
+            exit 1
           fi
-          actual="$(curl --fail --silent --show-error --retry 3 --max-time 30 https://app.fameex-testnet.xyz/version.txt)"
-          [[ "$actual" == "$release" ]] || { echo 'Public HTTPS version check failed'; exit 1; }
-          printf 'Operation: %s\n\nActive release: `%s`\n\nhttps://app.fameex-testnet.xyz\n' "$OPERATION" "$release" >> "$GITHUB_STEP_SUMMARY"
+
+  production:
+    needs: [staging, verify, production-ready]
+    uses: ./.github/workflows/release-environment.yml
+    secrets:
+      ALIYUN_SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
+      ALIYUN_SSH_KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
+    with:
+      environment: aliyun-production
+      operation: deploy
+      release_id: ${{ needs.verify.outputs.release_id }}
+      artifact_id: ${{ needs.verify.outputs.artifact_id }}
+      expected_current: ${{ inputs.expected_current }}
+      review_url: ${{ inputs.review_url }}
+
+  rollback:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.operation == 'rollback'
+    uses: ./.github/workflows/release-environment.yml
+    secrets:
+      ALIYUN_SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
+      ALIYUN_SSH_KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
+    with:
+      environment: aliyun-production
+      operation: rollback
+      release_id: ${{ inputs.rollback_target }}
+      expected_current: ${{ inputs.expected_current }}

@@ -1,5 +1,8 @@
 # fameex-testnet
 
+研发与发布：[AI 辅助研发、审查与 CI/CD 实战手册](docs/ci-cd-handbook.md) · [完整代码附录](docs/ci-cd-code.md) · [日常部署入口](docs/aliyun-deployment.md)
+
+
 项目统一命名为 `fameex-testnet`，交易页页头为 FameEX Logo 加 `testnet` 标识。交易页的行情和交易仍接入 Hyperliquid 测试网：SDK 包名、HTTP / WebSocket / RPC 地址、签名字段和会话中的网络标识保留协议原值。独立的 `/opportunities` 页面读取主网公开数据，仅用于观察。文档中提到 Hyperliquid 时，指底层交易所或官方资料。
 
 阿里云发布地址：`https://app.fameex-testnet.xyz`。旧地址 `https://hyperliquid.sunshinedairy.net` 保留为 301 跳转入口，路径和查询参数保持不变。构建、发布与回滚操作见 [部署说明](docs/aliyun-deployment.md)。

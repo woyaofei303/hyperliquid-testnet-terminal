@@ -6,6 +6,22 @@ from pathlib import Path
 
 
 class StaticHandler(SimpleHTTPRequestHandler):
+    def end_headers(self):
+        if self.path == "/version.txt":
+            self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
+    def do_GET(self):
+        if self.path == '/runtime-config.json':
+            body = b'{"schemaVersion":1,"phonePairingEnabled":false}'
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        super().do_GET()
+
     def translate_path(self, path):
         resolved = super().translate_path(path)
         # 对齐生产 try_files 的无扩展名页面路由。

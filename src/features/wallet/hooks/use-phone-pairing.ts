@@ -22,15 +22,29 @@ import {
   parsePairingQR,
   parsePhoneRequest,
   randomHex,
-  relayURL,
 } from '../lib/phone-pairing'
 
-const relay = process.env.NEXT_PUBLIC_PHONE_PAIRING_URL ?? ''
+import { loadPairingOrigin } from '../lib/runtime-config'
+
 type Pairing = { offer: PairingOffer; webToken: string }
 export function usePhonePairing(
   wallet: WalletSession,
   onBusy: (busy: boolean) => void,
 ) {
+  const [relay, setRelay] = useState('')
+  useEffect(() => {
+    let cancelled = false
+    void loadPairingOrigin(window.location.origin)
+      .then((origin) => {
+        if (!cancelled) setRelay(origin)
+      })
+      .catch(() => {
+        if (!cancelled) setRelay('')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
   const [pairing, setPairing] = useState<Pairing | null>(null)
   const [request, setRequest] = useState<PhoneRequest | null>(null)
   const [error, setError] = useState('')
@@ -135,6 +149,8 @@ export function usePhonePairing(
   const create = () =>
     run(async () => {
       const attempt = ++version.current
+      const endpoint = await loadPairingOrigin(window.location.origin)
+      if (attempt !== version.current) return
       if (active.current && !preserve.current)
         await pairingFetch(
           active.current.offer.relay,
@@ -149,12 +165,6 @@ export function usePhonePairing(
       setPairing(null)
       setRequest(null)
       setStatus('idle')
-      const endpoint = relayURL(relay)
-      if (
-        process.env.NODE_ENV === 'production' &&
-        !endpoint.startsWith('https://')
-      )
-        throw new Error('正式环境的配对服务必须使用 HTTPS')
       const oldest = await phoneAgentToReplace(wallet)
       if (attempt !== version.current) return
       if (oldest) {
@@ -219,6 +229,7 @@ export function usePhonePairing(
   const approve = () =>
     run(async () => {
       if (!pairing || !request || status !== 'waiting') return
+      await loadPairingOrigin(window.location.origin)
       if (retired.current.has(request.agentAddress.toLowerCase()))
         throw new Error('该手机密钥已失效，请使用最新版 App 重新扫码。')
       if (Date.now() >= pairing.offer.expiresAt)

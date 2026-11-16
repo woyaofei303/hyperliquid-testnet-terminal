@@ -1,0 +1,177 @@
+# 2026-11-16 AI 研发与交付改造验收记录
+
+这份记录保存本次实际执行的结果。日常操作按[实战手册](ci-cd-handbook.md)执行，完整实现见[代码附录](ci-cd-code.md)。未完成的项目不作为放行证据。
+
+## 源码、审查与环境
+
+原业务工作区保留在 `codex/mainnet-opportunity-release`，HEAD 为 `838900642b17730c99d6a80e6c8db7c0a357c46b`，原有未提交业务修改没有纳入本次交付。实施使用独立 worktree 和 `codex/ai-delivery-pipeline`。
+
+- 初始远端 main：`a88634ec062a15a43b08859a4c2e07db656924fa`。
+- 首批实现：[PR #3](https://github.com/woyaofei303/hyperliquid-testnet-terminal/pull/3)，审查 SHA `52e04f68ff542499ed5c402ccfada63f9429ff04`，合并 SHA `e2201a9061c9b90bc12ec97497d3e24226fbb3e3`，两个提交的代码树一致。
+- 现场修复：[PR #15](https://github.com/woyaofei303/hyperliquid-testnet-terminal/pull/15)，审查 SHA `d432ebd3317fbf23abf2757109123d2b85462b50`，合并 SHA `b85687658a386802da48dff0831dc16274b9df62`，两个提交的代码树一致。后续预发布产物使用这个提交。
+- 独立 Codex 审查发现“损坏 current 阻断回滚”问题：两个回归先失败后通过；新演练脚本的优化模式误报风险也已修复并复核。没有以编码者总结替代代码审查。
+
+服务器实际是阿里云轻量应用服务器，韩国首尔，`47.80.28.238`。预发布使用独立账号 `hyperliquid-staging-deploy`、目录 `/srv/hyperliquid-staging`、本机端口 `127.0.0.1:8090` 和 GitHub Environment `aliyun-staging`。实测该账号不能写生产目录，没有 sudo 或 Docker 权限。
+
+预发布 DNS、HTTPS、Nginx 和公开运行配置已创建；配置为 `schemaVersion: 1`、`phonePairingEnabled: false`。生产运行配置为 true。生产配置迁移曾因 reload 交接时短暂 404 自动恢复，补充有限重试后成功；应用版本没有因此切换。这不能代替应用版本回滚演练。
+
+生产当时及本次受控上线前的版本：
+
+```text
+current:  a88634ec062a15a43b08859a4c2e07db656924fa-43708795815-1
+previous: 140a2140cd2a6377d3d9385cd76172fe444f56d8-43349966499-1
+```
+
+两份历史版本仅补充文件清单，标记为旧服务器基线；没有补造来源证明。Web 改造没有重启采集器、切换其版本或删除共享采集数据。
+
+## 已通过的检查
+
+首批本机验证为 188 项单元测试、18 项发布器测试、174 项模拟浏览器测试通过；2 项性能场景按显式开关跳过，真实外部服务场景不混入模拟套件。构建、类型、Biome、实际提交钩子、Gitleaks、High 阈值 audit、Actionlint、ShellCheck、Compose 和源码附录一致性均通过。本机和原生产版本各执行一次部署只读 smoke，通过。
+
+[首批远端 CI](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43821616634) 与[修复远端 CI](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43824425050) 均通过相同的 188 / 18 / 174 项测试及必需安全门禁，浏览器报告均明确列出 2 项跳过。修复轮没有 flaky 汇总。
+
+`npm audit --audit-level=high` 未发现 High/Critical 阻断；53 个低危依赖链条目归于 deepmerge 公告 `GHSA-gcqx-w48m-w2h4`，没有用强制依赖升级或全局忽略掩盖。Dependabot 更新通过 PR 进入，未自动合并。
+
+## 主分支与审批门禁
+
+`main-delivery-gates` Ruleset ID `27355251` 已 active，无绕过名单：必须 PR、严格最新主分支、`ci-required`、解决审查讨论，禁止删除和强推；CodeQL 阻断 High 及以上安全告警和普通 Error。个人维护方式没有要求第二位人工批准人。
+
+[故意失败的 PR #4](https://github.com/woyaofei303/hyperliquid-testnet-terminal/pull/4) 不处于草稿状态。单元测试故意失败；Gitleaks 检出从未签发的合成检测串；CodeQL 检出一个 Critical 命令注入。三个分析任务本身成功，但独立 CodeQL 结果检查失败。启用规则后 API 返回 `mergeStateStatus: BLOCKED`。该 PR 已关闭，未尝试合并，演练代码没有进入 main。
+
+Secret scanning、Push protection、Dependabot 安全更新已开启。仓库级 Secrets 为空，SSH 凭据只在各自 Environment。生产 Environment 只允许 main、要求维护者批准、允许本人批准本人发起的部署、禁止管理员直接绕过。
+
+[最终审批门禁演练](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43825873782) 使用不能通过版本格式校验的无效目标，避免误批准引发切换。API 实测 workflow 和 `rollback / release` 均为 waiting，部署 steps 为空；随后取消，未批准。没有因此回滚生产。
+
+## 产物来源与失败定位
+
+[首个预发布尝试](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43823073241) 的 Artifact ID 是 `14204714638`。身份校验、GitHub 原生来源证明和完整文件清单均通过，随后 publish 因复用工作流未显式传递 Environment Secret，在 SSH 上传之前失败。按当前 GitHub 官方规则补充三个调用方的两项秘密传递，以及被调用方的必需声明后，已由 PR #15 修复。没有降低环境审批或把私钥移到仓库级 Secret。
+
+对该真实签名产物的本机副本执行了一项正向和六项负向校验：原始产物与签名 bundle 验证成功；错误仓库、错误工作流、错误源码 SHA、替换清单、修改 index.html、错误 run ID 均非零退出。测试没有修改服务器文件。失败或取消的运行不用于生产提升。
+
+## 预发布及恢复演练
+
+以下两个新运行使用修复后的同一源码，但每次独立构建唯一产物。它们均声明 high 风险且专项验收未完成，预期在预发布验收后由 `production-ready` 阻断生产；整体运行失败不能被描述成生产候选已放行。
+
+```text
+源码：b85687658a386802da48dff0831dc16274b9df62
+预发布 A：43825817058 / attempt 1
+预发布 B：43826293058 / attempt 1
+```
+
+两个运行的 verify、安全检查、CodeQL、来源证明、staging/release 均成功；预发布各通过 1 项只读冒烟测试。随后 production-ready 因专项未确认而失败，production 为 skipped，没有启动生产 job。
+
+```text
+预发布 A 发布 ID：b85687658a386802da48dff0831dc16274b9df62-43825817058-1
+Artifact ID：14207086550
+清单 SHA-256：dd681662a53edfd2cc5c1515274139de97feec8de935a9388850180128699969
+
+预发布 B 发布 ID：b85687658a386802da48dff0831dc16274b9df62-43826293058-1
+Artifact ID：14207117134
+清单 SHA-256：fe31f8e506134df272d858b5c5c3c2271f75bcb60403b4db2c8e378e3ab43505
+
+公开运行配置 SHA-256：3bc4b53d51cafe556d544d53007c8c500e45d08fde854e3714d3d18393cf5895
+phonePairingEnabled：false
+/pairings：HTTP 503
+```
+
+A、B 的清单各覆盖 665 个文件。两版共用 41 个静态资源，各另有 2 个资源；对 45 个公网静态资源逐项获取并比较 SHA-256，全部一致。首轮公网检查因连接重置中断，有限重试后通过；没有据此反复切换版本。
+
+恢复演练前 current=B、previous=A。以 A 为候选，`drill-staging-recovery.py` 在 current 实际切到 A 后注入仅针对 A 的健康失败。原发布器恢复 current=B、previous=A，真实检查 B 的版本、首页和 JS，journal 清除；脚本再次验证两个链接与真实 HTTP。整次注入演练耗时 **0.633 秒**，包含切换前校验、共享资源检查、切换和恢复验证，不代表真实故障检测时延或 SLA。
+
+恢复后再次从公网执行只读 smoke：1 项通过（5.5 秒），预期 B 版本、配置、资源和行情均正确。生产仍是本记录开头的原版本。这一步只完成预发布失败恢复演练；生产手动回滚的后续结果见本文最后的受控发布记录。
+
+## 监控与文档
+
+[只读监控手动验收](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43824818395) 的 http、contract 两个任务均成功。公网 HTTPS、版本、首页及 JS 摘要通过；真实外部接口的市场元数据、HTTP/WebSocket 盘口、历史 K 线通过。`accountRead: false`（未配置钱包地址）、`exchangeWrites: false`，没有把这次检查写成账户或交易验收。
+
+飞书原文已原地更新，保留[原 Wiki 地址](https://jcn890wvmzt5.feishu.cn/wiki/DX20wjBwviMIjTksJQPc8MoUno4)和个人文档库位置。更新前确认 revision 未变化，更新后回读正文及全部 25 份源码代码块。正文和代码保留原身份，实际预发布及恢复结果在本次收尾同步；不能把模拟或预发布结果替代生产验收。
+
+## 19:45 隔离配对准备与失败演练
+
+用户确认继续准备隔离服务后，复制生产 relay 的两个程序文件到独立的 `/srv/hyperliquid-staging-pairing`，没有复制或挂载生产会话。来源版本 `041f0ce079e02554d83d838dca7525eba9a999f7`，程序 SHA-256 为 `1a667b635d388eef234c70a2b344c58458815a929ae55145953f475be24a597d`。使用已安装官方 Node 镜像的固定摘要，新容器只加入预发布网络，没有主机端口。
+
+实测完成：容器冷启动健康检查；15 项内部合成协议检查；探针失败时停止开放流程并恢复关闭；Nginx 配置被追加注释时保留该修改、仍关闭 runtime 和停止 relay，并如实返回失败；恢复已知配置后 off 成功；5 秒测试定时器实际调用关闭脚本成功。开机关闭单元已启用并手动启动验证，`Result=success`、`ExecMainStatus=0`；没有重启整台服务器，也没有把 5 秒触发测试写成已经观察了完整 30 分钟窗口。
+
+独立审查发现并修复了“未知配置阻止定时关闭”和“失败断言打印令牌”两个问题。令牌输出回归先复现两类失败，再修复通过；本地部署测试增为 19 项通过，Biome、ShellCheck、Bash、Actionlint、Compose 校验通过。完整源代码附录增至 29 份。
+
+该阶段结束时：隔离 relay 已停止；`runtime-config.json` 为 false，`/pairings` 为 503；Web 预发布仍为 B，生产版本未变。尚未开放公网配对窗口、运行公网配对探针、启动独立 RN 开发服务或执行任何钱包操作。详细操作见[手机配对说明](PHONE-AGENT-PAIRING.md)。原始演练日志为本机 `output-tdd/ai-delivery/pairing-recovery-drill.log`；服务器备份分别为 `pairing-prepare-20261116-194222`、`pairing-drill-20261116-194503`，都位于 `/root/hyperliquid-deploy-backups/`。
+
+## 20:01 已批准的临时配对窗口
+
+用户确认 iPhone 16 Pro 与 Mac 同网且开发版 App 已就绪，并明确批准开放 30 分钟窗口、启动 8082 的 RN 开发服务。服务器实际开启成功，定时关闭时间为 **2026-11-16 20:31:32 +08:00**；备份为 `/root/hyperliquid-deploy-backups/pairing-20261116-200125`。没有延长窗口或操作生产应用。
+
+本机 Metro 在 `192.168.1.251:8082` 提供 iOS SDK 58 构建，服务状态及 LAN manifest 正常。实际获取的 iOS bundle 包含隔离配对地址；RN 工作区原有业务改动保留，8081 原开发服务未停止。构建使用当前 RN `9dda1cbbac1d7cc13507a3f5a99f76fc95e622fe` 加上原有未提交改动，因此不能称为干净提交构建。
+
+首次公网探针因服务器时钟比 Mac 快约 2 秒而误报：内部检查通过，但原探针要求“有效期不超过本机现在加五分钟”，没有沿用 v1 协议已有的 30 秒时钟容差。修正探针后，公网 15 项检查通过，合成会话已删除。新增回归先复现快 2 秒时失败，再验证快 2 秒通过、快 35 秒拒绝、已过期拒绝；没有修改 Web/RN 协议或服务器时钟。
+
+此时仅确认开发服务、公网协议和页面二维码就绪，真实扫码及六位码结果仍等待用户回报，尚未执行钱包授权或交易。扫码后的授权与清理撤销仍须逐项确认，不能由公网合成检查代替。
+
+## 20:21 原生安装与环境纠错
+
+用户实际尚未安装可用的原生 App，明确要求安装后，使用 RN 当前工作区、既有 Xcode 签名团队构建 iPhone 16 Pro 的 Debug App。`xcodebuild` 成功、`codesign --verify --deep --strict` 通过、`devicectl` 安装与启动成功；安装版本为 `fameex-testnet 0.1.10 (31)`，bundle identifier 为 `net.sunshinedairy.hyperliquidnative`。新描述文件有效至 2026-11-23 20:08:02 +08:00；旧构建的描述文件已过期。没有先卸载 App 或清除钱包数据。
+
+用户截图证明 App 仍显示生产网址，扫码报“二维码版本、账户或配对服务不匹配”。先发现界面链接写死，用户明确授权仅修正 RN 的 `src/modules/wallet/components/phone-agent-panel.tsx`：显示和复制跟随已有配对变量，未配置时隐藏链接。单文件 Biome、RN 类型检查、五种地址输入自检通过；RN 原有业务改动保留，未提交该仓库。
+
+修正链接后真机仍报错，进一步检查实际 bundle 才发现：Expo 58 开发模式的 `expo/virtual/env` 以 `.env.local` 的生产值覆盖了启动环境。先前“bundle 包含 staging”的检查只看到了注入前缀，没有验证模块实际使用的值，不能作为环境正确的证据。独立 8082 改用 `--no-dev --clear` 后，显示组件和扫码 hook 的配对地址都实际内联为预发布；包 SHA-256 为 `aece68a6647562787d8d9b4025a7d50da95355045471dffe38ea3ad780e56e7f`。手机原生日志在 20:21:14 记录请求 8082 的 `dev=false` 代码。原 `.env.local` 和 8081 服务未修改。
+
+修正后，用户明确回报“链接已是 staging，扫码后六位码和账户一致”，真机界面与相机扫码核对通过。随后用户确认已本人签名，手机已连接并显示账户；只读查询 `extraAgents` 找到相符的手机代理。用户再将 App 切到后台、返回并解锁，确认恢复同一账户，没有再次扫码或签名。这些是本次用户反馈和只读接口证据，不是自动化代签，也没有执行订单或资金操作。
+
+随后用户单独批准撤销刚创建的同一手机代理，并本人在钱包操作。网页实显已撤销、设备数为 0；只读 `extraAgents` 确认该公钥不存在。一次只读查询遭遇 TLS 连接中断，重查成功，没有重复提交撤销。用户最后确认手机“已失效，不能继续使用旧授权”。本轮完成配对、授权、后台只读恢复和撤销验收，不代表实际下单、资金操作或网络中断中途签名场景已经验收。
+
+探针时钟修复已通过 [PR #18](https://github.com/woyaofei303/hyperliquid-testnet-terminal/pull/18) 合并，main 为 `8a7078667f9d8ef697eb1874caaecf8379c15526`，与审查 head `128503d98e876e4b183ffc2fae884624db7a0f15` 树一致；[远端 CI](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43863682979) 的必需检查和 CodeQL 均通过。没有切换生产应用。
+
+用户随后明确确认配对专项通过，并批准从上述 main 创建全新的候选。新运行 [43867010843](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43867010843) 使用 `risk=high`、`specialized_checks=true`，审查与专项证据为 [PR #18 发布记录](https://github.com/woyaofei303/hyperliquid-testnet-terminal/pull/18#issuecomment-6916438200)。此时仅已启动，不代表预发布或生产发布成功；生产仍等待指定发布 ID 的批准。
+
+## 20:31 完整窗口自动关闭
+
+本次没有提前关闭或延长 30 分钟窗口。定时器计划 20:31:32；systemd 日志实记 20:31:34 开始关闭，20:31:35 完成 Nginx 校验与加载，20:31:45 停止隔离容器并报告成功。公网于 20:31:49 验证 runtime=false、`/pairings=503`。容器状态 `exited`，退出码 137、`OOMKilled=false`，与停止时等待约十秒后结束的现场记录一致；不将它描述为优雅退出。配置先关闭，临时会话不用于持久保存业务状态。
+
+这是实际完整窗口的定时关闭证据，与早先五秒触发演练区分。生产应用与配对服务未切换或重启。原始记录保存在本机 `output-tdd/ai-delivery/pairing-window-close.txt`。
+
+## 20:43 同一产物受控部署生产
+
+新候选运行的 188 项单元、20 项部署、174 项浏览器测试通过，2 项性能场景显式跳过；安全、CodeQL 和来源证明通过。预发布发布成功，公网只读 smoke 1 项通过（14.6 秒），随后生产任务实际停在 Environment 审批处。用户在会话明确批准下面的版本、15 分钟观察、回滚到指定旧版本并恢复同一新版本，代理才通过当前维护者账号调用 GitHub 环境审批 API。这是本人放行，不宣称双人复核。
+
+```text
+源码：8a7078667f9d8ef697eb1874caaecf8379c15526
+发布 ID：8a7078667f9d8ef697eb1874caaecf8379c15526-43867010843-1
+Artifact ID：14226393446
+清单 SHA-256：67da66f67ecaa30dfb4037ee0f99bb1171fb076d0db31c716dba8bd6234324bf
+文件数：665
+回滚目标：a88634ec062a15a43b08859a4c2e07db656924fa-43708795815-1
+```
+
+生产 job 再次按明确 Artifact ID 下载，校验来源、完整清单、预期旧版本，部署阶段没有重新构建。实际发布步骤在 20:43:17–20:43:29 完成，20:43:51 公网确认新版本；生产配置 true、预发布 false，两站应用发布 ID 一致。生产只读 smoke 在 20:44:12–20:44:19 通过，15 分钟定时 HTTP 观察在 20:44:19–20:59:30 完成，15 轮版本检查全部通过，整个发布运行成功。
+
+额外逐项获取新旧版本共 47 个公网静态资源并比对清单：39 个共同资源、旧版独有 4 个、新版独有 4 个，全部哈希一致，本轮无重试。上线前已只读核验服务器上 current 与 previous 两份旧版本的完整清单；它们仍是历史基线，不补造 CI 来源证明。
+
+## 21:03 生产手动回滚与恢复完成
+
+15 分钟观察成功后，按用户对完整序列的同一次授权，先启动[回滚运行 43871860699](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43871860699)，再启动[恢复运行 43872001751](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43872001751)。两次均经过生产 Environment 审批，明确填写目标和预期当前版本；没有重新构建、下载其他候选或安装 npm。
+
+- 回滚到旧版：发布步骤 21:01:51–21:01:56，实际 5 秒；本机版本、首页和关键资源健康检查及公网版本检查通过。随后从 Mac 执行旧版公网浏览器 smoke，1 项通过（6.0 秒），页面、资源、404、配置和只读行情正常，未出现写入请求或致命脚本异常。
+- 恢复原新版本：发布步骤 21:02:38–21:02:43，实际 5 秒；同样的本机与公网检查通过。随后执行新版浏览器 smoke，1 项通过（4.6 秒）。恢复目标仍为原发布 ID，不生成新的应用版本。
+- 两次都通过 SSH 只读核对 current、previous 和中断记录：链接按预期交换，`.deployment.json` 不存在。时间使用 GitHub 步骤起止值，包含 SSH、目标清单校验、切换、本机和公网检查，不是纯软链接耗时、故障发现时间或 SLA。
+
+最终状态：
+
+```text
+生产 current：8a7078667f9d8ef697eb1874caaecf8379c15526-43867010843-1
+生产 previous：a88634ec062a15a43b08859a4c2e07db656924fa-43708795815-1
+预发布 current：8a7078667f9d8ef697eb1874caaecf8379c15526-43867010843-1
+生产 phonePairingEnabled：true
+预发布 phonePairingEnabled：false；/pairings：503
+生产配置 SHA-256：a3009c29e13f9e9a99057745922a039a7b83e0f616055051f0e4f998c1c9b6a9
+预发布配置 SHA-256：3bc4b53d51cafe556d544d53007c8c500e45d08fde854e3714d3d18393cf5895
+```
+
+本机证据为 `production-job-final.json`、`production-rollback-job.json`、`production-restore-job.json`、两份 `*-smoke.log`、两份 `*-links.txt` 和 `production-final-identity.json`。最终文档提交晚于发布源码；不会因此重新发布应用。
+
+## 已完成范围与未验证边界
+
+- 独立手机配对 relay 的内部及公网合成检查、真机扫码及账户/六位码核对、用户本人授权、后台只读恢复、撤销与手机识别失效已通过；预发布按上述已批准窗口定时恢复默认关闭，不回退生产服务。
+- 没有执行真实交易、链上操作或资金转移；这些动作仍需按账户、资产、动作和金额逐笔授权。未实测真机签名中途断网；两个性能场景显式跳过。iPhone 使用依赖 Mac 8082 的 Debug 安装，描述文件于 2026-11-23 到期。
+- 生产受控上线、15 分钟观察、手动回滚旧版与恢复同一新版本全部通过；采集器未重启，业务数据未清理。
+- 同机预发布无法隔离整机故障；静态回滚不能撤销订单、清除浏览器待确认记录或停止已打开页面的交易能力。
+
+本机原始日志位于实施 worktree 的 `output-tdd/ai-delivery/`，不提交凭据、完整签名载荷或真实会话记录。GitHub 运行及 PR 评论保留远端证据，短期 Artifact 保留期不代替服务器回滚版本保留。

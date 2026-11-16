@@ -5,6 +5,7 @@ const baseURL = `http://127.0.0.1:${staticExport ? 33211 : 3210}`
 
 export default defineConfig({
   testDir: './tests',
+  testIgnore: 'deploy-smoke.spec.ts',
   fullyParallel: true,
   retries: 0,
   reporter: [
