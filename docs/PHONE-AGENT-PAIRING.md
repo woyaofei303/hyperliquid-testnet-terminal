@@ -13,7 +13,7 @@ npm run build:static
 STATIC_EXPORT=1 npm run test:e2e -- --workers=2 --grep '手机'
 ```
 
-真机联调使用 `https://staging-app.fameex-testnet.xyz`，Web 和隔离 relay 在同一域名下分别提供页面与 `/pairings`。RN 配置也必须指向该域名；RN 协议 version 保持 1。隔离服务已经准备好，默认不开放公网配对。下面给出安装和临时开放步骤；真实扫码与主钱包授权尚未验收。环回 HTTP 只用于容器内探针，手机不能连接服务器的 localhost。
+真机联调使用 `https://staging-app.fameex-testnet.xyz`，Web 和隔离 relay 在同一域名下分别提供页面与 `/pairings`。RN 配置也必须指向该域名；RN 协议 version 保持 1。隔离服务默认不开放公网配对。下面给出安装和临时开放步骤；本次真实扫码、本人授权、后台恢复和撤销结果见[实测记录](delivery-record-2026-11-16.md)。环回 HTTP 只用于容器内探针，手机不能连接服务器的 localhost。
 
 电脑打开 `/connect`，连接钱包后生成二维码。两端核对账户和六位码后，用户明确确认主钱包授权。二维码五分钟内有效，不要转发；`build:static` 只导出网页，不包含独立配对服务。
 
@@ -37,7 +37,7 @@ App 优先刷脸，失败后使用备用手势，通过后自动恢复有效的�
 /Users/julian/Documents/Codex/2026-11-05/to/outputs/hyperliquid-native/docs/PHONE-AGENT-PAIRING.md
 ```
 
-自动化使用模拟主钱包、模拟交易所和本地 HTTP 服务，没有执行真实钱包授权或链上交易。iPhone 16 Pro 的首次 Face ID 引导及后台返回验证已由用户实测通过；真机相机扫码和实际主钱包授权仍需按测试网流程验收。
+自动化使用模拟主钱包、模拟交易所和本地 HTTP 服务，没有代签钱包授权或执行交易。2026-11-16 用户在 iPhone 16 Pro 上完成真实扫码、本人钱包授权、后台恢复和指定授权撤销；App 确认旧授权失效。后续修改仍需按下面的测试网流程重新验收，不能借用本次结果。
 
 ## 隔离配对服务：准备、开放、关闭
 
@@ -125,17 +125,63 @@ systemctl show hyperliquid-staging-pairing-reset.service -p Result -p ExecMainSt
 
 ### 3. 准备手机（本机 RN 仓库，启动开发服务）
 
-RN 仓库有用户尚未提交的业务改动，本次不修改、不提交这些文件。现有 Metro 占用 8081 时也不停止它；准备独立的 8082 端口。以下命令只在用户确认手机与 Mac 同网、已经安装开发版 App 后执行：
+RN 仓库有用户尚未提交的业务改动，必须保留。现有 Metro 占用 8081 时也不停止它；准备独立的 8082 端口。用户后来单独授权修正 `src/modules/wallet/components/phone-agent-panel.tsx` 的显示和复制链接，让它使用已有的 `EXPO_PUBLIC_PHONE_PAIRING_URL`，没有提交 RN 改动或修改协议。以下命令只在用户确认手机与 Mac 同网后执行：
 
 ```bash
 cd /Users/julian/Documents/Codex/2026-11-05/to/outputs/hyperliquid-native
 git status --short
 git rev-parse HEAD
 EXPO_PUBLIC_PHONE_PAIRING_URL=https://staging-app.fameex-testnet.xyz \
-  npx expo start --dev-client --lan --port 8082
+  npx expo start --dev-client --lan --port 8082 --no-dev --clear
 ```
 
-手机打开开发版 App，选择这次 8082 的开发服务并完整 Reload；不要继续使用 8081 的旧 bundle。Expo 在打包时替换 `EXPO_PUBLIC_` 变量，切换地址后需要完整 Reload，不能只改电脑变量就认为手机已生效，见[Expo 官方说明](https://docs.expo.dev/guides/environment-variables/)。这里只配置公开服务地址，不能放入私钥。RN 会拒绝 relay 与受信任地址不一致的二维码。
+RN 显示与复制共用以下常量，原来的生产网址常量已移除；包含链接的 JSX 条件同时要求 `configured` 为 true。扫码 hook 原本已经读取同一个变量，本次不修改它的校验逻辑。
+
+```ts
+const pairingRelay = process.env.EXPO_PUBLIC_PHONE_PAIRING_URL
+const CONNECT_URL = pairingRelay
+  ? `${pairingRelay.replace(/\/$/, '')}/connect`
+  : ''
+```
+
+`--no-dev` 让这次验收代码在打包时内联公开环境配置，原生容器仍是开发版 App。当前安装的 Expo 58 开发模式会通过 `expo/virtual/env` 合并 `.env.local`，其中的生产地址会覆盖启动命令中的预发布值；本次真机已复现这个问题。因此不能只搜索 bundle 是否“包含 staging”，必须核对显示链接和扫码 hook 的有效地址均为 staging。无需改动原 `.env.local`，也不要把这种局部运行方式写成所有 Expo 版本的规则。相关实现位于安装依赖的 `@expo/metro-config/build/transform-worker/transform-worker.js`；公开变量说明见[Expo 官方文档](https://docs.expo.dev/guides/environment-variables/)。
+
+手机打开开发版 App，选择这次 8082 的服务并完整重新加载。`http://Mac的局域网IP:8082` 是向原生 App 提供代码的地址，不能在 Safari 打开它后把 Web 预览当成真机扫码。电脑浏览器仍打开 `https://staging-app.fameex-testnet.xyz/connect`。只配置公开服务地址，不能放入私钥；RN 继续拒绝 relay 与受信任地址不一致的二维码。
+
+如果手机尚未安装开发版，先用 Xcode 的既有签名团队构建，再通过 Apple 的 `devicectl` 安装。下面在本机 RN 仓库执行，会更新手机中的同一 App；不先卸载 App，不删除钱包或安全存储。先运行 Xcode 设备列表，在 `simulator: false` 的本人设备中读取 `identifier`（硬件 UDID），填入 `PHONE_DEVICE`。不要使用 `devicectl list devices` 显示的 CoreDevice UUID 代替 Xcode 的硬件 UDID，也不要把完整设备标识提交到公开文档。
+
+```bash
+xcrun xcdevice list
+PHONE_DEVICE='替换为已配对iPhone的硬件UDID'
+mkdir -p output-tdd/ai-pairing-ios
+xcodebuild -workspace ios/fameextestnet.xcworkspace \
+  -scheme fameextestnet -configuration Debug \
+  -destination "id=$PHONE_DEVICE" \
+  -derivedDataPath output-tdd/ai-pairing-ios/DerivedData \
+  -allowProvisioningUpdates build \
+  > output-tdd/ai-pairing-ios/build.log 2>&1
+```
+
+只有构建退出码为 0 且日志中出现 `BUILD SUCCEEDED` 才继续。失败时手机原有 App 保持原样，检查 Xcode 签名账号、设备信任、Developer Mode 和描述文件有效期；不要用重新创建钱包处理签名故障。日志可能包含构建环境，不能整份公开上传。
+
+```bash
+PHONE_APP='output-tdd/ai-pairing-ios/DerivedData/Build/Products/Debug-iphoneos/fameextestnet.app'
+codesign --verify --deep --strict "$PHONE_APP"
+xcrun devicectl device install app --device "$PHONE_DEVICE" "$PHONE_APP" \
+  --timeout 60 --json-output output-tdd/ai-pairing-ios/install.json
+```
+
+签名验证失败就停止，不继续安装。安装结果应为 success，bundle identifier 应为 `net.sunshinedairy.hyperliquidnative`，相机权限说明应存在。随后使用当前 Expo SDK 的原生启动链接打开 8082 服务。下面的 IP 是本次实测值，换网络后先用 `ipconfig getifaddr en0` 核对并替换。
+
+```bash
+xcrun devicectl device process launch --device "$PHONE_DEVICE" \
+  --terminate-existing \
+  --payload-url 'hyperliquid-native://?__expo_url=http%3A%2F%2F192.168.1.251%3A8082' \
+  net.sunshinedairy.hyperliquidnative --timeout 30 \
+  --json-output output-tdd/ai-pairing-ios/launch.json
+```
+
+重新启动会中断当前界面流程，因此仅在未发起签名、订单或资金操作时执行。成功启动不代表环境正确：在手机进入“资产 → 连接钱包”，实际显示和复制的链接都必须为 `https://staging-app.fameex-testnet.xyz/connect`，再扫描该网页新生成的二维码。出现“二维码版本、账户或配对服务不匹配”时停止，先核对运行环境，不放宽协议校验，不把二维码内容写入日志。两端账户、六位码一致仍只是扫码验收，钱包授权另行确认。
 
 ### 4. 开放最多 30 分钟（服务器管理员，公网配置写入）
 
