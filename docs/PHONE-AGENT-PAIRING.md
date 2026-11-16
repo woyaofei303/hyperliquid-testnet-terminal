@@ -181,8 +181,8 @@ Web release ID / runtime-config 摘要 / relay version / RN SHA 和脏文件说�
 ### 6. 提前关闭与排障（服务器管理员，恢复默认）
 
 ```bash
-sudo bash /etc/hyperliquid-staging-pairing/staging-pairing-window.sh off
-sudo systemctl stop hyperliquid-staging-pairing-close.timer
+sudo bash /etc/hyperliquid-staging-pairing/staging-pairing-window.sh off && \
+  sudo systemctl stop hyperliquid-staging-pairing-close.timer
 curl --fail --silent --show-error https://staging-app.fameex-testnet.xyz/runtime-config.json
 curl --silent --show-error -o /dev/null -w '%{http_code}\n' https://staging-app.fameex-testnet.xyz/pairings
 ```
