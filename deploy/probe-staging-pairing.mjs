@@ -48,8 +48,9 @@ async function main() {
   assert.ok(/^[a-f0-9]{64}$/.test(session.webToken), 'Web 令牌格式无效')
   assert.ok(/^[a-f0-9]{64}$/.test(session.phoneToken), '手机令牌格式无效')
   assert.ok(session.webToken !== session.phoneToken, '两端令牌不能相同')
+  // 与 v1 协议一致：跨设备时钟最多允许快 30 秒，不延长已过期会话。
   assert.ok(
-    session.expiresAt > Date.now() && session.expiresAt <= Date.now() + 300000,
+    session.expiresAt > Date.now() && session.expiresAt <= Date.now() + 330000,
   )
   const path = `/pairings/${session.id}`
   try {
