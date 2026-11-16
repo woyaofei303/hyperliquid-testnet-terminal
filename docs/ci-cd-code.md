@@ -4,7 +4,7 @@
 
 ## `.github/workflows/deploy-aliyun.yml`
 
-SHA-256：`a18ad39717172c21dd7ea03821b17814c2d7d8bb6cc067eb2b133f85cdaa6417`
+SHA-256：`3740c50a5b093ed86ce2ceffbeccc941fae30769d357f9876c8092cfbaa3fe2c`
 
 ````yaml
 name: CI & Production
@@ -189,12 +189,9 @@ jobs:
         env:
           REVIEWED_SHA: ${{ inputs.reviewed_sha }}
           REVIEW_URL: ${{ inputs.review_url }}
-          RISK: ${{ inputs.risk }}
-          SPECIALIZED: ${{ inputs.specialized_checks }}
         run: |
           test "$REVIEWED_SHA" = "$GITHUB_SHA"
           [[ "$REVIEW_URL" =~ ^https://github.com/woyaofei303/hyperliquid-testnet-terminal/pull/[0-9]+([/#].*)?$ ]]
-          [[ "$RISK" != high || "$SPECIALIZED" == true ]]
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           artifact-ids: ${{ needs.verify.outputs.artifact_id }}
@@ -216,8 +213,22 @@ jobs:
       review_url: ${{ inputs.review_url }}
       production_current: ${{ inputs.expected_current }}
 
+  production-ready:
+    needs: staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require specialized acceptance before production approval
+        env:
+          RISK: ${{ inputs.risk }}
+          SPECIALIZED: ${{ inputs.specialized_checks }}
+        run: |
+          if [[ "$RISK" == high && "$SPECIALIZED" != true ]]; then
+            echo '预发布已验收；高风险专项确认尚未完成，生产放行已阻断。'
+            exit 1
+          fi
+
   production:
-    needs: [staging, verify]
+    needs: [staging, verify, production-ready]
     uses: ./.github/workflows/release-environment.yml
     with:
       environment: aliyun-production

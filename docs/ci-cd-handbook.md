@@ -198,8 +198,8 @@ python3 scripts/sync-delivery-code.py --check
 - `security`：无安装脚本的依赖安装、High/Critical 阈值 audit、固定版本并校验下载哈希的 actionlint/Gitleaks、ShellCheck、Compose 校验。Gitleaks 扫候选提交的完整祖先历史（PR 包含合并父提交）；显式指定 GITHUB_SHA，避免默认 --all 把无关分支或未合并演练样本混入。唯一历史放行是 `.gitleaksignore` 中公共合约地址的具体 fingerprint，不能放行整个测试目录。
 - `codeql`：JavaScript/TypeScript、Python、Actions 三种语言的安全扩展查询；最小 `security-events: write` 只用于扫描结果。它没有部署 SSH Secret。分析成功不代表没有高危告警，结果还须由 Ruleset 阻断。
 - `ci-required`：固定名称，依赖 verify/security/codeql，`always()` 后显式核对每个结果必须是 `success`。失败、取消或跳过都不能伪装通过。专用 rollback 不运行这条构建路径。
-- `attest`：所有必需检查通过，审查 SHA 与本次 SHA 一致，PR 链接属于本仓库；高风险要求确认专项验收记录。为 manifest 生成 GitHub 原生来源证明。
-- `staging` → `production`：调用同一个 reusable workflow；生产 job 在 Environment 审批前不会获得环境 Secret 或启动上传。
+- `attest`：所有必需检查通过，审查 SHA 与本次 SHA 一致，PR 链接属于本仓库。为 manifest 生成 GitHub 原生来源证明。
+- `staging` → `production-ready` → `production`：两个环境调用同一个 reusable workflow。高风险专项确认必须在 production-ready 通过，才会进入生产 Environment 审批；生产 job 在批准前不会获得环境 Secret 或启动上传。
 - `rollback`：独立人工入口，直接执行服务端校验与切换；不依赖 npm 安装、构建或 Chrome 下载。
 
 默认 token 是只读。Action 用完整提交固定版本；不使用 pull_request_target 执行 PR 代码。新增 Action 必须查发布来源。fork PR 的权限由 GitHub 进一步收窄。GitHub 官方说明：[Actions 安全](https://docs.github.com/en/actions/reference/security/secure-use)、[Code scanning 合并保护](https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/manage-your-configuration/set-merge-protection)。
@@ -300,7 +300,7 @@ gh workflow run deploy-aliyun.yml --ref main \
   -f risk=high -f specialized_checks=true
 ```
 
-此处 `specialized_checks=true` 是你的明确声明，不能由 AI 因测试“看起来足够”自动填写。涉及资金或手机授权而专项验收未完成时，不发起生产放行。PR 链接和 SHA 校验只是防误选，机器不能判断审查内容是否充分。
+此处 `specialized_checks=true` 是你的明确声明，不能由 AI 因测试“看起来足够”自动填写。涉及资金或手机授权而专项验收未完成时，不发起生产放行。PR 链接和 SHA 校验只是防误选，机器不能判断审查内容是否充分。尚未完成专项验收时保持 false：工作流仍可完成预发布验证，随后在 production-ready 明确失败，生产任务不会开始。这次运行不成为生产候选；完成专项验收后重新触发完整流程，不复用失败运行的产物。
 
 Runner 构建一次，模拟交互验证后保存唯一产物并证明清单来源。预发布下载验证后，`publish.sh` 把文件 rsync 到该环境 `incoming/<id>`。网络断开只留下未发布目录。`release.py::deploy` 获取项目 flock，核对 `expected_current`，验证 manifest、路径、文件/哈希、无符号链接/秘密/多余文件，才 rename 为 releases。已存在不同内容不覆盖；共享资源同路径不同哈希停止。
 
