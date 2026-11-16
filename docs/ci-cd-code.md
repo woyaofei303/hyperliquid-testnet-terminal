@@ -1444,7 +1444,7 @@ networks:
 
 ## `deploy/probe-staging-pairing.mjs`
 
-SHA-256：`f43c5254dd092e26624342d3af848c366b60718bee7b83473a3e58e951fa2796`
+SHA-256：`408c38c26698d43eb1d5e5db5761dffbd188072e01e3be1f76c4686f4030f355`
 
 ````text
 // 仅创建短时合成密文，不连接钱包、交易所，也不输出会话凭据。
@@ -1497,8 +1497,9 @@ async function main() {
   assert.ok(/^[a-f0-9]{64}$/.test(session.webToken), 'Web 令牌格式无效')
   assert.ok(/^[a-f0-9]{64}$/.test(session.phoneToken), '手机令牌格式无效')
   assert.ok(session.webToken !== session.phoneToken, '两端令牌不能相同')
+  // 与 v1 协议一致：跨设备时钟最多允许快 30 秒，不延长已过期会话。
   assert.ok(
-    session.expiresAt > Date.now() && session.expiresAt <= Date.now() + 300000,
+    session.expiresAt > Date.now() && session.expiresAt <= Date.now() + 330000,
   )
   const path = `/pairings/${session.id}`
   try {
