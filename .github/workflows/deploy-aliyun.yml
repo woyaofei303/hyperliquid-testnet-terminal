@@ -195,6 +195,9 @@ jobs:
   staging:
     needs: [attest, verify]
     uses: ./.github/workflows/release-environment.yml
+    secrets:
+      ALIYUN_SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
+      ALIYUN_SSH_KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
     with:
       environment: aliyun-staging
       operation: deploy
@@ -221,6 +224,9 @@ jobs:
   production:
     needs: [staging, verify, production-ready]
     uses: ./.github/workflows/release-environment.yml
+    secrets:
+      ALIYUN_SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
+      ALIYUN_SSH_KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
     with:
       environment: aliyun-production
       operation: deploy
@@ -232,6 +238,9 @@ jobs:
   rollback:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.operation == 'rollback'
     uses: ./.github/workflows/release-environment.yml
+    secrets:
+      ALIYUN_SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
+      ALIYUN_SSH_KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
     with:
       environment: aliyun-production
       operation: rollback

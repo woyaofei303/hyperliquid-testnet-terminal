@@ -4,7 +4,7 @@
 
 ## `.github/workflows/deploy-aliyun.yml`
 
-SHA-256：`3740c50a5b093ed86ce2ceffbeccc941fae30769d357f9876c8092cfbaa3fe2c`
+SHA-256：`27c447b9e5fe8a8333133f849d0fe7278a1dc24ebd3289279d49cd9a3c01cfad`
 
 ````yaml
 name: CI & Production
@@ -204,6 +204,9 @@ jobs:
   staging:
     needs: [attest, verify]
     uses: ./.github/workflows/release-environment.yml
+    secrets:
+      ALIYUN_SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
+      ALIYUN_SSH_KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
     with:
       environment: aliyun-staging
       operation: deploy
@@ -230,6 +233,9 @@ jobs:
   production:
     needs: [staging, verify, production-ready]
     uses: ./.github/workflows/release-environment.yml
+    secrets:
+      ALIYUN_SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
+      ALIYUN_SSH_KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
     with:
       environment: aliyun-production
       operation: deploy
@@ -241,6 +247,9 @@ jobs:
   rollback:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.operation == 'rollback'
     uses: ./.github/workflows/release-environment.yml
+    secrets:
+      ALIYUN_SSH_PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
+      ALIYUN_SSH_KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
     with:
       environment: aliyun-production
       operation: rollback
@@ -250,12 +259,17 @@ jobs:
 
 ## `.github/workflows/release-environment.yml`
 
-SHA-256：`a82a872340aaef6ede988b6b39a056dd6312057ede0bc3c937f7505b513fd0b0`
+SHA-256：`98d7a3093953bc26d994c86b8e835a4202ed65edde8f1f9e69e90470e2ea200f`
 
 ````yaml
 name: Deploy verified environment
 on:
   workflow_call:
+    secrets:
+      ALIYUN_SSH_PRIVATE_KEY:
+        required: true
+      ALIYUN_SSH_KNOWN_HOSTS:
+        required: true
     inputs:
       environment:
         type: string
@@ -1106,6 +1120,71 @@ docker compose -f "$config/compose.yml" exec -T web nginx -s reload
 curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 1 --retry-max-time 10 http://127.0.0.1:8089/runtime-config.json | python3 -c 'import json,sys; assert json.load(sys.stdin) == {"schemaVersion":1,"phonePairingEnabled":True}'
 trap - ERR
 printf '生产运行配置已热加载；应用版本未切换；备份：%s\n' "$backup"
+````
+
+## `deploy/drill-staging-recovery.py`
+
+SHA-256：`376e5ef8f81c85be3b0f55e400e02f119510930adb2796dc4773cf2707c7f85c`
+
+````python
+"""仅预发布：候选健康失败注入，恢复后仍执行真实 HTTP 检查。"""
+import importlib.util
+import json
+import os
+from pathlib import Path
+import sys
+import time
+from unittest.mock import patch
+
+if sys.flags.optimize:
+    raise RuntimeError('禁止优化模式运行演练，恢复断言必须启用')
+
+root = Path('/srv/hyperliquid-staging')
+candidate, expected = sys.argv[1:]
+assert candidate != expected, '必须使用两个不同的已验证版本'
+os.environ.update(DEPLOY_ROOT=str(root),
+                  DEPLOY_HEALTH_URL='http://127.0.0.1:8090/version.txt',
+                  DEPLOY_HOST_HEADER='staging-app.fameex-testnet.xyz')
+source = Path(__file__).with_name('release.py')
+spec = importlib.util.spec_from_file_location('release', source)
+release = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(release)
+release.release_path(root, candidate)
+release.release_path(root, expected)
+assert release.linked_release(root, 'current').name == expected
+before = {name: os.readlink(root / name) if (root / name).is_symlink() else None
+          for name in ('current', 'previous')}
+real_health = release.check_health
+real_health(expected)
+checks = []
+
+def candidate_failure(release_id):
+    checks.append(release_id)
+    if release_id == candidate:
+        assert release.linked_release(root, 'current').name == candidate
+        raise RuntimeError('演练注入：候选健康失败；不改变站点文件或健康 URL')
+    real_health(release_id)
+
+started = time.monotonic()
+with patch.object(release, 'check_health', side_effect=candidate_failure):
+    try:
+        release.deploy(root, candidate, expected)
+    except RuntimeError as error:
+        assert '已恢复并核验旧版本' in str(error), str(error)
+        result = str(error)
+    else:
+        raise AssertionError('故障注入没有触发发布失败')
+elapsed = time.monotonic() - started
+assert checks == [candidate, expected], checks
+assert all((os.readlink(root / name) if (root / name).is_symlink() else None) == target
+           for name, target in before.items())
+assert not (root / '.deployment.json').exists()
+real_health(expected)
+print(json.dumps(dict(environment='aliyun-staging', candidate=candidate,
+                      restored=expected, previous=before['previous'],
+                      result=result, recoverySeconds=round(elapsed, 3),
+                      injection='candidate-health-only',
+                      restoredHttpVerified=True), ensure_ascii=False))
 ````
 
 ## `deploy/compose.yml`

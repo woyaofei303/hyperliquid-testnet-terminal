@@ -6,6 +6,10 @@
 
 > **实施状态必须与设计分开。** 2026-11-16 14:58（首次本地验收快照）本次代码在 `codex/ai-delivery-pipeline` 隔离工作区，基线为 `a88634ec062a15a43b08859a4c2e07db656924fa`。原业务工作区的未提交修改没有混入。本次已创建预发布账号、目录、Nginx、HTTPS、独立 GitHub Environment 和凭据；开启 Secret scanning、Push protection、Dependabot 安全更新，生产设置了本人审批、禁止管理员绕过。新工作流尚未提交到远端运行，Ruleset 文件目前为 `disabled`，不能说主分支门禁已经验收通过。受控发布、预发布故障演练及生产回滚演练待发布分支进入 GitHub 后执行。
 
+截至 2026-11-16 15:23 的远端补充证据：实现 [PR #3](https://github.com/woyaofei303/hyperliquid-testnet-terminal/pull/3) 已合并，main 为 `e2201a9061c9b90bc12ec97497d3e24226fbb3e3`，代码树与独立审查提交 `52e04f68ff542499ed5c402ccfada63f9429ff04` 完全相同。[远端 CI](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43821616634) 实测 188 单元测试、18 发布器测试、174 浏览器交互通过，2 项性能场景显式跳过。Ruleset `27355251` 已 active、无绕过名单；仓库 JSON 保留 disabled 作为安装模板，启用步骤仍要求先验证检查存在。
+
+[门禁演练 PR #4](https://github.com/woyaofei303/hyperliquid-testnet-terminal/pull/4) 的单测、合成秘密检测和 CodeQL Critical 告警分别产生失败，非草稿状态实测 BLOCKED；该 PR 已关闭、没有合并。[生产审批演练](https://github.com/woyaofei303/hyperliquid-testnet-terminal/actions/runs/43823265887) 在 Environment 审批处 waiting、部署 steps 为空，随后取消。它使用不能通过发布器校验的无效版本名，没有操作生产链接。仓库级 Secrets 为空，部署 SSH 凭据只在对应 Environment。
+
 ## 01 当前系统：请求、文件、账号和秘密在哪里
 
 用户打开 `https://app.fameex-testnet.xyz`，Caddy 终止 HTTPS，再向本机 `127.0.0.1:8089` 转发。Nginx 读取 `/srv/hyperliquid/current` 指向的静态文件。浏览器下载 JS 后直接向 Hyperliquid 测试网读取行情、提交用户授权的请求；服务器不保存交易钱包密钥。
@@ -199,10 +203,12 @@ python3 scripts/sync-delivery-code.py --check
 - `codeql`：JavaScript/TypeScript、Python、Actions 三种语言的安全扩展查询；最小 `security-events: write` 只用于扫描结果。它没有部署 SSH Secret。分析成功不代表没有高危告警，结果还须由 Ruleset 阻断。
 - `ci-required`：固定名称，依赖 verify/security/codeql，`always()` 后显式核对每个结果必须是 `success`。失败、取消或跳过都不能伪装通过。专用 rollback 不运行这条构建路径。
 - `attest`：所有必需检查通过，审查 SHA 与本次 SHA 一致，PR 链接属于本仓库。为 manifest 生成 GitHub 原生来源证明。
-- `staging` → `production-ready` → `production`：两个环境调用同一个 reusable workflow。高风险专项确认必须在 production-ready 通过，才会进入生产 Environment 审批；生产 job 在批准前不会获得环境 Secret 或启动上传。
+- `staging` → `production-ready` → `production`：两个环境调用同一个 reusable workflow。调用方按名称传递两项 SSH Secret，被调用方将这两项声明为 required，再在 job 上选择 Environment；实际值由该环境提供。高风险专项确认必须在 production-ready 通过，才会进入生产 Environment 审批；生产 job 在批准前不会获得环境 Secret 或启动上传。
 - `rollback`：独立人工入口，直接执行服务端校验与切换；不依赖 npm 安装、构建或 Chrome 下载。
 
 默认 token 是只读。Action 用完整提交固定版本；不使用 pull_request_target 执行 PR 代码。新增 Action 必须查发布来源。fork PR 的权限由 GitHub 进一步收窄。GitHub 官方说明：[Actions 安全](https://docs.github.com/en/actions/reference/security/secure-use)、[Code scanning 合并保护](https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/manage-your-configuration/set-merge-protection)。
+
+复用工作流的 Environment Secret 也需要调用方显式传递。只在被调用 job 上设置 environment，而漏掉调用方 secrets，会解析为空字符串；required 检查传递声明，`publish.sh` 还检查实际值非空。此处只传两项部署凭据，普通 PR 检查仍不进入 Environment。第一次预发布运行 `43823073241` 实际在此处于上传前失败，产物身份、来源证明和文件校验此前均已通过；修复后必须发起新的完整候选，不能把该失败运行作为生产候选。依据 [GitHub 复用工作流说明](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#using-inputs-and-secrets-in-a-reusable-workflow)。
 
 Artifact 名称为 `release-<commit>-<run_id>-<attempt>`，不覆盖同名对象，保留 30 天。文件上传为 out，运行配置在构建命令后删除。`release-manifest.json` 包含 schemaVersion、releaseId、commitSha、runId、runAttempt、每个文件 SHA-256；清单不计算自身。证明签清单，清单覆盖所有文件。失败或取消的旧运行不能被手工选为“最新产物”；本流程只接受当前候选运行的精确 Artifact ID。
 
@@ -365,7 +371,36 @@ python3 /home/hyperliquid-deploy/ai-delivery-tools-20261116/release.py \
 
 若恢复失败，不删除 journal 后盲目再发。检查磁盘/inode、目录所有者、manifest 和 Nginx 错误日志；先恢复被验证的旧文件/配置，再用 recover 重试。current 指向目录外或版本名称异常仍拒绝恢复；被撤下 current 的文件损坏不再阻止 rollback/recover。将启用的旧版本必须完整通过清单和健康检查，不能手工跳过。恢复后需保留损坏版本证据并调查原因。
 
-演练分两步：先在预发布上传一份已验证候选，注入错误的本机健康 URL，使切换失败，记录恢复旧版的耗时和二次健康；再在生产批准的候选上线后，用独立 rollback 入口回到事先确认的 previous，做相同 smoke，记录恢复耗时。演练需要真实已发布版本；Python 临时目录测试只证明实现分支，不等于现场演练。本次现场两项尚待执行。生产运行配置迁移曾因 reload 交接时的短暂 404 自动恢复，修正有限重试后成功；这是配置恢复证据，不能替代应用版本回滚演练。
+演练分两步：先在预发布准备两个已校验来源的真实版本，只对候选版本注入本机健康检查失败，使发布器真实切换后恢复；旧版恢复仍调用正常 HTTP 健康检查，并记录实际耗时。不要把健康 URL 整体改错：那会同时使恢复后的检查失败，属于“恢复失败”演练。再在生产批准的候选上线后，用独立 rollback 入口回到事先确认的 previous，做相同 smoke，记录恢复耗时。演练需要真实已发布版本；Python 临时目录测试只证明实现分支，不等于现场演练。本次现场两项尚待执行。生产运行配置迁移曾因 reload 交接时的短暂 404 自动恢复，修正有限重试后成功；这是配置恢复证据，不能替代应用版本回滚演练。
+
+**可重复的预发布恢复演练（实际切换，限预发布）：**`deploy/drill-staging-recovery.py` 与 `release.py` 放在同一目录。它固定使用 `/srv/hyperliquid-staging` 和 `127.0.0.1:8090`，没有生产参数。输入必须是两份已经校验清单和来源的真实版本，且候选与当前不同。它先验证当前 HTTP，切到候选后仅注入一次候选健康失败，再由原发布器恢复 current/previous；恢复 HTTP、两个链接、journal 任一不符合预期都会非零退出。报告中的秒数是本次注入到恢复验证的耗时，不是检测真实故障的时间或可用性承诺。
+
+操作者是维护者，下面在**本机仓库根目录**执行。先按第 10 章核验两个版本的 Artifact ID 和来源证明，再上传已审查脚本。私钥正文不出现在命令或日志中：
+
+```bash
+scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
+  -o UserKnownHostsFile=/Users/julian/.ssh/douyin_known_hosts \
+  -i /Users/julian/.ssh/hyperliquid-staging-deploy_ed25519 \
+  deploy/release.py deploy/drill-staging-recovery.py \
+  hyperliquid-staging-deploy@47.80.28.238:/home/hyperliquid-staging-deploy/ai-delivery-tools-20261116/
+```
+
+从发布记录复制完整 ID 到以下两个变量，不用 latest、分支名或短 SHA。`CURRENT_RELEASE` 必须与现场一致；不一致即停止。以下占位符会被版本校验拒绝，先替换后执行：
+
+```bash
+CANDIDATE_RELEASE='填写已验证的候选完整发布ID'
+CURRENT_RELEASE='填写当前预发布完整发布ID'
+[[ "$CANDIDATE_RELEASE" =~ ^[0-9a-f]{40}-[0-9]+-[0-9]+$ ]] && \
+[[ "$CURRENT_RELEASE" =~ ^[0-9a-f]{40}-[0-9]+-[0-9]+$ ]] && \
+ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
+  -o UserKnownHostsFile=/Users/julian/.ssh/douyin_known_hosts \
+  -i /Users/julian/.ssh/hyperliquid-staging-deploy_ed25519 \
+  hyperliquid-staging-deploy@47.80.28.238 \
+  python3 /home/hyperliquid-staging-deploy/ai-delivery-tools-20261116/drill-staging-recovery.py \
+  "$CANDIDATE_RELEASE" "$CURRENT_RELEASE"
+```
+
+预期输出 JSON 包含 `restoredHttpVerified: true`、`restored` 等于原 current、`recoverySeconds` 为实际耗时；随后从公网按第 10 章运行只读 smoke。失败时保留终端输出和 journal，按本章 recover 步骤处理，不能因为这是演练就删除保护记录。此脚本不验证钱包或真实交易。
 
 ```text
 故障 / 回滚记录

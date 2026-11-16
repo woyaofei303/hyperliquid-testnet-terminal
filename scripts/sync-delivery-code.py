@@ -11,6 +11,7 @@ files = [
     '.github/pull_request_template.md', '.gitleaksignore', '.husky/pre-commit',
     'scripts/install-ci-tools.sh', 'deploy/release.py', 'deploy/adopt-legacy.py',
     'deploy/publish.sh', 'deploy/bootstrap-staging.sh', 'deploy/upgrade-production.sh',
+    'deploy/drill-staging-recovery.py',
     'deploy/compose.yml', 'deploy/nginx.conf', 'deploy/runtime-config.json',
     'deploy/staging/compose.yml', 'deploy/staging/nginx.conf', 'deploy/staging/Caddyfile',
     'deploy/staging/runtime-config.json', 'src/features/wallet/lib/runtime-config.ts',
