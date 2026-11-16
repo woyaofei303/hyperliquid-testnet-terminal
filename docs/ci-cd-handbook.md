@@ -253,7 +253,7 @@ gh api --method POST repos/woyaofei303/hyperliquid-testnet-terminal/rulesets --i
 
 规则包括必须 PR、严格最新分支、ci-required、讨论已解决、禁止强推与删除、无日常 bypass；不要求个人项目无法满足的第二人审批。CodeQL 的安全阈值 `high_or_higher`、普通告警 `errors`。
 
-**门禁验证：**开一个明确标为测试的 draft PR，分别制造失败断言、Gitleaks 的合成测试检测值和可被 CodeQL 识别的高危测试分支；只放可公开的合成值，不用真实密钥、不合并。保留失败 job 与合并被阻断的截图/状态，修复后检查重新放行，再关闭测试 PR。Secret scanning 的 Push protection 可能在上传前拦截，须把这项与 CI Gitleaks 拦截分别记录。本次还没有做远端失败 PR 演练。
+**门禁验证：**开一个明确标为测试的 draft PR，分别制造失败断言、Gitleaks 的合成测试检测值和可被 CodeQL 识别的高危测试分支；只放可公开的合成值，不用真实密钥、不合并。检查失败后将测试 PR 设为 Ready for review，再保留失败 job 与合并被门禁阻断的截图/状态，避免把草稿限制当成门禁证据。修复后检查重新放行，再关闭测试 PR。Secret scanning 的 Push protection 可能在上传前拦截，须把这项与 CI Gitleaks 拦截分别记录。本次已通过 [PR #4](https://github.com/woyaofei303/hyperliquid-testnet-terminal/pull/4) 完成非草稿失败门禁演练，结果见[交付验收记录](delivery-record-2026-11-16.md)。
 
 ## 09 预发布服务器初始化及生产配置迁移
 
