@@ -1,6 +1,11 @@
 name: Deploy verified environment
 on:
   workflow_call:
+    secrets:
+      ALIYUN_SSH_PRIVATE_KEY:
+        required: true
+      ALIYUN_SSH_KNOWN_HOSTS:
+        required: true
     inputs:
       environment:
         type: string
