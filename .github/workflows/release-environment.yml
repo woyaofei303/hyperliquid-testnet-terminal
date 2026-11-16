@@ -64,7 +64,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" > artifact.json
           jq -e --arg sha "$GITHUB_SHA" --arg run "$GITHUB_RUN_ID" --arg name "release-$RELEASE_ID" \
             '.expired == false and .name == $name and .workflow_run.head_sha == $sha and (.workflow_run.id|tostring) == $run and .workflow_run.head_branch == "main"' artifact.json
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: inputs.operation == 'deploy'
         with:
           artifact-ids: ${{ inputs.artifact_id }}
