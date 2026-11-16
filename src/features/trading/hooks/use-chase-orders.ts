@@ -32,7 +32,7 @@ type Chase = {
 }
 export function useChaseOrders(
   wallet: WalletSession | null,
-  onPending: (pending: PendingOrder | null) => void,
+  onPending: (pending: PendingOrder | null, expectedCloid?: string) => void,
 ) {
   const entries = useRef<Chase[]>([])
   const [rows, setRows] = useState<Chase[]>([])

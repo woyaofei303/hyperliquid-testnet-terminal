@@ -7,6 +7,13 @@ type Outcomes = Awaited<ReturnType<typeof info.outcomeMeta>>
 type Templates = Awaited<ReturnType<typeof info.outcomeTemplates>>
 export const isCash = (market?: Market) =>
   market?.kind === 'spot' || market?.kind === 'outcome'
+export const isPrelaunch = (
+  market: Pick<MarketContext, 'name' | 'kind' | 'dex' | 'marginMode'>,
+) =>
+  market.kind === 'perp' &&
+  !market.dex &&
+  market.name !== 'CASHCAT' &&
+  market.marginMode === 'strictIsolated'
 export const baseName = (market: Market) => market.base ?? market.name
 export const quoteName = (market?: Market) => market?.quote ?? 'USDC'
 export const marketLabel = (market: Market) =>
@@ -16,10 +23,13 @@ export const pricePrecision = (market: Market) =>
     ? 5
     : Math.max(0, (market.kind === 'spot' ? 8 : 6) - market.szDecimals)
 const emptyContext = () => ({ markPx: '', prevDayPx: '', dayNtlVlm: '' })
+// shortcut: API 未暴露对齐报价币标识，官方测试网名单变化时须同步更新。
+const alignedQuote = (name: string) => ['USDZZ', 'HORSE', 'USDL'].includes(name)
 
 export function cashMarkets([meta, contexts]: SpotMeta): MarketContext[] {
   const byCoin = new Map(contexts.map((c) => [c.coin, c]))
   const tokens = new Map(meta.tokens.map((t) => [t.index, t]))
+  const quotes = new Set(meta.universe.map((pair) => pair.tokens[1]))
   return meta.universe.flatMap((pair) => {
     const base = tokens.get(pair.tokens[0]),
       quote = tokens.get(pair.tokens[1])
@@ -33,6 +43,8 @@ export function cashMarkets([meta, contexts]: SpotMeta): MarketContext[] {
         quote: quote.name,
         baseToken: base.index,
         quoteToken: quote.index,
+        stablePair: quotes.has(base.index),
+        alignedQuote: alignedQuote(quote.name),
         szDecimals: base.szDecimals,
         maxLeverage: 1,
         canonical: pair.isCanonical,
@@ -59,6 +71,7 @@ export function builderMarkets(
               asset: 100000 + dexIndex * 10000 + index,
               quote: quote.name,
               quoteToken: quote.index,
+              alignedQuote: alignedQuote(quote.name),
               base: item.name.split(':').slice(1).join(':'),
               context: emptyContext(),
             },

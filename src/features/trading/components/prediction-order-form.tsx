@@ -110,6 +110,13 @@ export function PredictionOrderForm({
           {f.side === 'buy' ? quote : base}
         </span>
       </div>
+      {model.account.snapshot?.mode === 'portfolioMargin' && (
+        <p className="text-xs leading-5 text-muted">
+          {t(
+            '可用额度包含交易所核定的自动借贷额度；成交可能产生借款与利息。偿债卖出仅释放已有抵押资产。',
+          )}
+        </p>
+      )}
       {f.kind === 'limit' && (
         <Input
           label={`${t('价格（')}${quote}${t('）')}`}

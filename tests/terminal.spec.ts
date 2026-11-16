@@ -292,6 +292,7 @@ async function mockExchange(
     | 'reject-trades'
     | 'empty-trades'
     | 'partial-batch'
+    | 'prelaunch'
     | 'lost-native' = 'normal',
 ) {
   const { promise: historyReady, resolve: releaseHistory } =
@@ -303,6 +304,8 @@ async function mockExchange(
   let candleSnapshotGate: Promise<void> | null = null
   let cashReadGate: Promise<void> | null = null
   let cashReads = 0
+  let loseOrderResponse = false
+  let orderResponseGate: Promise<void> | null = null
   const cashBalances = [
     { coin: 'USDC', token: 0, total: '1000', hold: '10', entryNtl: '1000' },
     { coin: 'HYPE', token: 2, total: '10', hold: '2', entryNtl: '200' },
@@ -311,10 +314,13 @@ async function mockExchange(
   ]
   const assetCoins: Record<number, string> = {
     3: 'BTC',
+    4: 'ETH',
     10007: '@7',
+    10008: '@8',
     110000: 'test:ABC',
     100000120: '#120',
     100000121: '#121',
+    100000130: '#130',
   }
   const statuses = new Map<number, string>()
   const twaps: {
@@ -332,9 +338,10 @@ async function mockExchange(
     twapId: number
   }[] = []
   let position = 0
+  let maxTradeSizes = ['1', '1']
   let extraPositions: Record<string, number> = {}
   let leverage = 2
-  let isCross = true
+  let isCross = mode !== 'prelaunch'
   let isolatedMargin = 35
   let agentAddress = ''
   let agentRegistrations = 0
@@ -370,6 +377,9 @@ async function mockExchange(
       szDecimals: name === 'BTC' ? 5 : 4,
       maxLeverage: 40,
       marginTableId: 1,
+      ...(mode === 'prelaunch' && name === 'BTC'
+        ? { marginMode: 'strictIsolated' }
+        : {}),
     })),
     marginTables: [],
   }
@@ -428,7 +438,12 @@ async function mockExchange(
   })
   let pushTrade = (_coin: string, _tid: number) => {}
   const tradeSubscriptions: string[] = []
-  let pushMarket = (_coin: string, _price: number, _time?: number) => {}
+  let pushMarket = (
+    _coin: string,
+    _price: number,
+    _time?: number,
+    _step = 1,
+  ) => {}
   const candles = (
     coin: string,
     interval: string,
@@ -541,6 +556,7 @@ async function mockExchange(
               ![
                 'HyperliquidTransaction:ApproveAgent',
                 'HyperliquidTransaction:UsdClassTransfer',
+                'HyperliquidTransaction:SendAsset',
                 'HyperliquidTransaction:SendToEvmWithData',
                 'HyperliquidTransaction:UserSetAbstraction',
               ].includes(typed.primaryType) ||
@@ -595,6 +611,36 @@ async function mockExchange(
     let data: unknown
     if (request.type) {
       switch (request.type) {
+        case 'spotMeta':
+          data = {
+            universe: [],
+            tokens: [
+              {
+                name: 'USDC',
+                index: 0,
+                szDecimals: 8,
+                weiDecimals: 8,
+                tokenId: '0x00000000000000000000000000000000',
+              },
+              {
+                name: 'HYPE',
+                index: 2,
+                szDecimals: 2,
+                weiDecimals: 8,
+                tokenId: '0x11111111111111111111111111111111',
+              },
+            ],
+          }
+          break
+        case 'perpDexs':
+          data = [null, { name: 'test' }]
+          break
+        case 'allBorrowLendReserveStates':
+          data = [
+            [0, { oraclePx: '1' }],
+            [2, { oraclePx: '20' }],
+          ]
+          break
         case 'spotMetaAndAssetCtxs':
           data = [
             {
@@ -613,7 +659,14 @@ async function mockExchange(
           data = [
             meta,
             {
-              universe: [{ name: 'test:ABC', szDecimals: 0, maxLeverage: 3 }],
+              universe: [
+                {
+                  name: 'test:ABC',
+                  szDecimals: 0,
+                  maxLeverage: 3,
+                  deployerFeeScale: '1',
+                },
+              ],
               collateralToken: 0,
             },
           ]
@@ -708,7 +761,7 @@ async function mockExchange(
             leverage: isCross
               ? { type: 'cross', value: leverage }
               : { type: 'isolated', value: leverage, rawUsd: '100' },
-            maxTradeSzs: ['1', '1'],
+            maxTradeSzs: maxTradeSizes,
             availableToTrade: ['1000', '1000'],
             markPx: '70000',
           }
@@ -770,7 +823,7 @@ async function mockExchange(
         })
         return
       }
-      if (action.type === 'usdClassTransfer') {
+      if (action.type === 'usdClassTransfer' || action.type === 'sendAsset') {
         expect(action.hyperliquidChain).toBe('Testnet')
         writes.push(action)
         await route.fulfill({
@@ -823,7 +876,7 @@ async function mockExchange(
           action.orders ??
           action.modifies.map((modify: { order: WireOrder }) => modify.order)
         ).map((order: WireOrder, index: number) => {
-          expect([3, 10007, 110000, 100000120, 100000121]).toContain(order.a)
+          expect(assetCoins).toHaveProperty(String(order.a))
           if (mode === 'reject' || (mode === 'partial-batch' && index === 1))
             return { error: 'Insufficient margin' }
           const oid = nextOid++
@@ -883,7 +936,8 @@ async function mockExchange(
           status: 'ok',
           response: { type: 'order', data: { statuses: reports } },
         }
-        if (mode === 'lost-response') {
+        if (mode === 'lost-response' || loseOrderResponse) {
+          loseOrderResponse = false
           await route.abort('failed')
           return
         }
@@ -957,12 +1011,14 @@ async function mockExchange(
         data = { status: 'ok', response: { type: 'default' } }
       } else throw new Error(`Unexpected exchange action ${action.type}`)
     }
+    if (!request.type && orderResponseGate) await orderResponseGate
     await route.fulfill({ json: data })
   })
   const socketConnections: string[] = []
   let disconnectMarket = () => {}
   let pushFastBook = (_price: number) => {}
   let pushAccount = () => {}
+  let refreshAccount = () => {}
   await page.routeWebSocket('wss://api.hyperliquid-testnet.xyz/ws', (ws) => {
     socketConnections.push(ws.url())
     ws.onMessage((raw) => {
@@ -1001,13 +1057,13 @@ async function mockExchange(
             },
           }),
         )
-        pushMarket = (coin, price, time) => {
+        pushMarket = (coin, price, time, step = 1) => {
           const depth = book(coin)
           depth.levels[0].forEach((row, i) => {
-            row.px = String(price - 1 - i)
+            row.px = String(price - step * (i + 1))
           })
           depth.levels[1].forEach((row, i) => {
-            row.px = String(price + 1 + i)
+            row.px = String(price + step * (i + 1))
           })
           ws.send(JSON.stringify({ channel: 'l2Book', data: depth }))
           ws.send(
@@ -1055,6 +1111,10 @@ async function mockExchange(
             ws.send(JSON.stringify({ channel: 'l2Book', data: next }))
           }
       }
+      if (s.type === 'orderUpdates') {
+        refreshAccount = () =>
+          ws.send(JSON.stringify({ channel: 'orderUpdates', data: [] }))
+      }
       if (s.type === 'clearinghouseState') {
         pushAccount = () =>
           ws.send(
@@ -1084,6 +1144,9 @@ async function mockExchange(
     pushFastBook(price: number) {
       pushFastBook(price)
     },
+    refreshAccount() {
+      refreshAccount()
+    },
     pushAccount() {
       pushAccount()
     },
@@ -1102,6 +1165,9 @@ async function mockExchange(
         outcomes.set(order.cloid, order)
       }
     },
+    setMaxTradeSizes(buy: string, sell = buy) {
+      maxTradeSizes = [buy, sell]
+    },
     setPosition(value: number) {
       position = value
     },
@@ -1113,6 +1179,17 @@ async function mockExchange(
       if (!row) throw new Error('Unknown fixture balance')
       row.total = total
       row.hold = hold
+    },
+    loseNextOrderResponse() {
+      loseOrderResponse = true
+    },
+    pauseOrderResponses() {
+      const gate = Promise.withResolvers<void>()
+      orderResponseGate = gate.promise
+      return () => {
+        orderResponseGate = null
+        gate.resolve()
+      }
     },
     pauseCashReads() {
       const gate = Promise.withResolvers<void>()
@@ -1142,6 +1219,7 @@ async function mockExchange(
         gate.resolve()
       }
     },
+    agentAddress: () => agentAddress,
     agentRegistrations: () => agentRegistrations,
     expireAgent: () => {
       agentValidUntil = Date.now() - 1
@@ -1152,8 +1230,8 @@ async function mockExchange(
     releaseHistory,
     socketConnections,
     tradeSubscriptions,
-    pushMarket: (coin: string, price: number, time?: number) =>
-      pushMarket(coin, price, time),
+    pushMarket: (coin: string, price: number, time?: number, step = 1) =>
+      pushMarket(coin, price, time, step),
     pushTrade: (coin: string, tid: number) => pushTrade(coin, tid),
   }
 }
@@ -1166,6 +1244,7 @@ async function ready(page: Page) {
   await expect(
     page.getByRole('button', { name: '下单', exact: true }),
   ).toBeEnabled()
+  await page.getByRole('tab', { name: '限价单', exact: true }).click()
 }
 
 async function confirmOrder(page: Page) {
@@ -1352,16 +1431,16 @@ test('市价滑点在下单摘要中设置，取消不修改，切换订单类�
     panel.getByRole('textbox', { name: '滑点上限（%）' }),
   ).toHaveCount(0)
   const setting = panel.getByRole('button', { name: '调整最大滑点' })
-  await expect(setting).toContainText('0.50%')
+  await expect(setting).toContainText('8.00%')
   await setting.click()
   const dialog = page.getByRole('dialog', { name: '调整最大滑点' })
   await dialog.getByLabel('最大滑点（%）').fill('1')
   await dialog.getByRole('button', { name: '关闭滑点设置' }).click()
-  await expect(setting).toContainText('0.50%')
+  await expect(setting).toContainText('8.00%')
   await setting.click()
   await dialog.getByLabel('最大滑点（%）').fill('0.001')
   await dialog.getByRole('button', { name: '确认', exact: true }).click()
-  await expect(dialog.getByRole('alert')).toContainText('0.01%')
+  await expect(dialog.getByRole('alert')).toContainText('最多两位小数')
   await dialog.getByLabel('最大滑点（%）').fill('1')
   await dialog.getByRole('button', { name: '确认', exact: true }).click()
   await expect(dialog).toBeHidden()
@@ -1388,15 +1467,15 @@ test('市价滑点在下单摘要中设置，取消不修改，切换订单类�
   await confirmOrder(page)
   await expect.poll(() => writes.length).toBe(1)
   expect(writes[0].orders?.[0]).toMatchObject({
-    p: '70701',
+    p: '70700',
     s: '0.001',
     t: { limit: { tif: 'Ioc' } },
   })
 })
 
 for (const [category, name, unit, size, asset, price] of [
-  ['现货', 'HYPE / USDC', 'HYPE', '2', 10007, '20.41'],
-  ['预测', 'BTC 达到目标价？ · Yes', 'Yes', '20', 100000120, '0.5202'],
+  ['现货', 'HYPE / USDC', 'HYPE', '2', 10007, '20.4'],
+  ['预测', 'BTC 达到目标价？ · Yes', 'Yes', '20', 100000120, '0.51'],
 ] as const) {
   test(`${category}市价共用滑点弹窗，设置实际限制成交价格`, async ({
     page,
@@ -2554,6 +2633,10 @@ test('输入框仅外框高亮，账户在交易侧栏，订单类型使用直�
   await mockExchange(page)
   await page.setViewportSize({ width: 1440, height: 1080 })
   await page.goto('/')
+  await expect(
+    page.getByRole('tab', { name: '市价单', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true')
+  await page.getByRole('tab', { name: '限价单', exact: true }).click()
   const input = page.getByLabel('价格（USDC）')
   await input.focus()
   expect(await input.evaluate((el) => getComputedStyle(el).boxShadow)).toBe(
@@ -3170,6 +3253,2151 @@ async function signPreview(page: Page) {
   await page.getByRole('button', { name: '下单', exact: true }).click()
   await confirmOrder(page)
 }
+
+const orderCategories = [
+  '合约',
+  '现货',
+  '预测',
+  'HIP-3',
+  'HIP-4',
+  '预上线',
+] as const
+type OrderCategory = (typeof orderCategories)[number]
+async function chooseOrderCategory(page: Page, category: OrderCategory) {
+  await page.getByRole('button', { name: '交易市场', exact: true }).click()
+  const selector = page.getByRole('region', { name: '市场选择器', exact: true })
+  await selector.getByRole('tab', { name: category, exact: true }).click()
+  await selector
+    .getByRole('option', {
+      name:
+        category === '现货'
+          ? 'HYPE / USDC'
+          : category === '预测' || category === 'HIP-4'
+            ? 'BTC 达到目标价？ · Yes'
+            : category === 'HIP-3'
+              ? 'ABC / USDC'
+              : 'BTC / USDC',
+      exact: true,
+    })
+    .click()
+}
+
+for (const category of orderCategories) {
+  test(`恢复续查：${category} 取消确认不保存跳过偏好，重开使用当前方向和参数`, async ({
+    page,
+  }) => {
+    const { panel, amount, writes, outcome, base } = await recoveryOrder(
+      page,
+      category,
+    )
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '确认订单', exact: true })
+    await dialog
+      .getByRole('checkbox', { name: '不再显示此消息', exact: true })
+      .check()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    const cash = outcome || category === '现货'
+    const size = outcome ? '30' : base === 'BTC' ? '0.002' : '2'
+    const price = outcome ? '0.6' : cash ? '21' : '69000'
+    await panel
+      .getByRole('tab', { name: cash ? '卖出' : '卖出 / 做空', exact: true })
+      .click()
+    await panel
+      .getByRole('textbox', { name: '价格（USDC）', exact: true })
+      .fill(price)
+    await amount.fill(size)
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    await expect(dialog).toContainText(`${size} ${outcome ? '份' : base}`)
+    await expect(
+      dialog.getByRole('checkbox', { name: '不再显示此消息', exact: true }),
+    ).not.toBeChecked()
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+    expect(writes).toEqual([])
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    await confirmOrder(page)
+    await expect.poll(() => writes.length).toBe(1)
+    expect(writes[0].orders?.[0]).toMatchObject({ b: false, s: size, p: price })
+  })
+
+  test(`恢复续查：${category} 提交中重复确认和回车不重复发送，成功后解除锁`, async ({
+    page,
+  }) => {
+    const exchange = await recoveryOrder(page, category)
+    const release = exchange.pauseOrderResponses()
+    await exchange.panel
+      .getByRole('button', { name: '下单', exact: true })
+      .click()
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /^(买入|卖出)/ })
+      .evaluate((element) => {
+        ;(element as HTMLButtonElement).click()
+        ;(element as HTMLButtonElement).click()
+      })
+    await expect.poll(() => exchange.writes.length).toBe(1)
+    await expect(
+      exchange.panel.getByRole('button', {
+        name: /^(下单|操作处理中…|等待账户数据 \/ 核对未确认订单)$/,
+      }),
+    ).toBeDisabled()
+    await exchange.amount.press('Enter')
+    expect(exchange.writes).toHaveLength(1)
+    release()
+    await expect(
+      exchange.panel.getByRole('button', { name: '下单', exact: true }),
+    ).toBeEnabled()
+    await expect(
+      page.getByRole('button', { name: '查询未确认订单' }),
+    ).toHaveCount(0)
+    expect(exchange.writes).toHaveLength(1)
+  })
+
+  test(`恢复续查：${category} 网络超时后刷新仍阻止重复，核对后仅按新参数重试`, async ({
+    page,
+  }) => {
+    test.setTimeout(45000)
+    const exchange = await recoveryOrder(page, category)
+    const release = exchange.pauseOrderResponses()
+    await exchange.panel
+      .getByRole('button', { name: '下单', exact: true })
+      .click()
+    await confirmOrder(page)
+    await expect.poll(() => exchange.writes.length).toBe(1)
+    await expect(
+      page.getByRole('status').filter({ hasText: 'timed out' }),
+    ).toBeVisible({ timeout: 20000 })
+    release()
+    const reconcile = page.getByRole('button', { name: '查询未确认订单' })
+    await expect(reconcile).toBeEnabled()
+    await page.reload()
+    await expect(reconcile).toBeEnabled()
+    expect(exchange.writes).toHaveLength(1)
+    await reconcile.click()
+    await expect(reconcile).toHaveCount(0)
+    const size = exchange.outcome
+      ? '30'
+      : exchange.base === 'BTC'
+        ? '0.002'
+        : '2'
+    if (exchange.outcome) await predictionType(page, '限价')
+    else
+      await exchange.panel
+        .getByRole('tab', { name: '限价单', exact: true })
+        .click()
+    await predictionUnit(page, exchange.base)
+    await exchange.panel
+      .getByRole('textbox', { name: '价格（USDC）', exact: true })
+      .fill(exchange.price)
+    await exchange.amount.fill(size)
+    await expect(
+      exchange.panel.getByRole('button', { name: '下单', exact: true }),
+    ).toBeEnabled()
+    await exchange.panel
+      .getByRole('button', { name: '下单', exact: true })
+      .click()
+    await expect(page.getByRole('dialog')).toContainText(
+      `${size} ${exchange.outcome ? '份' : exchange.base}`,
+    )
+    await confirmOrder(page)
+    await expect.poll(() => exchange.writes.length).toBe(2)
+    expect(exchange.writes[1].orders?.[0].s).toBe(size)
+  })
+}
+
+async function recoveryOrder(page: Page, category: OrderCategory) {
+  const exchange = await mockExchange(
+    page,
+    category === '预上线' ? 'prelaunch' : 'normal',
+  )
+  if (category === 'HIP-3') exchange.setMaxTradeSizes('100')
+  await ready(page)
+  await chooseOrderCategory(page, category)
+  const outcome = category === '预测' || category === 'HIP-4'
+  const cash = outcome || category === '现货'
+  const base = outcome
+    ? 'Yes'
+    : cash
+      ? 'HYPE'
+      : category === 'HIP-3'
+        ? 'ABC'
+        : 'BTC'
+  const panel = page.getByRole('region', { name: '下单面板', exact: true })
+  if (outcome) await predictionType(page, '限价')
+  else await panel.getByRole('tab', { name: '限价单', exact: true }).click()
+  await predictionUnit(page, base)
+  const price = outcome ? '0.5' : cash ? '20' : '70000'
+  await panel
+    .getByRole('textbox', { name: '价格（USDC）', exact: true })
+    .fill(price)
+  const amount = panel.getByRole('textbox', {
+    name: `数量（${base}）`,
+    exact: true,
+  })
+  const size = outcome ? '20' : cash || category === 'HIP-3' ? '1' : '0.001'
+  await amount.fill(size)
+  return { ...exchange, panel, amount, size, price, base, outcome }
+}
+
+test('恢复续查：旧核对请求返回时不能清除其他页面的新待核对记录', async ({
+  page,
+}) => {
+  const exchange = await recoveryOrder(page, '合约')
+  exchange.loseNextOrderResponse()
+  await exchange.panel
+    .getByRole('button', { name: '下单', exact: true })
+    .click()
+  await confirmOrder(page)
+  const reconcile = page.getByRole('button', { name: '查询未确认订单' })
+  await expect(reconcile).toBeEnabled()
+  const gate = Promise.withResolvers<void>()
+  let querying = false
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/info',
+    async (route) => {
+      if (route.request().postDataJSON().type === 'orderStatus') {
+        querying = true
+        await gate.promise
+      }
+      await route.fallback()
+    },
+  )
+  await reconcile.click()
+  await expect.poll(() => querying).toBe(true)
+  const newer = `0x${'bc'.repeat(16)}`
+  const key = `hl-testnet-pending-order:${address}`
+  await page.evaluate(
+    ({ key, cloid }) => {
+      const old = JSON.parse(localStorage.getItem(key) ?? 'null')
+      localStorage.setItem(key, JSON.stringify({ ...old, cloid }))
+    },
+    { key, cloid: newer },
+  )
+  gate.resolve()
+  await expect(reconcile).toBeEnabled()
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (key) => JSON.parse(localStorage.getItem(key) ?? 'null')?.cloid,
+        key,
+      ),
+    )
+    .toBe(newer)
+  await page.reload()
+  await expect(reconcile).toBeEnabled()
+  expect(exchange.writes).toHaveLength(1)
+})
+
+test('恢复续查：原生 TWAP 等待序号后实际有效期与待核对记录一致', async ({
+  page,
+}) => {
+  await page.clock.install()
+  const exchange = await recoveryOrder(page, '合约')
+  await selectAdvanced(page, 'TWAP')
+  await exchange.amount.fill('0.03')
+  let sentExpiry: number | undefined
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/exchange',
+    async (route) => {
+      const body = route.request().postDataJSON()
+      if (body.action.type === 'twapOrder') sentExpiry = body.expiresAfter
+      await route.fallback()
+    },
+  )
+  await page.evaluate(async (key) => {
+    await new Promise<void>((acquired) => {
+      void navigator.locks.request(key, async () => {
+        acquired()
+        await new Promise<void>((release) =>
+          window.addEventListener('release-test-nonce', () => release(), {
+            once: true,
+          }),
+        )
+      })
+    })
+  }, `hl-testnet-nonce:${exchange.agentAddress().toLowerCase()}`)
+  await exchange.panel
+    .getByRole('button', { name: '下单', exact: true })
+    .click()
+  await confirmOrder(page)
+  const pending = () =>
+    page.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key) ?? 'null'),
+      `hl-testnet-pending-order:${address}`,
+    )
+  await expect.poll(pending).not.toBeNull()
+  const expiresAt = (await pending()).expiresAt
+  await page.clock.fastForward(10000)
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event('release-test-nonce')),
+  )
+  await expect.poll(() => sentExpiry).toBeDefined()
+  expect(sentExpiry).toBe(expiresAt)
+  await expect.poll(() => exchange.writes.length).toBe(1)
+})
+
+for (const category of orderCategories) {
+  for (const failure of ['钱包校验', '待核对记录', '序号'] as const) {
+    test(`恢复续查：${category} ${failure}发送前失败不锁单，修正后使用新参数重试`, async ({
+      page,
+    }) => {
+      const { panel, amount, writes, outcome, base } = await recoveryOrder(
+        page,
+        category,
+      )
+      await page.evaluate((failure) => {
+        let fail = true
+        if (failure === '钱包校验') {
+          const provider = window.ethereum
+          if (!provider) throw new Error('模拟钱包未注入')
+          const request = provider.request.bind(provider)
+          provider.request = (async (params: {
+            method: string
+            params?: unknown[]
+          }) => {
+            if (params.method === 'eth_accounts' && fail) {
+              fail = false
+              throw new Error('模拟钱包暂不可用')
+            }
+            return request(params as Parameters<typeof provider.request>[0])
+          }) as typeof provider.request
+        } else {
+          const prefix =
+            failure === '序号'
+              ? 'hl-testnet-nonce:'
+              : 'hl-testnet-pending-order:'
+          const setItem = Storage.prototype.setItem
+          Storage.prototype.setItem = function (key, value) {
+            if (key.startsWith(prefix) && fail) {
+              fail = false
+              throw new DOMException(
+                '模拟订单记录保存失败',
+                'QuotaExceededError',
+              )
+            }
+            return setItem.call(this, key, value)
+          }
+        }
+      }, failure)
+      await panel.getByRole('button', { name: '下单', exact: true }).click()
+      await confirmOrder(page)
+      await expect(
+        page.getByRole('status').filter({ hasText: '请求尚未发送' }),
+      ).toBeVisible()
+      await expect(
+        page.getByRole('button', { name: '查询未确认订单' }),
+      ).toHaveCount(0)
+      expect(writes).toEqual([])
+      const size = outcome ? '30' : base === 'BTC' ? '0.002' : '2'
+      await amount.fill(size)
+      await panel.getByRole('button', { name: '下单', exact: true }).click()
+      await expect(page.getByRole('dialog')).toContainText(
+        `${size} ${outcome ? '份' : base}`,
+      )
+      await confirmOrder(page)
+      await expect.poll(() => writes.length).toBe(1)
+      expect(writes[0].orders?.[0].s).toBe(size)
+    })
+  }
+
+  for (const failure of ['外层拒绝', '逐单拒绝', '整批单条拒绝'] as const) {
+    test(`恢复续查：${category} ${failure}解除锁，重新确认后仅提交新参数`, async ({
+      page,
+    }) => {
+      const { panel, amount, writes, outcome, base } = await recoveryOrder(
+        page,
+        category,
+      )
+      if (failure === '整批单条拒绝') {
+        if (outcome) await predictionType(page, '分段订单')
+        else await selectAdvanced(page, '阶梯单')
+        await panel
+          .getByRole('textbox', {
+            name:
+              category === '现货' || outcome
+                ? '开始价格（USDC）'
+                : '价格（USDC）',
+            exact: true,
+          })
+          .fill(outcome ? '0.4' : category === '现货' ? '18' : '69000')
+        await panel
+          .getByRole('textbox', { name: '结束价格（USDC）', exact: true })
+          .fill(outcome ? '0.6' : category === '现货' ? '22' : '71000')
+        await panel
+          .getByRole('textbox', {
+            name: outcome ? '总订单数（2–50）' : '阶梯档数（2–50）',
+          })
+          .fill('3')
+        await amount.fill(outcome ? '90' : base === 'BTC' ? '0.03' : '3')
+      }
+      const attempts: WireOrder[][] = []
+      await page.route(
+        'https://api.hyperliquid-testnet.xyz/exchange',
+        async (route) => {
+          const action = route.request().postDataJSON().action
+          if (action.type === 'order') {
+            attempts.push(action.orders)
+            if (attempts.length === 1) {
+              await route.fulfill({
+                json:
+                  failure === '外层拒绝'
+                    ? { status: 'err', response: '模拟交易所拒绝' }
+                    : {
+                        status: 'ok',
+                        response: {
+                          type: 'order',
+                          data: { statuses: [{ error: '模拟交易所拒绝' }] },
+                        },
+                      },
+              })
+              return
+            }
+          }
+          await route.fallback()
+        },
+      )
+      await panel.getByRole('button', { name: '下单', exact: true }).click()
+      await confirmOrder(page)
+      await expect(
+        page.getByRole('status').filter({ hasText: '模拟交易所拒绝' }),
+      ).toBeVisible()
+      await expect(
+        page.getByRole('button', { name: '查询未确认订单' }),
+      ).toHaveCount(0)
+      await expect(
+        panel.getByRole('button', { name: '下单', exact: true }),
+      ).toBeEnabled()
+      expect(attempts).toHaveLength(1)
+      expect(attempts[0]).toHaveLength(failure === '整批单条拒绝' ? 3 : 1)
+      expect(writes).toHaveLength(0)
+      const size =
+        failure === '整批单条拒绝'
+          ? outcome
+            ? '120'
+            : base === 'BTC'
+              ? '0.06'
+              : '6'
+          : outcome
+            ? '30'
+            : base === 'BTC'
+              ? '0.002'
+              : '2'
+      await amount.fill(size)
+      await panel.getByRole('button', { name: '下单', exact: true }).click()
+      await expect(page.getByRole('dialog')).toContainText(
+        `${size} ${outcome ? '份' : base}`,
+      )
+      await confirmOrder(page)
+      await expect.poll(() => writes.length).toBe(1)
+      expect(attempts).toHaveLength(2)
+      const sent = attempts[1]
+      expect(sent.reduce((sum, order) => sum + Number(order.s), 0)).toBeCloseTo(
+        Number(size),
+      )
+      expect(
+        sent.every((order) => !attempts[0].some((old) => old.c === order.c)),
+      ).toBe(true)
+    })
+  }
+}
+
+for (const type of ['TWAP', '移动止损', '追价单'] as const) {
+  test(`恢复续查：${type} 签名前失败解除待核对和策略锁，重试不带旧数量`, async ({
+    page,
+  }) => {
+    const { panel, amount, writes } = await recoveryOrder(page, '合约')
+    await selectAdvanced(page, type)
+    await amount.fill('0.03')
+    if (type === '移动止损')
+      await panel
+        .getByRole('textbox', { name: '回撤距离', exact: true })
+        .fill('1.5')
+    await page.evaluate(() => {
+      const provider = window.ethereum
+      if (!provider) throw new Error('模拟钱包未注入')
+      const request = provider.request.bind(provider)
+      let fail = true
+      provider.request = (async (params: {
+        method: string
+        params?: unknown[]
+      }) => {
+        if (params.method === 'eth_accounts' && fail) {
+          fail = false
+          throw new Error('模拟钱包暂不可用')
+        }
+        return request(params as Parameters<typeof provider.request>[0])
+      }) as typeof provider.request
+    })
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    await confirmOrder(page)
+    await expect(
+      page.getByRole('status').filter({ hasText: '请求尚未发送' }),
+    ).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: '查询未确认订单' }),
+    ).toHaveCount(0)
+    expect(writes).toEqual([])
+    await amount.fill('0.06')
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    await expect(page.getByRole('dialog')).toContainText('0.06 BTC')
+    await confirmOrder(page)
+    await expect.poll(() => writes.length).toBe(1)
+    expect(
+      type === 'TWAP'
+        ? writes[0].twap?.s
+        : type === '移动止损'
+          ? writes[0].sz
+          : writes[0].orders?.[0].s,
+    ).toBe('0.06')
+    await expect(
+      panel.getByRole('button', { name: '下单', exact: true }),
+    ).toBeEnabled()
+  })
+}
+
+test('恢复续查：原生 TWAP 等待序号超过有效期时停止发送，重新预览恢复', async ({
+  page,
+}) => {
+  await page.clock.install()
+  const exchange = await recoveryOrder(page, '合约')
+  await selectAdvanced(page, 'TWAP')
+  await exchange.amount.fill('0.03')
+  await page.evaluate(async (key) => {
+    await new Promise<void>((acquired) => {
+      void navigator.locks.request(key, async () => {
+        acquired()
+        await new Promise<void>((release) =>
+          window.addEventListener('release-test-nonce', () => release(), {
+            once: true,
+          }),
+        )
+      })
+    })
+  }, `hl-testnet-nonce:${exchange.agentAddress().toLowerCase()}`)
+  await exchange.panel
+    .getByRole('button', { name: '下单', exact: true })
+    .click()
+  await confirmOrder(page)
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (key) => localStorage.getItem(key),
+        `hl-testnet-pending-order:${address}`,
+      ),
+    )
+    .not.toBeNull()
+  await page.clock.fastForward(61000)
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event('release-test-nonce')),
+  )
+  await expect(
+    page.getByRole('status').filter({ hasText: '订单签名有效期已过' }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: '查询未确认订单' }),
+  ).toHaveCount(0)
+  expect(exchange.writes).toEqual([])
+  await page.clock.setSystemTime(new Date())
+  await page.reload()
+  await selectAdvanced(page, 'TWAP')
+  await exchange.amount.fill('0.06')
+  await exchange.panel
+    .getByRole('button', { name: '下单', exact: true })
+    .click()
+  await confirmOrder(page)
+  await expect.poll(() => exchange.writes.length).toBe(1)
+  expect(exchange.writes[0].twap?.s).toBe('0.06')
+})
+
+for (const category of ['合约', '预测'] as const) {
+  test(`恢复续查：${category} 核对失败和未知结果保留保护，有效期后解除也不重发`, async ({
+    page,
+  }) => {
+    await page.clock.install()
+    const exchange = await recoveryOrder(page, category)
+    exchange.loseNextOrderResponse()
+    await exchange.panel
+      .getByRole('button', { name: '下单', exact: true })
+      .click()
+    await confirmOrder(page)
+    const query = page.getByRole('button', { name: '查询未确认订单' })
+    await expect(query).toBeEnabled()
+    let queries = 0
+    await page.route(
+      'https://api.hyperliquid-testnet.xyz/info',
+      async (route) => {
+        if (route.request().postDataJSON().type !== 'orderStatus')
+          return route.fallback()
+        queries += 1
+        if (queries === 1)
+          await route.fulfill({ status: 503, body: '模拟查询暂不可用' })
+        else await route.fulfill({ json: { status: 'unknownOid' } })
+      },
+    )
+    await query.click()
+    await expect(
+      page.getByRole('status').filter({ hasText: '503' }),
+    ).toBeVisible()
+    await expect(query).toBeEnabled()
+    await query.click()
+    await expect(
+      page.getByRole('status').filter({ hasText: '仍保留待确认状态' }),
+    ).toBeVisible()
+    await expect(query).toBeEnabled()
+    expect(exchange.writes).toHaveLength(1)
+    await page.clock.fastForward(91000)
+    await query.click()
+    await expect(query).toHaveCount(0)
+    await expect(
+      page.getByRole('status').filter({ hasText: '已超过签名有效期 30 秒' }),
+    ).toBeVisible()
+    expect(queries).toBe(3)
+    expect(exchange.writes).toHaveLength(1)
+  })
+}
+
+test('恢复续查：原生请求未知结果不能提前解除，刷新和到期核对均不自动重发', async ({
+  page,
+}) => {
+  await page.clock.install()
+  const { writes } = await mockExchange(page, 'lost-native')
+  await ready(page)
+  await selectAdvanced(page, 'TWAP')
+  await page
+    .getByRole('textbox', { name: '数量（BTC）', exact: true })
+    .fill('0.03')
+  await signPreview(page)
+  const query = page.getByRole('button', { name: '查询未确认订单' })
+  await expect(query).toBeEnabled()
+  await page.reload()
+  await expect(query).toBeEnabled()
+  const checked = page.getByRole('checkbox', {
+    name: '已在官方页面核对委托、成交及 TWAP',
+  })
+  const clear = page.getByRole('button', { name: '核对后解除本地保护' })
+  await checked.check()
+  await clear.click()
+  await expect(
+    page.getByRole('status').filter({ hasText: '签名仍可能有效' }),
+  ).toBeVisible()
+  await expect(query).toBeEnabled()
+  await page.clock.fastForward(91000)
+  await checked.check()
+  await clear.click()
+  await expect(query).toHaveCount(0)
+  await expect(
+    page.getByRole('status').filter({ hasText: '没有重新发送交易' }),
+  ).toBeVisible()
+  expect(writes).toHaveLength(1)
+})
+
+for (const category of orderCategories) {
+  test(`预算续查：${category} 比例随余额和额度变化，手填数量保持固定`, async ({
+    page,
+  }) => {
+    const cash = ['现货', '预测', 'HIP-4'].includes(category)
+    const factor = category === 'HIP-3' ? 100 : 1
+    const outcome = category === '预测' || category === 'HIP-4'
+    const base = outcome
+      ? 'Yes'
+      : category === '现货'
+        ? 'HYPE'
+        : category === 'HIP-3'
+          ? 'ABC'
+          : 'BTC'
+    const exchange = await mockExchange(
+      page,
+      category === '预上线' ? 'prelaunch' : 'normal',
+    )
+    exchange.setMaxTradeSizes(String(factor))
+    await ready(page)
+    await chooseOrderCategory(page, category)
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    if (outcome) await predictionType(page, '限价')
+    else await panel.getByRole('tab', { name: '限价单', exact: true }).click()
+    await predictionUnit(page, base)
+    const price = panel.getByRole('textbox', {
+      name: '价格（USDC）',
+      exact: true,
+    })
+    await price.fill(outcome ? '0.5' : cash ? '20' : '70000')
+    await panel
+      .getByRole('button', { name: '下单比例 50%', exact: true })
+      .click()
+    const amount = panel.getByRole('textbox', {
+      name: `数量（${base}）`,
+      exact: true,
+    })
+    await expect(amount).toHaveValue(
+      outcome ? '990' : cash ? '24.75' : String(0.5 * factor),
+    )
+    const changeBudget = (quote: string, capacity: string) => {
+      if (cash) exchange.setCashBalance('USDC', quote, '0')
+      else exchange.setMaxTradeSizes(String(Number(capacity) * factor))
+      exchange.refreshAccount()
+    }
+    changeBudget('200', '0.2')
+    await expect(amount).toHaveValue(
+      outcome ? '200' : cash ? '5' : String(0.1 * factor),
+    )
+    await expect(panel.getByRole('slider', { name: '下单比例' })).toHaveValue(
+      '50',
+    )
+    const manual = outcome ? '100' : cash ? '3' : String(0.05 * factor)
+    await amount.fill(manual)
+    changeBudget('100', '0.1')
+    await expect(panel.getByRole('slider', { name: '下单比例' })).toHaveValue(
+      cash && !outcome ? '60' : '50',
+    )
+    await expect(amount).toHaveValue(manual)
+    await panel
+      .getByRole('button', { name: '下单比例 100%', exact: true })
+      .click()
+    changeBudget('0', '0')
+    await expect(amount).toHaveValue('0')
+    await expect(panel.getByRole('slider', { name: '下单比例' })).toBeDisabled()
+    changeBudget('100', '0.1')
+    const maximum = outcome ? '200' : cash ? '5' : String(0.1 * factor)
+    await expect(amount).toHaveValue(maximum)
+    await price.fill('')
+    await expect(amount).toHaveValue(maximum)
+    await price.fill(outcome ? '0.5' : cash ? '20' : '70000')
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    await expect(page.getByRole('dialog', { name: '确认订单' })).toContainText(
+      `${maximum} ${outcome ? '份' : base}`,
+    )
+    expect(exchange.writes).toEqual([])
+  })
+}
+
+for (const category of orderCategories) {
+  test(`预算续查：${category} 市价全额比例随价格重算，已打开的确认参数保持固定`, async ({
+    page,
+  }) => {
+    const outcome = category === '预测' || category === 'HIP-4'
+    const cash = outcome || category === '现货'
+    const factor = category === 'HIP-3' ? 100 : 1
+    const base = outcome
+      ? 'Yes'
+      : cash
+        ? 'HYPE'
+        : category === 'HIP-3'
+          ? 'ABC'
+          : 'BTC'
+    const coin = outcome
+      ? '#120'
+      : cash
+        ? '@7'
+        : category === 'HIP-3'
+          ? 'test:ABC'
+          : 'BTC'
+    const exchange = await mockExchange(
+      page,
+      category === '预上线' ? 'prelaunch' : 'normal',
+    )
+    exchange.setMaxTradeSizes(String(factor))
+    await ready(page)
+    await chooseOrderCategory(page, category)
+    const panel = page.getByRole('region', {
+      name: '下单面板',
+      exact: true,
+      includeHidden: true,
+    })
+    if (outcome) await predictionType(page, '市价')
+    else await panel.getByRole('tab', { name: '市价单', exact: true }).click()
+    await predictionUnit(page, 'USDC')
+    const amount = panel.getByRole('textbox', { name: /(?:数量|金额)（USDC）/ })
+    await panel
+      .getByRole('button', { name: '下单比例 100%', exact: true })
+      .click()
+    exchange.pushMarket(
+      coin,
+      outcome ? 0.8 : cash ? 40 : 140000,
+      undefined,
+      outcome ? 0.01 : 1,
+    )
+    await expect(amount).toHaveValue(
+      outcome
+        ? '989.280000'
+        : cash
+          ? '989.712000'
+          : (70000 * factor).toFixed(6),
+    )
+    await predictionUnit(page, base)
+    const quantity = panel.getByRole('textbox', {
+      name: `数量（${base}）`,
+      includeHidden: true,
+    })
+    const oldSize = outcome ? '1145' : cash ? '22.91' : String(0.5 * factor)
+    await expect(quantity).toHaveValue(oldSize)
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '确认订单' })
+    await expect(dialog).toContainText(`${oldSize} ${outcome ? '份' : base}`)
+    exchange.pushMarket(
+      coin,
+      outcome ? 0.5 : cash ? 20 : 70000,
+      undefined,
+      outcome ? 0.01 : 1,
+    )
+    const newSize = outcome ? '1833' : cash ? '45.83' : String(factor)
+    await expect(quantity).toHaveValue(newSize)
+    await expect(dialog).toContainText(`${oldSize} ${outcome ? '份' : base}`)
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    await expect(dialog).toContainText(`${newSize} ${outcome ? '份' : base}`)
+    expect(exchange.writes).toEqual([])
+  })
+}
+
+for (const category of ['现货', '预测', 'HIP-4'] as const) {
+  for (const side of ['买入', '卖出'] as const) {
+    test(`预算续查：${category} ${side}确认后可用余额减少，签名前停止`, async ({
+      page,
+    }) => {
+      const outcome = category !== '现货'
+      const exchange = await mockExchange(page)
+      await ready(page)
+      await chooseOrderCategory(page, category)
+      const panel = page.getByRole('region', { name: '下单面板', exact: true })
+      if (outcome) await predictionType(page, '限价')
+      else await panel.getByRole('tab', { name: '限价单', exact: true }).click()
+      await panel.getByRole('tab', { name: side, exact: true }).click()
+      await predictionUnit(page, outcome ? 'Yes' : 'HYPE')
+      await panel
+        .getByRole('textbox', { name: '价格（USDC）' })
+        .fill(outcome ? '0.5' : '20')
+      await panel
+        .getByRole('button', { name: '下单比例 100%', exact: true })
+        .click()
+      await panel.getByRole('button', { name: '下单', exact: true }).click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+      exchange.setCashBalance(
+        side === '买入' ? 'USDC' : outcome ? '+120' : 'HYPE',
+        '0',
+        '0',
+      )
+      await confirmOrder(page)
+      await expect(
+        page
+          .getByText(
+            side === '买入'
+              ? '可用余额不足以支付整笔订单'
+              : '卖出数量超过可用持有量',
+            { exact: false },
+          )
+          .first(),
+      ).toBeVisible()
+      expect(exchange.writes).toEqual([])
+    })
+  }
+}
+
+test('预算续查：合约确认时额度减少，旧最大数量不能继续提交', async ({
+  page,
+}) => {
+  const exchange = await mockExchange(page)
+  await ready(page)
+  const panel = page.getByRole('region', { name: '下单面板', exact: true })
+  await panel
+    .getByRole('button', { name: '下单比例 100%', exact: true })
+    .click()
+  await expect(panel.getByRole('textbox', { name: '数量（BTC）' })).toHaveValue(
+    '1',
+  )
+  await panel.getByRole('button', { name: '下单', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '确认订单' })).toContainText(
+    '1 BTC',
+  )
+  exchange.setMaxTradeSizes('0.1')
+  await confirmOrder(page)
+  await expect(
+    page.getByText('下单额度已变化，请重新预览', { exact: false }).first(),
+  ).toBeVisible()
+  expect(exchange.writes).toEqual([])
+})
+
+for (const category of ['现货', '预测', 'HIP-4'] as const) {
+  test(`预算续查：${category} 等待余额期间价格变化，预览采用当前预算数量`, async ({
+    page,
+  }) => {
+    const outcome = category !== '现货'
+    const exchange = await mockExchange(page)
+    await ready(page)
+    await chooseOrderCategory(page, category)
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    if (outcome) await predictionType(page, '市价')
+    else await panel.getByRole('tab', { name: '市价单', exact: true }).click()
+    await predictionUnit(page, 'USDC')
+    await panel
+      .getByRole('textbox', { name: /(?:数量|金额)（USDC）/ })
+      .fill('200')
+    const pending = exchange.pauseCashReads()
+    const before = pending.reads()
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    await expect.poll(pending.reads).toBeGreaterThan(before)
+    exchange.pushMarket(
+      outcome ? '#120' : '@7',
+      outcome ? 0.8 : 40,
+      undefined,
+      outcome ? 0.01 : 1,
+    )
+    if (outcome)
+      await expect(panel.getByText('231 USDC', { exact: true })).toBeVisible()
+    else
+      await expect(panel.getByRole('definition').first()).toContainText(
+        '199.5840',
+      )
+    pending.release()
+    const dialog = page.getByRole('dialog', { name: '确认订单', exact: true })
+    await expect(dialog).toContainText(outcome ? '231 份' : '4.62 HYPE')
+    expect(exchange.writes).toEqual([])
+  })
+}
+
+for (const category of ['合约', 'HIP-3', '预上线'] as const) {
+  for (const kind of ['市价单', '阶梯单', 'TWAP', '追价单'] as const) {
+    test(`预算续查：${category} ${kind} 确认时重查整笔额度`, async ({
+      page,
+    }) => {
+      const exchange = await mockExchange(
+        page,
+        category === '预上线' ? 'prelaunch' : 'normal',
+      )
+      if (category === 'HIP-3') exchange.setMaxTradeSizes('100')
+      await ready(page)
+      await chooseOrderCategory(page, category)
+      const panel = page.getByRole('region', { name: '下单面板', exact: true })
+      if (kind === '市价单')
+        await panel.getByRole('tab', { name: kind, exact: true }).click()
+      else await selectAdvanced(page, kind)
+      if (kind === '追价单')
+        await panel
+          .getByRole('textbox', { name: '价格（USDC）', exact: true })
+          .fill('70000')
+      if (kind === '阶梯单') {
+        await panel
+          .getByRole('textbox', { name: '价格（USDC）', exact: true })
+          .fill('70000')
+        await panel
+          .getByRole('textbox', { name: '结束价格（USDC）' })
+          .fill('80000')
+      }
+      await panel
+        .getByRole('textbox', {
+          name: `数量（${category === 'HIP-3' ? 'ABC' : 'BTC'}）`,
+        })
+        .fill(category === 'HIP-3' ? '10' : '0.1')
+      await panel.getByRole('button', { name: '下单', exact: true }).click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+      exchange.setMaxTradeSizes('0.001')
+      await confirmOrder(page)
+      await expect(
+        page.getByText('下单额度已变化，请重新预览', { exact: false }).first(),
+      ).toBeVisible()
+      expect(exchange.writes).toEqual([])
+    })
+  }
+}
+
+for (const category of ['合约', 'HIP-3', '预上线'] as const) {
+  test(`预算续查：${category} 只减仓确认后仓位减少，不提交旧平仓数量`, async ({
+    page,
+  }) => {
+    const hip3 = category === 'HIP-3'
+    const exchange = await mockExchange(
+      page,
+      category === '预上线' ? 'prelaunch' : 'normal',
+    )
+    if (hip3) exchange.setExtraPositions({ 'test:ABC': 10 })
+    else exchange.setPosition(0.5)
+    await ready(page)
+    await chooseOrderCategory(page, category)
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    await panel.getByRole('tab', { name: '限价单', exact: true }).click()
+    await panel
+      .getByRole('textbox', { name: '价格（USDC）', exact: true })
+      .fill('70000')
+    await panel.getByRole('tab', { name: '卖出 / 做空', exact: true }).click()
+    await panel.getByRole('checkbox', { name: /只减仓/ }).check()
+    await panel
+      .getByRole('button', { name: '下单比例 100%', exact: true })
+      .click()
+    await expect(
+      panel.getByRole('textbox', { name: `数量（${hip3 ? 'ABC' : 'BTC'}）` }),
+    ).toHaveValue(hip3 ? '10' : '0.5')
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    if (hip3) exchange.setExtraPositions({ 'test:ABC': 2 })
+    else exchange.setPosition(0.2)
+    await confirmOrder(page)
+    await expect(
+      page.getByText('可平仓位已变化，请重新预览', { exact: false }).first(),
+    ).toBeVisible()
+    expect(exchange.writes).toEqual([])
+  })
+}
+
+test('切换状态：现货数量单位往返保留七位报价金额和原数量', async ({ page }) => {
+  const { writes } = await mockExchange(page)
+  await ready(page)
+  await chooseCashMarket(page)
+  const panel = page.getByRole('region', { name: '下单面板', exact: true })
+  await panel.getByRole('textbox', { name: '价格（USDC）' }).fill('0.12345')
+  await panel.getByRole('textbox', { name: '数量（HYPE）' }).fill('123.45')
+  for (let i = 0; i < 3; i++) {
+    await predictionUnit(page, 'USDC')
+    await expect(
+      panel.getByRole('textbox', { name: '金额（USDC）' }),
+    ).toHaveValue('15.2399025')
+    await predictionUnit(page, 'HYPE')
+    await expect(
+      panel.getByRole('textbox', { name: '数量（HYPE）' }),
+    ).toHaveValue('123.45')
+  }
+  expect(writes).toEqual([])
+})
+
+test('切换状态：现货从市价转 TWAP 后按价格边界换算报价币预算', async ({
+  page,
+}) => {
+  const { writes } = await mockExchange(page)
+  await ready(page)
+  await chooseOrderCategory(page, '现货')
+  const panel = page.getByRole('region', { name: '下单面板', exact: true })
+  await predictionUnit(page, 'USDC')
+  await panel.getByRole('textbox', { name: '金额（USDC）' }).fill('200')
+  await selectAdvanced(page, 'TWAP')
+  await panel
+    .getByRole('textbox', { name: 'TWAP 最高成交价（可选）' })
+    .fill('25')
+  await expect(panel.getByLabel('订单摘要')).toContainText('200.0000 USDC')
+  await signPreview(page)
+  await expect.poll(() => writes.at(-1)?.twap?.s).toBe('8')
+  await panel.getByRole('textbox', { name: 'TWAP 最高成交价（可选）' }).fill('')
+  await panel.getByRole('textbox', { name: 'TWAP 触发价（可选）' }).fill('30')
+  await signPreview(page)
+  await expect.poll(() => writes.at(-1)?.twap?.s).toBe('6.47')
+  expect(Number(writes.at(-1)?.twap?.s) * 30 * 1.03).toBeLessThanOrEqual(200)
+})
+
+for (const category of ['现货', '预测', 'HIP-4'] as const) {
+  for (const change of ['买卖', '类型', '单位', '币种'] as const) {
+    test(`切换状态：${category} 余额查询期间切换${change}丢弃旧预览`, async ({
+      page,
+    }) => {
+      const exchange = await mockExchange(page)
+      await ready(page)
+      await chooseOrderCategory(page, category)
+      const panel = page.locator('section[aria-label="下单面板"]')
+      await predictionUnit(page, 'USDC')
+      await panel
+        .getByRole('textbox', { name: /(?:数量|金额)（USDC）/ })
+        .fill('20')
+      const pending = exchange.pauseCashReads()
+      const before = pending.reads()
+      await panel.getByRole('button', { name: '下单', exact: true }).click()
+      await expect.poll(pending.reads).toBeGreaterThan(before)
+      if (change === '买卖')
+        await panel.getByRole('tab', { name: '卖出', exact: true }).click()
+      if (change === '类型') {
+        if (category === '现货')
+          await panel.getByRole('tab', { name: '限价单', exact: true }).click()
+        else await predictionType(page, '限价')
+      }
+      if (change === '单位')
+        await predictionUnit(page, category === '现货' ? 'HYPE' : 'Yes')
+      if (change === '币种') {
+        if (category === '现货') await chooseOrderCategory(page, '合约')
+        else
+          await panel.getByRole('button', { name: 'No', exact: true }).click()
+      }
+      pending.release()
+      await expect(
+        panel.getByRole('button', {
+          name: '下单',
+          exact: true,
+          includeHidden: true,
+        }),
+      ).toBeEnabled()
+      await expect(page.getByRole('dialog')).toHaveCount(0)
+      expect(exchange.writes).toEqual([])
+    })
+  }
+}
+
+for (const category of ['现货', '预测', 'HIP-4'] as const) {
+  test(`切换状态：${category} 返回市场不重放旧的一键卖出`, async ({ page }) => {
+    const { writes } = await mockExchange(page)
+    await ready(page)
+    await chooseOrderCategory(page, category)
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    const records = page.getByRole('region', { name: '交易记录', exact: true })
+    await records
+      .getByRole('tab', {
+        name: category === '现货' ? '余额' : '预测',
+        exact: true,
+      })
+      .click()
+    const row = records.getByRole('row').filter({
+      hasText: category === '现货' ? 'HYPE' : 'BTC 达到目标价？ · Yes',
+    })
+    await row.getByRole('button', { name: '卖出', exact: true }).click()
+    await expect(
+      panel.getByRole('textbox', {
+        name: category === '现货' ? '数量（HYPE）' : '数量（Yes）',
+        exact: true,
+      }),
+    ).toHaveValue(category === '现货' ? '8' : '95')
+    if (category === '现货') {
+      await chooseOrderCategory(page, '合约')
+      await chooseOrderCategory(page, category)
+      await expect(
+        panel.getByRole('textbox', { name: '数量（HYPE）', exact: true }),
+      ).toHaveValue('')
+      await expect(
+        panel.getByRole('tab', { name: '买入', exact: true }),
+      ).toHaveAttribute('aria-selected', 'true')
+    } else {
+      await panel.getByRole('button', { name: 'No', exact: true }).click()
+      await panel
+        .getByRole('textbox', { name: '数量（No）', exact: true })
+        .fill('2')
+      await panel.getByRole('button', { name: 'Yes', exact: true }).click()
+      await expect(
+        panel.getByRole('textbox', { name: '数量（Yes）', exact: true }),
+      ).toHaveValue('2')
+    }
+    expect(writes).toEqual([])
+  })
+}
+
+for (const category of orderCategories) {
+  test(`切换状态：${category} 重选当前数量单位不改写预算`, async ({ page }) => {
+    const { writes } = await mockExchange(
+      page,
+      category === '预上线' ? 'prelaunch' : 'normal',
+    )
+    await ready(page)
+    await chooseOrderCategory(page, category)
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    if (category !== '预测' && category !== 'HIP-4')
+      await panel.getByRole('tab', { name: '市价单', exact: true }).click()
+    await predictionUnit(page, 'USDC')
+    const amount = panel.getByRole('textbox', { name: /(?:数量|金额)（USDC）/ })
+    await amount.fill('100.123456')
+    await predictionUnit(page, 'USDC')
+    await expect(amount).toHaveValue('100.123456')
+    expect(writes).toEqual([])
+  })
+}
+
+for (const category of ['合约', '现货', 'HIP-3', '预上线'] as const) {
+  test(`切换状态：${category} 连续选择专业类型后可以立即键盘编辑数量`, async ({
+    page,
+  }) => {
+    const { writes } = await mockExchange(
+      page,
+      category === '预上线' ? 'prelaunch' : 'normal',
+    )
+    await ready(page)
+    await chooseOrderCategory(page, category)
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    const quantity = panel.getByRole('textbox', {
+      name: /数量（(BTC|HYPE|ABC)）/,
+    })
+    await quantity.fill('123')
+    const types =
+      category === '现货'
+        ? ['追价单', '阶梯单', 'TWAP']
+        : [
+            '追价单',
+            '阶梯单',
+            '止损限价',
+            '止损市价',
+            '止盈限价',
+            '止盈市价',
+            '移动止损',
+            'TWAP',
+          ]
+    for (const kind of types) {
+      await selectAdvanced(page, kind)
+      await quantity.click()
+      await quantity.press('ControlOrMeta+A')
+      await expect(quantity).toBeFocused()
+      await expect
+        .poll(() =>
+          quantity.evaluate((el) => {
+            const input = el as HTMLInputElement
+            return [input.selectionStart, input.selectionEnd]
+          }),
+        )
+        .toEqual([0, 3])
+    }
+    expect(writes).toEqual([])
+  })
+}
+
+for (const category of orderCategories) {
+  test(`切换状态：${category} 买卖、限价市价、TIF 与单位连续切换使用当前参数`, async ({
+    page,
+  }) => {
+    const { writes } = await mockExchange(
+      page,
+      category === '预上线' ? 'prelaunch' : 'normal',
+    )
+    await ready(page)
+    await chooseOrderCategory(page, category)
+    const prediction = category === '预测' || category === 'HIP-4'
+    const spot = category === '现货'
+    const cash = prediction || spot
+    const base = prediction
+      ? 'Yes'
+      : spot
+        ? 'HYPE'
+        : category === 'HIP-3'
+          ? 'ABC'
+          : 'BTC'
+    const asset = prediction
+      ? 100000120
+      : spot
+        ? 10007
+        : category === 'HIP-3'
+          ? 110000
+          : 3
+    const price = prediction ? '0.5' : spot ? '20' : '70000'
+    const size = prediction
+      ? '20'
+      : spot
+        ? '2'
+        : category === 'HIP-3'
+          ? '1'
+          : '0.001'
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    const kind = async (market: boolean) => {
+      if (prediction) await predictionType(page, market ? '市价' : '限价')
+      else
+        await panel
+          .getByRole('tab', { name: market ? '市价单' : '限价单', exact: true })
+          .click()
+    }
+    await kind(false)
+    await predictionUnit(page, base)
+    await panel
+      .getByRole('textbox', { name: '价格（USDC）', exact: true })
+      .fill(price)
+    await panel
+      .getByRole('textbox', { name: `数量（${base}）`, exact: true })
+      .fill(size)
+    await panel.getByRole('button', { name: /订单有效方式/ }).click()
+    await page
+      .getByRole(prediction ? 'menuitemradio' : 'option', {
+        name: prediction ? 'Post-only' : 'Post-only · 只挂单',
+        exact: true,
+      })
+      .click()
+    await signPreview(page)
+    await expect
+      .poll(() => writes.at(-1)?.orders?.[0])
+      .toMatchObject({
+        a: asset,
+        b: true,
+        s: size,
+        p: price,
+        r: false,
+        t: { limit: { tif: 'Alo' } },
+      })
+    await predictionUnit(page, 'USDC')
+    await panel
+      .getByRole('tab', { name: cash ? '卖出' : '卖出 / 做空', exact: true })
+      .click()
+    await kind(true)
+    await signPreview(page)
+    await expect
+      .poll(() => writes.at(-1)?.orders?.[0])
+      .toMatchObject({
+        a: asset,
+        b: false,
+        s: size,
+        r: false,
+        t: { limit: { tif: 'Ioc' } },
+      })
+    expect(writes.at(-1)?.orders?.[0].p).not.toBe(price)
+    await kind(false)
+    await predictionUnit(page, base)
+    await expect(
+      panel.getByRole('textbox', { name: '价格（USDC）', exact: true }),
+    ).toHaveValue(price)
+    await panel
+      .getByRole('tab', { name: cash ? '买入' : '买入 / 做多', exact: true })
+      .click()
+    await signPreview(page)
+    await expect.poll(() => writes.length).toBe(3)
+    expect(writes.at(-1)?.orders?.[0]).toMatchObject({
+      a: asset,
+      b: true,
+      s: size,
+      p: price,
+      t: { limit: { tif: 'Alo' } },
+    })
+    if (!cash) {
+      await selectAdvanced(page, '止损市价')
+      await panel
+        .getByRole('textbox', { name: '触发价格（USDC）' })
+        .fill('69000')
+      await panel.getByRole('button', { name: '下单', exact: true }).click()
+      await expect(panel.getByRole('alert')).toContainText('触发价必须高于')
+      await kind(false)
+      await signPreview(page)
+      await expect.poll(() => writes.length).toBe(4)
+      expect(writes.at(-1)?.orders?.[0].t).toEqual({ limit: { tif: 'Alo' } })
+    }
+  })
+}
+
+for (const category of ['合约', 'HIP-3', '预上线'] as const) {
+  test(`切换状态：${category} 无效数量切换单位后清除过期校验提示`, async ({
+    page,
+  }) => {
+    await mockExchange(page, category === '预上线' ? 'prelaunch' : 'normal')
+    await ready(page)
+    await chooseOrderCategory(page, category)
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    await panel
+      .getByRole('textbox', { name: /数量（(BTC|ABC)）/ })
+      .fill('invalid')
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    await expect(panel.getByRole('alert')).toBeVisible()
+    await predictionUnit(page, 'USDC')
+    await expect(
+      panel.getByRole('textbox', { name: '金额（USDC）' }),
+    ).toHaveValue('')
+    await expect(panel.getByRole('alert')).toHaveCount(0)
+  })
+
+  test(`切换状态：${category} 切币清空金额与条件参数，保留可见交易偏好`, async ({
+    page,
+  }) => {
+    const { writes } = await mockExchange(
+      page,
+      category === '预上线' ? 'prelaunch' : 'normal',
+    )
+    await ready(page)
+    await chooseOrderCategory(page, category)
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    await selectAdvanced(page, 'TWAP')
+    await predictionUnit(page, 'USDC')
+    await panel.getByRole('textbox', { name: '金额（USDC）' }).fill('70000')
+    await panel
+      .getByRole('textbox', { name: 'TWAP 触发价（可选）' })
+      .fill('71000')
+    await panel
+      .getByRole('textbox', { name: 'TWAP 最高成交价（可选）' })
+      .fill('72000')
+    await panel.getByRole('tab', { name: '卖出 / 做空', exact: true }).click()
+    await page.getByRole('button', { name: '交易市场', exact: true }).click()
+    const selector = page.getByRole('region', {
+      name: '市场选择器',
+      exact: true,
+    })
+    await selector.getByRole('tab', { name: '合约', exact: true }).click()
+    await selector
+      .getByRole('option', { name: 'ETH / USDC', exact: true })
+      .click()
+    await expect(
+      panel.getByRole('textbox', { name: '金额（USDC）' }),
+    ).toHaveValue('')
+    await expect(
+      panel.getByRole('textbox', { name: 'TWAP 触发价（可选）' }),
+    ).toHaveValue('')
+    await expect(
+      panel.getByRole('textbox', { name: 'TWAP 最低成交价（可选）' }),
+    ).toHaveValue('')
+    await expect(
+      panel.getByRole('tab', { name: '卖出 / 做空', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true')
+    await panel.getByRole('tab', { name: '限价单', exact: true }).click()
+    await expect(
+      panel.getByRole('textbox', { name: '价格（USDC）' }),
+    ).toHaveValue('70000')
+    await panel.getByRole('textbox', { name: '金额（USDC）' }).fill('70')
+    await signPreview(page)
+    await expect
+      .poll(() => writes.at(-1)?.orders?.[0])
+      .toMatchObject({
+        a: 4,
+        b: false,
+        s: '0.001',
+        t: { limit: { tif: 'Gtc' } },
+      })
+  })
+}
+
+test('切换状态：现货换报价币后清空旧草稿并按新币余额校验', async ({ page }) => {
+  const { writes } = await mockExchange(page)
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/info',
+    async (route) => {
+      const { type } = route.request().postDataJSON()
+      if (type === 'spotMetaAndAssetCtxs') {
+        await route.fulfill({
+          json: [
+            {
+              universe: [
+                { name: '@7', index: 7, tokens: [2, 0], isCanonical: true },
+                { name: '@8', index: 8, tokens: [2, 5], isCanonical: false },
+              ],
+              tokens: [
+                { name: 'USDC', index: 0, szDecimals: 8 },
+                { name: 'HYPE', index: 2, szDecimals: 2 },
+                { name: 'ALT', index: 5, szDecimals: 4 },
+              ],
+            },
+            [
+              { coin: '@7', markPx: '20', prevDayPx: '19', dayNtlVlm: '1000' },
+              { coin: '@8', markPx: '2', prevDayPx: '2', dayNtlVlm: '1000' },
+            ],
+          ],
+        })
+      } else if (type === 'spotClearinghouseState') {
+        await route.fulfill({
+          json: {
+            balances: [
+              {
+                coin: 'USDC',
+                token: 0,
+                total: '1000',
+                hold: '10',
+                entryNtl: '0',
+              },
+              { coin: 'HYPE', token: 2, total: '10', hold: '2', entryNtl: '0' },
+              { coin: 'ALT', token: 5, total: '70', hold: '20', entryNtl: '0' },
+            ],
+          },
+        })
+      } else await route.fallback()
+    },
+  )
+  await ready(page)
+  await chooseCashMarket(page)
+  const panel = page.getByRole('region', { name: '下单面板', exact: true })
+  await predictionUnit(page, 'USDC')
+  await panel.getByRole('textbox', { name: '金额（USDC）' }).fill('600')
+  await panel.getByRole('tab', { name: '卖出', exact: true }).click()
+  await page.getByRole('button', { name: '交易市场', exact: true }).click()
+  await page.getByRole('option', { name: 'HYPE / ALT', exact: true }).click()
+  await expect(
+    panel.getByRole('tab', { name: '买入', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true')
+  await expect(
+    panel.getByRole('textbox', { name: '数量（HYPE）' }),
+  ).toHaveValue('')
+  await panel.getByRole('tab', { name: '限价单', exact: true }).click()
+  await panel.getByRole('textbox', { name: '价格（ALT）' }).fill('2')
+  await panel.getByRole('button', { name: '数量单位' }).click()
+  await expect(page.getByRole('menuitemradio')).toHaveText(['HYPE', 'ALT'])
+  await page.getByRole('menuitemradio', { name: 'ALT', exact: true }).click()
+  await panel.getByRole('textbox', { name: '金额（ALT）' }).fill('60')
+  await panel.getByRole('button', { name: '下单', exact: true }).click()
+  await expect(panel.getByRole('alert')).toContainText('余额不足')
+  expect(writes).toEqual([])
+  await panel.getByRole('textbox', { name: '金额（ALT）' }).fill('40')
+  await signPreview(page)
+  await expect
+    .poll(() => writes.at(-1)?.orders?.[0])
+    .toMatchObject({
+      a: 10008,
+      b: true,
+      p: '2',
+      s: '20',
+      t: { limit: { tif: 'Gtc' } },
+    })
+})
+
+for (const category of ['预测', 'HIP-4'] as const) {
+  test(`切换状态：${category} 换事件清除旧阶梯草稿并使用新结果资产`, async ({
+    page,
+  }) => {
+    const { writes } = await mockExchange(page)
+    await page.route(
+      'https://api.hyperliquid-testnet.xyz/info',
+      async (route) => {
+        if (route.request().postDataJSON().type !== 'outcomeMeta')
+          return route.fallback()
+        await route.fulfill({
+          json: {
+            outcomes: [12, 13].map((outcome) => ({
+              outcome,
+              name: outcome === 12 ? 'BTC 达到目标价？' : 'ETH 达到目标价？',
+              description: '按公开价格结算',
+              quoteToken: 'USDC',
+              sideSpecs: [{ name: 'Yes' }, { name: 'No' }],
+            })),
+            questions: [],
+            feeScale: '1',
+          },
+        })
+      },
+    )
+    await ready(page)
+    await chooseOrderCategory(page, category)
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    await predictionType(page, '分段订单')
+    await panel.getByRole('textbox', { name: '开始价格（USDC）' }).fill('0.2')
+    await panel.getByRole('textbox', { name: '结束价格（USDC）' }).fill('0.8')
+    await predictionUnit(page, 'Yes')
+    await panel.getByRole('textbox', { name: '数量（Yes）' }).fill('30')
+    await panel.getByRole('tab', { name: '卖出', exact: true }).click()
+    await page.getByRole('button', { name: '交易市场', exact: true }).click()
+    await page
+      .getByRole('option', { name: 'ETH 达到目标价？ · Yes', exact: true })
+      .click()
+    await expect(
+      panel.getByRole('button', { name: '预测订单类型', exact: true }),
+    ).toHaveText('市价')
+    await expect(
+      panel.getByRole('tab', { name: '买入', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true')
+    await expect(
+      panel.getByRole('textbox', { name: '数量（USDC）' }),
+    ).toHaveValue('')
+    await predictionType(page, '限价')
+    await panel.getByRole('textbox', { name: '价格（USDC）' }).fill('0.4')
+    await panel.getByRole('textbox', { name: '数量（USDC）' }).fill('20')
+    await signPreview(page)
+    await expect
+      .poll(() => writes.at(-1)?.orders?.[0])
+      .toMatchObject({
+        a: 100000130,
+        b: true,
+        p: '0.4',
+        s: '50',
+        t: { limit: { tif: 'Gtc' } },
+      })
+    expect(writes.at(-1)?.orders).toHaveLength(1)
+  })
+}
+
+for (const category of ['合约', '现货', 'HIP-3', '预上线'] as const) {
+  test(`切换状态：${category} TWAP 换方向重新校验保留的价格边界`, async ({
+    page,
+  }) => {
+    const { writes } = await mockExchange(
+      page,
+      category === '预上线' ? 'prelaunch' : 'normal',
+    )
+    await ready(page)
+    await chooseOrderCategory(page, category)
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    const spot = category === '现货'
+    await selectAdvanced(page, 'TWAP')
+    await panel
+      .getByRole('textbox', { name: /数量（(BTC|HYPE|ABC)）/ })
+      .fill(spot ? '6' : category === 'HIP-3' ? '1' : '0.01')
+    await panel
+      .getByRole('textbox', { name: 'TWAP 触发价（可选）' })
+      .fill(spot ? '21' : '71000')
+    await panel
+      .getByRole('textbox', { name: 'TWAP 最高成交价（可选）' })
+      .fill(spot ? '22' : '72000')
+    await panel
+      .getByRole('tab', { name: spot ? '卖出' : '卖出 / 做空', exact: true })
+      .click()
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    await expect(panel.getByRole('alert')).toContainText('最低价须低于触发价')
+    expect(writes).toEqual([])
+    await panel
+      .getByRole('textbox', { name: 'TWAP 最低成交价（可选）' })
+      .fill(spot ? '18' : '69000')
+    await signPreview(page)
+    await expect.poll(() => writes.at(-1)?.twap?.b).toBe(false)
+    expect(writes.at(-1)?.details).toEqual({
+      t: { p: spot ? '21' : '71000', a: true },
+      s: spot ? '18' : '69000',
+    })
+    await panel
+      .getByRole('tab', { name: spot ? '买入' : '买入 / 做多', exact: true })
+      .click()
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    await expect(panel.getByRole('alert')).toContainText('最高价须高于触发价')
+    expect(writes).toHaveLength(1)
+  })
+}
+
+for (const category of ['现货', '预测', 'HIP-4'] as const) {
+  test(`切换状态：${category} 旧余额请求失败不污染新方向的错误提示`, async ({
+    page,
+  }) => {
+    const { writes } = await mockExchange(page)
+    const response = Promise.withResolvers<void>()
+    let fail = false
+    let waiting = false
+    await page.route(
+      'https://api.hyperliquid-testnet.xyz/info',
+      async (route) => {
+        if (
+          !fail ||
+          route.request().postDataJSON().type !== 'spotClearinghouseState'
+        )
+          return route.fallback()
+        waiting = true
+        await response.promise
+        await route.fulfill({
+          status: 503,
+          json: { error: 'test delayed failure' },
+        })
+      },
+    )
+    await ready(page)
+    await chooseOrderCategory(page, category)
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    await predictionUnit(page, 'USDC')
+    await panel
+      .getByRole('textbox', { name: /(?:数量|金额)（USDC）/ })
+      .fill('20')
+    fail = true
+    await panel.getByRole('button', { name: '下单', exact: true }).click()
+    await expect.poll(() => waiting).toBe(true)
+    await panel.getByRole('tab', { name: '卖出', exact: true }).click()
+    response.resolve()
+    await expect(
+      panel.getByRole('button', { name: '下单', exact: true }),
+    ).toBeEnabled()
+    await expect(panel.getByRole('alert')).toHaveCount(0)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    expect(writes).toEqual([])
+  })
+}
+
+for (const product of ['合约', '现货', 'HIP-3', '预上线'] as const) {
+  test(`逐项下拉核验：${product} 的专业菜单、TIF、单位和 TWAP 触发方向`, async ({
+    page,
+  }) => {
+    test.slow()
+    await page.setViewportSize({ width: 1440, height: 1100 })
+    const { writes } = await mockExchange(
+      page,
+      product === '预上线' ? 'prelaunch' : 'normal',
+    )
+    await ready(page)
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    let base = 'BTC'
+    if (product === '现货') {
+      await chooseCashMarket(page)
+      base = 'HYPE'
+    }
+    if (product === 'HIP-3') {
+      await page.getByRole('button', { name: '交易市场', exact: true }).click()
+      await page.getByRole('tab', { name: 'HIP-3', exact: true }).click()
+      await page
+        .getByRole('option', { name: 'ABC / USDC', exact: true })
+        .click()
+      base = 'ABC'
+    }
+    await panel
+      .getByRole('button', { name: '高级订单类型', exact: true })
+      .click()
+    const names =
+      product === '现货'
+        ? ['追价单', '阶梯单', 'TWAP']
+        : [
+            '追价单',
+            '阶梯单',
+            '止损限价',
+            '止损市价',
+            '止盈限价',
+            '止盈市价',
+            '移动止损',
+            'TWAP',
+          ]
+    await expect(page.getByRole('menuitemradio')).toHaveCount(names.length)
+    for (const name of names)
+      await expect(
+        page.getByRole('menuitemradio', { name, exact: true }),
+      ).toBeVisible()
+    await page.keyboard.press('Escape')
+    await panel.getByRole('tab', { name: '限价单', exact: true }).click()
+    await panel
+      .getByRole('textbox', { name: '价格（USDC）', exact: true })
+      .fill('40')
+    await panel
+      .getByRole('textbox', { name: `数量（${base}）`, exact: true })
+      .fill('1')
+    await predictionUnit(page, 'USDC')
+    await expect(
+      panel.getByRole('textbox', { name: '金额（USDC）', exact: true }),
+    ).toHaveValue('40.000000')
+    await predictionUnit(page, base)
+    if (product === '合约')
+      await page.setViewportSize({ width: 1280, height: 720 })
+    for (const [label, tif] of [
+      ['GTC · 撤销前有效', 'Gtc'],
+      ['IOC · 立即成交或取消', 'Ioc'],
+      ['Post-only · 只挂单', 'Alo'],
+    ]) {
+      await panel.getByRole('button', { name: /订单有效方式/ }).click()
+      await expect(page.getByRole('listbox')).toBeVisible()
+      await page.getByRole('option', { name: label, exact: true }).click()
+      await signPreview(page)
+      await expect
+        .poll(() => writes.at(-1)?.orders?.[0]?.t)
+        .toEqual({ limit: { tif } })
+    }
+    await selectAdvanced(page, 'TWAP')
+    await panel
+      .getByRole('textbox', { name: `数量（${base}）`, exact: true })
+      .fill(product === '现货' ? '6' : '1')
+    await panel
+      .getByRole('textbox', { name: 'TWAP 触发价（可选）' })
+      .fill(product === '现货' ? '19' : '69000')
+    await expect(
+      panel.getByText('标记价低于触发价', { exact: true }),
+    ).toBeVisible()
+    await expect(
+      panel.getByRole('button', { name: /TWAP 触发方向/ }),
+    ).toHaveCount(0)
+    await signPreview(page)
+    await expect.poll(() => writes.at(-1)?.details?.t?.a).toBe(false)
+    expect(writes.at(-1)?.twap?.a).toBe(
+      product === '现货' ? 10007 : product === 'HIP-3' ? 110000 : 3,
+    )
+  })
+}
+
+for (const category of ['预测', 'HIP-4'] as const) {
+  test(`逐项下拉核验：${category} 的完整类型、有效方式与反向阶梯金额预算`, async ({
+    page,
+  }) => {
+    test.slow()
+    await page.setViewportSize({ width: 1440, height: 1100 })
+    const { writes } = await mockExchange(page)
+    await ready(page)
+    await page.getByRole('button', { name: '交易市场', exact: true }).click()
+    await page
+      .getByRole('region', { name: '市场选择器', exact: true })
+      .getByRole('tab', { name: category, exact: true })
+      .click()
+    await page
+      .getByRole('option', { name: 'BTC 达到目标价？ · Yes', exact: true })
+      .click()
+    const panel = page.getByRole('region', { name: '下单面板', exact: true })
+    await panel
+      .getByRole('button', { name: '预测订单类型', exact: true })
+      .click()
+    await expect(page.getByRole('menuitemradio')).toHaveText([
+      '市价',
+      '限价',
+      '分段订单',
+      '转换',
+    ])
+    await page.getByRole('menuitemradio', { name: '限价', exact: true }).click()
+    await panel
+      .getByRole('textbox', { name: '价格（USDC）', exact: true })
+      .fill('0.5')
+    await panel
+      .getByRole('textbox', { name: '数量（USDC）', exact: true })
+      .fill('20')
+    for (const [label, tif] of [
+      ['GTC', 'Gtc'],
+      ['IOC', 'Ioc'],
+      ['Post-only', 'Alo'],
+    ]) {
+      await panel.getByRole('button', { name: /订单有效方式/ }).click()
+      await page
+        .getByRole('menuitemradio', { name: label, exact: true })
+        .click()
+      await signPreview(page)
+      await expect
+        .poll(() => writes.at(-1)?.orders?.[0])
+        .toMatchObject({ a: 100000120, s: '40', t: { limit: { tif } } })
+    }
+    await predictionType(page, '分段订单')
+    await panel.getByRole('textbox', { name: '开始价格（USDC）' }).fill('0.6')
+    await panel.getByRole('textbox', { name: '结束价格（USDC）' }).fill('0.4')
+    await panel.getByRole('textbox', { name: '总订单数（2–50）' }).fill('3')
+    await panel
+      .getByRole('textbox', { name: '数量偏差', exact: true })
+      .fill('2')
+    await panel
+      .getByRole('textbox', { name: '数量（USDC）', exact: true })
+      .fill('100')
+    await signPreview(page)
+    await expect.poll(() => writes.length).toBe(4)
+    expect(writes.at(-1)?.orders?.map(({ p, s, t }) => ({ p, s, t }))).toEqual([
+      { p: '0.6', s: '46', t: { limit: { tif: 'Alo' } } },
+      { p: '0.5', s: '69', t: { limit: { tif: 'Alo' } } },
+      { p: '0.4', s: '93', t: { limit: { tif: 'Alo' } } },
+    ])
+  })
+}
+
+test('组合保证金自动借贷：预算含借贷额度，确认时额度减少停止提交，偿债卖出可释放供应资产', async ({
+  page,
+}) => {
+  const { writes } = await mockExchange(page)
+  let hold = '-100'
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/info',
+    async (route) => {
+      const { type } = route.request().postDataJSON()
+      if (type === 'userAbstraction')
+        return route.fulfill({ json: 'portfolioMargin' })
+      if (type === 'spotClearinghouseState')
+        return route.fulfill({
+          json: {
+            portfolioMarginEnabled: true,
+            balances: [
+              {
+                coin: 'USDC',
+                token: 0,
+                total: '0',
+                hold,
+                borrowed: '100',
+                entryNtl: '0',
+              },
+              {
+                coin: 'HYPE',
+                token: 2,
+                total: '10',
+                hold: '9',
+                supplied: '8',
+                entryNtl: '0',
+              },
+            ],
+          },
+        })
+      await route.fallback()
+    },
+  )
+  await ready(page)
+  await chooseCashMarket(page)
+  const panel = page.getByRole('region', { name: '下单面板', exact: true })
+  await expect(panel).toContainText('自动借贷额度')
+  await panel.getByRole('textbox', { name: '价格（USDC）' }).fill('20')
+  await panel.getByRole('textbox', { name: '数量（HYPE）' }).fill('5')
+  await panel.getByRole('button', { name: '下单', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  hold = '-50'
+  await confirmOrder(page)
+  await expect(
+    page.getByText('可用余额不足以支付整笔订单', { exact: false }).first(),
+  ).toBeVisible()
+  expect(writes).toHaveLength(0)
+  await panel.getByRole('tab', { name: '卖出', exact: true }).click()
+  await panel.getByRole('textbox', { name: '数量（HYPE）' }).fill('5.1')
+  await signPreview(page)
+  await expect.poll(() => writes.length).toBe(1)
+  expect(writes[0].orders?.[0]).toMatchObject({ a: 10007, b: false, s: '5.1' })
+})
+
+test('HIP-3 独立划转：抵押币过滤、同钱包目标、非 USDC 精度及确认重查余额', async ({
+  page,
+}) => {
+  const { writes, setCashBalance } = await mockExchange(page)
+  await mockFunding(page)
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/info',
+    async (route) => {
+      const { type } = route.request().postDataJSON()
+      if (type === 'allPerpMetas')
+        return route.fulfill({
+          json: [
+            { universe: [], collateralToken: 0 },
+            { universe: [], collateralToken: 0 },
+            { universe: [], collateralToken: 2 },
+          ],
+        })
+      if (type === 'perpDexs')
+        return route.fulfill({
+          json: [null, { name: 'test' }, { name: 'alt' }],
+        })
+      await route.fallback()
+    },
+  )
+  await openFunds(page)
+  await openFundOperation(page, '划转')
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('button', { name: /划转目标/ }).click()
+  await page.getByRole('option', { name: 'HIP-3 · test', exact: true }).click()
+  await dialog.getByLabel('划转金额（USDC）').fill('10')
+  await dialog.getByRole('button', { name: '确认划转' }).click()
+  await expect.poll(() => writes.length).toBe(1)
+  expect(writes[0]).toMatchObject({
+    type: 'sendAsset',
+    sourceDex: '',
+    destinationDex: 'test',
+    destination: address,
+    token: 'USDC:0x00000000000000000000000000000000',
+    fromSubAccount: '',
+    amount: '10',
+  })
+  await page
+    .locator('#account-panel')
+    .getByRole('button', { name: '划转', exact: true })
+    .click()
+  await dialog.getByRole('button', { name: /划转币种/ }).click()
+  await page.getByRole('option', { name: 'HYPE', exact: true }).click()
+  await dialog.getByRole('button', { name: /划转目标/ }).click()
+  await expect(
+    page.getByRole('option', { name: 'HIP-3 · alt', exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('option', { name: '合约账户', exact: true }),
+  ).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await dialog.getByLabel('划转金额（HYPE）').fill('2.123456789')
+  await expect(dialog.getByRole('button', { name: '确认划转' })).toBeDisabled()
+  await dialog.getByLabel('划转金额（HYPE）').fill('2.12345678')
+  setCashBalance('HYPE', '1', '0')
+  await dialog.getByRole('button', { name: '确认划转' }).click()
+  await expect(
+    dialog.getByText('划转金额超过可用余额', { exact: false }).first(),
+  ).toBeVisible()
+  expect(writes).toHaveLength(1)
+  setCashBalance('HYPE', '10', '0')
+  await dialog.getByRole('button', { name: '确认划转' }).click()
+  await expect.poll(() => writes.length).toBe(2)
+  await expect(page.locator('[data-feedback="success"]')).toContainText(
+    'HYPE 划转已确认。',
+  )
+  expect(writes[1]).toMatchObject({
+    type: 'sendAsset',
+    sourceDex: 'spot',
+    destinationDex: 'alt',
+    token: 'HYPE:0x11111111111111111111111111111111',
+    amount: '2.12345678',
+  })
+})
+test('发布回归：划转签名前钱包故障不留下未知锁，修正后可重试', async ({
+  page,
+}) => {
+  const { writes } = await mockExchange(page)
+  await mockFunding(page)
+  await openFunds(page)
+  await openFundOperation(page, '划转')
+  await page.evaluate(() => {
+    const provider = window.ethereum
+    if (!provider) throw new Error('模拟钱包未注入')
+    const request = provider.request.bind(provider)
+    let failed = false
+    provider.request = (async (args: {
+      method: string
+      params?: unknown[]
+    }) => {
+      if (args.method === 'eth_signTypedData_v4' && !failed) {
+        failed = true
+        throw new Error('模拟签名前钱包断线')
+      }
+      return request(args as Parameters<typeof provider.request>[0])
+    }) as typeof provider.request
+  })
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('划转金额（USDC）').fill('10')
+  await dialog.getByRole('button', { name: '确认划转' }).click()
+  await expect(
+    dialog.getByText('操作已取消或失败', { exact: true }),
+  ).toBeVisible()
+  expect(writes).toEqual([])
+  await dialog.getByLabel('划转金额（USDC）').fill('11')
+  await dialog.getByRole('button', { name: '确认划转' }).click()
+  await expect.poll(() => writes.length).toBe(1)
+  expect(writes[0]).toMatchObject({ type: 'sendAsset', amount: '11' })
+})
+
+test('发布回归：另一标签页不能覆盖未知划转或再次请求签名', async ({
+  page,
+  context,
+}) => {
+  test.slow()
+  const first = await mockExchange(page)
+  await mockFunding(page)
+  const other = await context.newPage()
+  const second = await mockExchange(other)
+  await mockFunding(other)
+  await openFunds(page)
+  await openFunds(other)
+  await openFundOperation(page, '划转')
+  await openFundOperation(other, '划转')
+  let sentNonce: number | undefined
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/exchange',
+    async (route) => {
+      const { action } = route.request().postDataJSON()
+      if (action.type !== 'sendAsset') return route.fallback()
+      sentNonce = action.nonce
+      await route.abort('failed')
+    },
+  )
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('划转金额（USDC）').fill('10')
+  await dialog.getByRole('button', { name: '确认划转' }).click()
+  await expect(
+    dialog.getByText('资金结果待确认', { exact: true }),
+  ).toBeVisible()
+  expect(sentNonce).toBeDefined()
+  const signsBefore = await other.evaluate(() =>
+    sessionStorage.getItem('mock-wallet-signs'),
+  )
+  const secondDialog = other.getByRole('dialog')
+  await secondDialog.getByLabel('划转金额（USDC）').fill('11')
+  await secondDialog.getByRole('button', { name: '确认划转' }).click()
+  await expect(
+    secondDialog.getByText('上一笔划转结果待确认，请先核对资金记录').first(),
+  ).toBeVisible()
+  expect(second.writes).toEqual([])
+  expect(first.writes).toEqual([])
+  expect(
+    await other.evaluate(() => sessionStorage.getItem('mock-wallet-signs')),
+  ).toBe(signsBefore)
+  expect(
+    await other.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key) ?? 'null')?.nonce,
+      `hl-testnet-funding:${address}`,
+    ),
+  ).toBe(sentNonce)
+  await other.close()
+})
+
+for (const reply of ['Nonce already used', 'Insufficient balance'] as const) {
+  test(`HIP-3 划转拒绝分类：${reply}`, async ({ page }) => {
+    await mockExchange(page)
+    await mockFunding(page)
+    let submissions = 0
+    await page.route(
+      'https://api.hyperliquid-testnet.xyz/exchange',
+      async (route) => {
+        const { action } = route.request().postDataJSON()
+        if (action.type !== 'sendAsset') return route.fallback()
+        submissions++
+        await route.fulfill({ json: { status: 'err', response: reply } })
+      },
+    )
+    await openFunds(page)
+    await openFundOperation(page, '划转')
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('button', { name: /划转目标/ }).click()
+    await page
+      .getByRole('option', { name: 'HIP-3 · test', exact: true })
+      .click()
+    await dialog.getByLabel('划转金额（USDC）').fill('10')
+    await dialog.getByRole('button', { name: '确认划转' }).click()
+    if (reply.startsWith('Nonce')) {
+      await expect(
+        dialog.getByText('资金结果待确认', { exact: true }),
+      ).toBeVisible()
+      await expect(
+        dialog.getByRole('button', { name: '确认划转' }),
+      ).toBeDisabled()
+    } else {
+      await expect(
+        dialog.getByText('操作已取消或失败', { exact: true }),
+      ).toBeVisible()
+      await expect(dialog.getByLabel('划转金额（USDC）')).toBeEditable()
+    }
+    expect(submissions).toBe(1)
+  })
+}
+
+test('HIP-3 划转结果丢失：刷新后不重发，严格匹配账本后解锁；确认时账户模式改变停止签名', async ({
+  page,
+}) => {
+  test.slow()
+  await mockExchange(page)
+  const funds = await mockFunding(page)
+  let mode = 'disabled'
+  let matched = false
+  const sent: {
+    nonce: number
+    amount: string
+    sourceDex: string
+    destinationDex: string
+  }[] = []
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/info',
+    async (route) => {
+      const { type } = route.request().postDataJSON()
+      if (type === 'userAbstraction') return route.fulfill({ json: mode })
+      if (type === 'userNonFundingLedgerUpdates')
+        return route.fulfill({
+          json: sent.length
+            ? [
+                {
+                  time: Date.now(),
+                  hash: `0x${'dd'.repeat(32)}`,
+                  delta: {
+                    ...sent[0],
+                    type: 'send',
+                    user: address,
+                    destination: matched ? address : `0x${'22'.repeat(20)}`,
+                    token: 'USDC',
+                    fee: '0',
+                  },
+                },
+              ]
+            : [],
+        })
+      await route.fallback()
+    },
+  )
+  await page.route(
+    'https://api.hyperliquid-testnet.xyz/exchange',
+    async (route) => {
+      const { action } = route.request().postDataJSON()
+      if (action.type !== 'sendAsset') return route.fallback()
+      sent.push(action)
+      await route.abort('failed')
+    },
+  )
+  await openFunds(page)
+  await openFundOperation(page, '划转')
+  let dialog = page.getByRole('dialog')
+  await dialog.getByLabel('划转金额（USDC）').fill('10')
+  mode = 'portfolioMargin'
+  await dialog.getByRole('button', { name: '确认划转' }).click()
+  await expect(
+    dialog.getByText('独立账户划转仅适用于手动模式', { exact: false }),
+  ).toBeVisible()
+  expect(sent).toHaveLength(0)
+  mode = 'disabled'
+  await dialog.getByRole('button', { name: '确认划转' }).click()
+  await expect(
+    dialog.getByText('资金结果待确认', { exact: true }),
+  ).toBeVisible()
+  expect(sent).toHaveLength(1)
+  await page.reload()
+  await expect(
+    page
+      .locator('#account-panel')
+      .getByRole('button', { name: '划转', exact: true }),
+  ).toBeVisible()
+  await page
+    .locator('#account-panel')
+    .getByRole('button', { name: '划转', exact: true })
+    .click()
+  dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('button', { name: '确认划转' })).toBeDisabled()
+  await expect(
+    dialog.getByText('上一笔划转结果待确认，请先核对资金记录'),
+  ).toBeVisible()
+  await dialog.getByRole('button', { name: '关闭钱包面板' }).click()
+  await page
+    .locator('header')
+    .getByRole('button', { name: '存款', exact: true })
+    .click()
+  await dialog.getByLabel('存款金额（USDC）').fill('5')
+  await dialog.getByRole('button', { name: '存款', exact: true }).click()
+  await expect(
+    dialog.getByText('上一笔划转结果待确认，请先核对资金记录'),
+  ).toBeVisible()
+  expect(funds.transactions).toHaveLength(0)
+  matched = true
+  await openFundOperation(page, '划转')
+  await expect(dialog.getByText('操作已确认', { exact: true })).toBeVisible({
+    timeout: 15000,
+  })
+  await expect(dialog.getByLabel('划转金额（USDC）')).toBeEditable()
+  expect(sent).toHaveLength(1)
+})
+
 test('高级订单：四种触发单、附带保护和阶梯单使用正确请求并保留部分拒单', async ({
   page,
 }) => {
@@ -3210,7 +5438,7 @@ test('高级订单：四种触发单、附带保护和阶梯单使用正确请�
     .getByRole('textbox', { name: '价格（USDC）', exact: true })
     .fill('69000')
   await page
-    .getByRole('textbox', { name: '最高价格（USDC）', exact: true })
+    .getByRole('textbox', { name: '结束价格（USDC）', exact: true })
     .fill('71000')
   await page.getByRole('textbox', { name: '阶梯档数（2–50）' }).fill('3')
   pushMarket('BTC', 70000)
@@ -3388,6 +5616,10 @@ test('分类下拉切换现货、预测和 HIP-3，使用各自资产 ID 与下�
   await choose('现货', 'HYPE / USDC')
   const panel = page.getByRole('region', { name: '下单面板', exact: true })
   await expect(panel.getByText('现货交易', { exact: true })).toBeVisible()
+  await expect(
+    panel.getByRole('tab', { name: '市价单', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true')
+  await panel.getByRole('tab', { name: '限价单', exact: true }).click()
   await expect(panel.getByRole('button', { name: '保证金模式' })).toHaveCount(0)
   await panel.getByRole('textbox', { name: '价格（USDC）' }).fill('20')
   await panel.getByRole('textbox', { name: '数量（HYPE）' }).fill('2')
@@ -3409,9 +5641,13 @@ test('分类下拉切换现货、预测和 HIP-3，使用各自资产 ID 与下�
     panel.getByRole('button', { name: 'No', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true')
   await choose('HIP-3', 'ABC / USDC')
+  await panel.getByRole('tab', { name: '限价单', exact: true }).click()
   await expect(panel.getByRole('button', { name: '保证金模式' })).toBeVisible()
   await panel.getByRole('textbox', { name: '价格（USDC）' }).fill('70000')
   await panel.getByRole('textbox', { name: '数量（ABC）' }).fill('1')
+  await expect(panel.getByLabel('订单摘要')).toContainText(
+    '21.0000 – 63.0000 USDC',
+  )
   await signPreview(page)
   await expect.poll(() => writes.at(-1)?.orders?.[0]?.a).toBe(110000)
   expect(
@@ -3420,6 +5656,32 @@ test('分类下拉切换现货、预测和 HIP-3，使用各自资产 ID 与下�
     ),
   ).toBe(navigationCount)
   expect(socketConnections).toHaveLength(4) // 快速盘口与完整行情各一个连接；默认 DEX 与 HIP-3 账户各一次。
+})
+
+test('预上线筛选保留原合约编号，逐仓限制与下单流程一致', async ({ page }) => {
+  const { writes } = await mockExchange(page, 'prelaunch')
+  await ready(page)
+  await page.getByRole('button', { name: '交易市场', exact: true }).click()
+  await page.getByRole('tab', { name: '预上线', exact: true }).click()
+  await expect(page.getByRole('option')).toHaveCount(1)
+  await page.getByRole('option', { name: 'BTC / USDC', exact: true }).click()
+  const panel = page.getByRole('region', { name: '下单面板', exact: true })
+  await expect(panel).toContainText('预上线合约仅支持逐仓')
+  await panel
+    .getByRole('button', { name: '调整保证金模式', exact: true })
+    .click()
+  await expect(
+    page.getByRole('radio', { name: '全仓', exact: true }),
+  ).toBeDisabled()
+  await page.getByRole('button', { name: '关闭设置', exact: true }).click()
+  await panel.getByRole('textbox', { name: '数量（BTC）' }).fill('0.001')
+  await signPreview(page)
+  await expect.poll(() => writes.length).toBe(1)
+  expect(writes.at(-1)?.orders?.[0]).toMatchObject({
+    a: 3,
+    s: '0.001',
+    r: false,
+  })
 })
 
 test('成交量在两套引擎均为 60% 不透明度，关闭再打开 VOL 不恢复高亮', async ({
@@ -3611,6 +5873,8 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
       await predictionUnit(page, 'Yes')
       await panel.getByRole('tab', { name: '卖出', exact: true }).click()
     }
+    if (product === 'spot')
+      await panel.getByRole('tab', { name: '限价单', exact: true }).click()
     const base =
       product === 'perp' ? 'BTC' : product === 'spot' ? 'HYPE' : 'Yes'
     const price = panel.getByRole('textbox', {
@@ -3642,10 +5906,11 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
     await expect(
       panel.getByRole('textbox', { name: `数量（${base}）`, exact: true }),
     ).toHaveValue(
-      product === 'perp' ? '0.25' : product === 'spot' ? '12.36' : '47',
+      product === 'perp' ? '0.25' : product === 'spot' ? '12.37' : '47',
     )
     await panel.getByRole('button', { name: '数量单位', exact: true }).click()
     await page.getByRole('menuitemradio', { name: 'USDC', exact: true }).click()
+    await expect(page.getByRole('menu', { name: '数量单位选项' })).toBeHidden()
     const amount = panel.getByRole('textbox', {
       name: product === 'outcome' ? '数量（USDC）' : '金额（USDC）',
       exact: true,
@@ -3654,7 +5919,7 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
       product === 'perp'
         ? '35000.000000'
         : product === 'spot'
-          ? '494.400000'
+          ? '494.800000'
           : '23.970000',
     )
     await panel
@@ -3689,13 +5954,20 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
       .poll(() =>
         amount.evaluate((element) => {
           const input = element as HTMLInputElement
-          return (
-            input.selectionStart === 0 &&
-            input.selectionEnd === input.value.length
-          )
+          return {
+            focused: document.activeElement === input,
+            start: input.selectionStart,
+            end: input.selectionEnd,
+            length: input.value.length,
+          }
         }),
       )
-      .toBe(true)
+      .toEqual({
+        focused: true,
+        start: 0,
+        end: (await amount.inputValue()).length,
+        length: (await amount.inputValue()).length,
+      })
     await amount.press('Backspace')
     await expect(amount).toHaveValue('')
     await price.fill(
@@ -3799,6 +6071,8 @@ for (const product of ['perp', 'spot', 'outcome'] as const) {
             .locator('[data-slot="cursor"]'),
         ).toHaveCSS('background-color', 'rgb(235, 71, 71)')
     }
+    if (product === 'spot')
+      await panel.getByRole('tab', { name: '限价单', exact: true }).click()
     const base =
       product === 'perp' ? 'BTC' : product === 'spot' ? 'HYPE' : 'Yes'
     if (product === 'outcome') {
@@ -3945,6 +6219,8 @@ async function chooseCashMarket(page: Page, outcome = false) {
     await expect(
       page.getByRole('button', { name: '下单', exact: true }),
     ).toBeEnabled()
+  if (!outcome)
+    await page.getByRole('tab', { name: '限价单', exact: true }).click()
 }
 
 for (const width of [1440, 375]) {
@@ -3954,13 +6230,13 @@ for (const width of [1440, 375]) {
     await ready(page)
     const trigger = page.getByRole('button', { name: '高级订单类型' })
     await trigger.scrollIntoViewIfNeeded()
-    const market = await page
-      .getByRole('tab', { name: '市价单', exact: true })
+    const lastBasic = await page
+      .getByRole('tab', { name: '限价单', exact: true })
       .boundingBox()
     const more = await trigger.boundingBox()
-    if (!more || !market) throw new Error('订单类型入口不可见')
-    expect(more.x - market.x - market.width).toBeLessThanOrEqual(20)
-    expect(Math.abs(more.y - market.y)).toBeLessThanOrEqual(2)
+    if (!more || !lastBasic) throw new Error('订单类型入口不可见')
+    expect(more.x - lastBasic.x - lastBasic.width).toBeLessThanOrEqual(20)
+    expect(Math.abs(more.y - lastBasic.y)).toBeLessThanOrEqual(2)
     await trigger.hover()
     await expect(trigger).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
     await trigger.click()
@@ -4008,9 +6284,9 @@ for (const width of [1440, 375]) {
     await chooseCashMarket(page)
     await trigger.click()
     await expect(menu.getByRole('menuitemradio')).toHaveText([
+      /追价单/,
       /阶梯单/,
       /TWAP/,
-      /追价单/,
     ])
     await page.screenshot({
       path: `output-tdd/playwright/order-type-menu/spot-menu-${width}.png`,
@@ -4038,8 +6314,8 @@ test('现货高级订单：整批余额校验、确认重读余额、部分拒�
   await ready(page)
   await chooseCashMarket(page)
   await selectAdvanced(page, '阶梯单')
-  await page.getByRole('textbox', { name: '最低价格（USDC）' }).fill('18')
-  await page.getByRole('textbox', { name: '最高价格（USDC）' }).fill('22')
+  await page.getByRole('textbox', { name: '开始价格（USDC）' }).fill('18')
+  await page.getByRole('textbox', { name: '结束价格（USDC）' }).fill('22')
   await page.getByRole('textbox', { name: '阶梯档数（2–50）' }).fill('3')
   const quantity = page.getByRole('textbox', { name: '数量（HYPE）' })
   await quantity.fill('60')
@@ -4078,6 +6354,34 @@ test('现货高级订单：整批余额校验、确认重读余额、部分拒�
     page.getByRole('button', { name: '撤单', exact: true }),
   ).toHaveCount(1)
   expect(writes.at(-1)?.cancels?.[0].a).toBe(10007)
+})
+
+test('现货买入可用满报价币，手续费标为基础币；市价金额包含滑点预算', async ({
+  page,
+}) => {
+  const { writes, setCashBalance } = await mockExchange(page)
+  setCashBalance('USDC', '100', '0')
+  await ready(page)
+  await chooseCashMarket(page)
+  const panel = page.getByRole('region', { name: '下单面板', exact: true })
+  await panel.getByRole('textbox', { name: '价格（USDC）' }).fill('20')
+  await panel.getByRole('textbox', { name: '数量（HYPE）' }).fill('5')
+  await expect(panel.getByLabel('订单摘要')).toContainText('0.00350000 HYPE')
+  await signPreview(page)
+  await expect.poll(() => writes.length).toBe(1)
+  expect(writes.at(-1)?.orders?.[0]).toMatchObject({
+    s: '5',
+    p: '20',
+    a: 10007,
+  })
+  await panel.getByRole('tab', { name: '市价单', exact: true }).click()
+  await predictionUnit(page, 'USDC')
+  await panel.getByRole('textbox', { name: '金额（USDC）' }).fill('100')
+  await signPreview(page)
+  await expect.poll(() => writes.length).toBe(2)
+  const order = writes.at(-1)?.orders?.[0]
+  expect(order?.t).toEqual({ limit: { tif: 'Ioc' } })
+  expect(Number(order?.p) * Number(order?.s)).toBeLessThanOrEqual(100)
 })
 
 test('预测高级订单：整数份额、价格范围、整批卖出余额与阶梯请求', async ({
@@ -4558,9 +6862,10 @@ test('Web3 未知资金结果刷新后保留进度，不锁表单、不需人工
   await dialog.getByRole('button', { name: '确认划转' }).click()
   await expect.poll(() => exchange.writes.length).toBe(1)
   expect(exchange.writes[0]).toMatchObject({
-    type: 'usdClassTransfer',
+    type: 'sendAsset',
     amount: '5',
-    toPerp: false,
+    sourceDex: '',
+    destinationDex: 'spot',
   })
   expect(funds.transactions).toHaveLength(2)
 })
@@ -4600,9 +6905,10 @@ test('Web3 划转使用主钱包确认，精度和可用余额校验在签名前
   await expect(page.getByRole('dialog')).toHaveCount(0)
   expect(writes).toHaveLength(1)
   expect(writes[0]).toMatchObject({
-    type: 'usdClassTransfer',
+    type: 'sendAsset',
     amount: '10.123456',
-    toPerp: false,
+    sourceDex: '',
+    destinationDex: 'spot',
   })
   await page
     .locator('#account-panel')
@@ -4613,9 +6919,10 @@ test('Web3 划转使用主钱包确认，精度和可用余额校验在签名前
   await dialog.getByRole('button', { name: '确认划转' }).click()
   await expect.poll(() => writes.length).toBe(2)
   expect(writes[1]).toMatchObject({
-    type: 'usdClassTransfer',
+    type: 'sendAsset',
     amount: '10',
-    toPerp: true,
+    sourceDex: 'spot',
+    destinationDex: '',
   })
 })
 
@@ -4901,6 +7208,30 @@ for (const mode of [
       dialog.getByRole('button', { name: '现货转入合约', exact: true }),
     ).toHaveCount(canTransfer ? 1 : 0)
     expect(writes).toHaveLength(0)
+    if (mode === 'dexAbstraction') {
+      await dialog
+        .getByRole('button', { name: '现货转入合约', exact: true })
+        .click()
+      await dialog.getByRole('button', { name: /划转币种/ }).click()
+      await expect(page.getByRole('option')).toHaveText(['USDC'])
+      await page.keyboard.press('Escape')
+      await dialog.getByRole('button', { name: /划转目标/ }).click()
+      await expect(page.getByRole('option')).toHaveText([
+        '现货账户',
+        '合约账户',
+      ])
+      await page.keyboard.press('Escape')
+      await dialog.getByLabel('划转金额（USDC）').fill('1.12345678')
+      await dialog.getByRole('button', { name: '确认划转' }).click()
+      await expect
+        .poll(() => writes.at(-1))
+        .toMatchObject({
+          type: 'sendAsset',
+          sourceDex: 'spot',
+          destinationDex: '',
+          amount: '1.12345678',
+        })
+    }
   })
 }
 
@@ -5159,7 +7490,7 @@ test('Web3 提款：主钱包确认、固定测试网 CCTP 路由、目标链真
   })
   await expect(
     dialog.getByRole('link', { name: /查看链上交易/ }),
-  ).toHaveAttribute('href', /^https:\/\/sepolia.arbiscan.io\/tx\/0x/)
+  ).toHaveAttribute('href', /^https:\/\/sepolia\.arbiscan\.io\/tx\/0x/)
 })
 
 test('Web3 提款未知响应刷新后不锁表单，按 nonce 自动恢复查询且不自动重发', async ({
@@ -5418,7 +7749,7 @@ test('Web3 独立资金弹窗：存提资产网络可下拉选择，无多余引
     const dialog = page.getByRole('dialog')
     await expect(
       dialog.getByRole('heading', {
-        name: name === '划转' ? '划转 USDC' : name,
+        name,
         exact: true,
       }),
     ).toBeVisible()
@@ -5511,7 +7842,7 @@ test('Web3 提款单页：先展示费用与最大值，点击提款才签名，
   })
   await dialog.getByRole('button', { name: '现货转入合约' }).click()
   await expect(
-    page.getByRole('dialog').getByRole('heading', { name: '划转 USDC' }),
+    page.getByRole('dialog').getByRole('heading', { name: '划转' }),
   ).toBeVisible()
   await expect(
     page.getByRole('dialog').getByLabel('划转方向', { exact: true }),
@@ -7009,7 +9340,7 @@ test('刷新静默恢复连接和历史划转，主动划转只提示一次', as
     .click()
   const dialog = page.getByRole('dialog')
   await expect(
-    dialog.getByText('USDC 划转 · 12 USDC', { exact: true }),
+    dialog.getByText('划转 · 12 USDC', { exact: true }),
   ).toBeVisible()
   expect(await page.locator('[data-feedback="success"]').count()).toBe(0)
   expect(exchange.writes).toHaveLength(0)
@@ -7031,7 +9362,7 @@ test('刷新静默恢复连接和历史划转，主动划转只提示一次', as
     .getByRole('button', { name: '划转', exact: true })
     .click()
   await expect(
-    dialog.getByText('USDC 划转 · 10 USDC', { exact: true }),
+    dialog.getByText('划转 · 10 USDC', { exact: true }),
   ).toBeVisible()
   expect(await page.locator('[data-feedback="success"]').count()).toBe(0)
   expect(exchange.writes).toHaveLength(1)
@@ -8332,15 +10663,15 @@ test('预测专用下单：默认市价 USDC、固定 Yes/No、保持草稿、�
     panel.getByRole('button', { name: '下单', exact: true }),
   ).toBeDisabled()
   await panel.getByRole('textbox', { name: '数量（USDC）' }).fill('10.2')
-  await expect(panel.getByLabel('订单摘要')).toContainText('20 USDC')
+  await expect(panel.getByLabel('订单摘要')).toContainText('18 USDC')
   await expect(panel.getByLabel('订单摘要')).toContainText('0.0000% / 0.0000%')
   await predictionUnit(page, 'Yes')
   await expect(panel.getByRole('textbox', { name: '数量（Yes）' })).toHaveValue(
-    '20',
+    '18',
   )
   await panel.getByRole('button', { name: 'No', exact: true }).click()
   await expect(panel.getByRole('textbox', { name: '数量（No）' })).toHaveValue(
-    '20',
+    '18',
   )
   await expect(
     panel.getByRole('group', { name: '预测方向' }).getByRole('button').first(),
@@ -8351,15 +10682,15 @@ test('预测专用下单：默认市价 USDC、固定 Yes/No、保持草稿、�
   await predictionType(page, '限价')
   await panel.getByRole('textbox', { name: '价格（USDC）' }).fill('0.4')
   await expect(panel.getByRole('textbox', { name: '数量（No）' })).toHaveValue(
-    '20',
+    '18',
   )
-  await expect(panel.getByLabel('订单摘要')).toContainText('8.0000 USDC')
+  await expect(panel.getByLabel('订单摘要')).toContainText('7.2000 USDC')
   await signPreview(page)
   await expect.poll(() => writes.length).toBe(1)
   expect(writes[0].orders?.[0]).toMatchObject({
     a: 100000121,
     b: true,
-    s: '20',
+    s: '18',
     p: '0.4',
     t: { limit: { tif: 'Gtc' } },
   })

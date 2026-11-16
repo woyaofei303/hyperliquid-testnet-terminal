@@ -31,7 +31,12 @@ import {
   preparePositionProtection,
   type Ticket,
 } from '@/features/trading/lib/order-ticket'
-import { Money } from '@/features/trading/lib/orders'
+import {
+  isOrderNotSent,
+  Money,
+  marketReferencePrice,
+  OrderNotSentError,
+} from '@/features/trading/lib/orders'
 import {
   type PositionActionOptions,
   preparePositionAction,
@@ -172,6 +177,7 @@ export function useTerminal() {
       const feedback = fundingFeedback(
         funding.notification.kind,
         funding.notification.status,
+        funding.notification.token,
       )
       notify(feedback.tone, feedback.text, 'funding')
     } else dismissNotification('funding')
@@ -227,17 +233,30 @@ export function useTerminal() {
       : null
   const canTrade = tradingReady && accountReady && !unresolved
 
-  function storePending(next: PendingOrder | null) {
+  function storePending(next: PendingOrder | null, expectedCloid?: string) {
     const owner = next?.account ?? address
+    if (!next && owner && expectedCloid) {
+      const latest = loadPending(owner)
+      if (latest?.cloid !== expectedCloid) {
+        if (owner.toLowerCase() === activeAddress.current?.toLowerCase())
+          setPending(latest)
+        return false
+      }
+    }
+    if (next) {
+      try {
+        localStorage.setItem(
+          `${pendingKey}:${next.account.toLowerCase()}`,
+          JSON.stringify(next),
+        )
+      } catch (error) {
+        throw new OrderNotSentError(errorText(error), { cause: error })
+      }
+    } else if (address)
+      localStorage.removeItem(`${pendingKey}:${address.toLowerCase()}`)
     if (owner?.toLowerCase() === activeAddress.current?.toLowerCase())
       setPending(next)
-    if (next)
-      localStorage.setItem(
-        `${pendingKey}:${next.account.toLowerCase()}`,
-        JSON.stringify(next),
-      )
-    else if (address)
-      localStorage.removeItem(`${pendingKey}:${address.toLowerCase()}`)
+    return true
   }
   const chase = useChaseOrders(wallet, storePending)
   const log = useCallback(
@@ -385,13 +404,18 @@ export function useTerminal() {
           info.orderStatus({ user: unresolved.account, oid }),
         ),
       )
+      if (
+        activeAddress.current?.toLowerCase() !==
+        unresolved.account.toLowerCase()
+      )
+        return
       const known = results.filter((result) => result.status === 'order')
       const complete =
         known.length === results.length ||
         Date.now() > unresolved.expiresAt + 30000
       const text = `订单核对：${known.length}/${results.length} 笔查到记录。${known.map((result) => (result.status === 'order' ? `#${result.order.order.oid} ${result.order.status}` : '')).join('；')}`
       if (complete) {
-        storePending(null)
+        if (!storePending(null, unresolved.cloid)) return
         log({
           account: unresolved.account,
           action: 'reconcile',
@@ -449,8 +473,8 @@ export function useTerminal() {
         next,
         !!unresolved,
         (pending) => {
+          storePending(pending, cloid)
           if (pending) cloid = pending.cloid
-          storePending(pending)
         },
       )
       setMessage(result.message, tradeFeedbackTone(result.state))
@@ -482,15 +506,19 @@ export function useTerminal() {
       }
       const denied = isUserRejection(e)
       const needsDeposit = isDepositRequired(e)
-      const rejected = e instanceof ApiRequestError || denied || needsDeposit
-      if (cloid && rejected) storePending(null)
+      const notSent = isOrderNotSent(e)
+      const rejected =
+        e instanceof ApiRequestError || denied || needsDeposit || notSent
+      if (cloid && rejected) storePending(null, cloid)
       const text = needsDeposit
         ? DEPOSIT_REQUIRED_MESSAGE
         : denied
           ? '签名已取消，未发送交易请求。'
-          : rejected
-            ? `交易所拒绝：${errorText(e)}`
-            : `${errorText(e)}${cloid ? '。结果待确认，请查询订单状态。' : ''}`
+          : notSent
+            ? `${errorText(e)}。请求尚未发送，可修正后重试。`
+            : rejected
+              ? `交易所拒绝：${errorText(e)}`
+              : `${errorText(e)}${cloid ? '。结果待确认，请查询订单状态。' : ''}`
       setMessage(
         text,
         denied || needsDeposit || (cloid && !rejected) ? 'warning' : 'error',
@@ -604,11 +632,12 @@ export function useTerminal() {
         book.time > Date.now() + 5000
       )
         throw new Error('该市场行情过期，暂不能平仓')
-      const price = book.levels[new Money(latest.szi).gt(0) ? 0 : 1][0]?.px
-      if (!price) throw new Error('当前盘口没有对手方报价')
+      if (!book.levels[new Money(latest.szi).gt(0) ? 0 : 1][0]?.px)
+        throw new Error('当前盘口没有对手方报价')
       const mark = new Money(latest.positionValue)
         .div(new Money(latest.szi).abs())
         .toFixed()
+      const price = marketReferencePrice(book, mark)
       const ticket = preparePositionAction(
         { ...selected, context: { ...selected.context, markPx: mark } },
         latest.szi,
@@ -765,6 +794,7 @@ export function useTerminal() {
       )
       return
     }
+    if (!storePending(null, unresolved.cloid)) return
     log({
       account: unresolved.account,
       action: 'manual-reconcile',
@@ -773,12 +803,12 @@ export function useTerminal() {
       message:
         '用户确认已在交易所核对，解除本地重复提交保护；不代表请求成功或失败',
     })
-    storePending(null)
     setMessage('已按你的核对结果解除本地保护，没有重新发送交易。')
   }
 
   function selectMarket(name: string) {
     if (!markets.some((m) => m.name === name)) return
+    setCashOrderIntent(null)
     setCoin(name)
     window.history.replaceState(
       null,
@@ -818,8 +848,11 @@ export function useTerminal() {
     if (needsDeposit) setWeb3Panel('deposit')
     else connect()
   }
-  async function transferFunds(amount: string, toPerp: boolean) {
-    if (await funding.transfer(amount, toPerp)) {
+  async function transferFunds(
+    amount: string,
+    quote: Parameters<typeof funding.transfer>[1],
+  ) {
+    if (await funding.transfer(amount, quote)) {
       if (activeWallet.current?.lifecycle !== wallet?.lifecycle) return
       setWeb3Panel(null)
     }

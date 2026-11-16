@@ -21,6 +21,7 @@ export function tradeFeedbackTone(state: string) {
 export function fundingFeedback(
   kind: FundingRecord['kind'],
   status: FundingRecord['status'],
+  token = 'USDC',
 ): { tone: FeedbackTone; text: string } {
   if (status === 'unknown')
     return {
@@ -44,7 +45,7 @@ export function fundingFeedback(
         kind === 'withdraw'
           ? '提款已到账，请核对目标链钱包余额。'
           : kind === 'transfer'
-            ? 'USDC 划转已确认。'
+            ? `${token} 划转已确认。`
             : '存款已到账，账户余额正在更新。',
     }
   return {

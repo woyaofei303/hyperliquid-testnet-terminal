@@ -1,5 +1,50 @@
 // 前端文案：简体中文为源文案，英文与同一交易状态共享，不通过切换路由重建会话。
 export const en: Record<string, string> = {
+  '旧版 DEX 模式仅支持原生合约与现货之间划转 USDC':
+    'Legacy DEX mode only supports USDC transfers between native perps and spot.',
+  划转币种: 'Transfer asset',
+  划转来源: 'From account',
+  划转目标: 'To account',
+  '划转金额（': 'Transfer amount (',
+  可卖数量: 'Available to sell',
+  '开始价格（': 'Start price (',
+  '结束价格（': 'End price (',
+  '1 表示等量；2 表示最后一单的目标数量为第一单的 2 倍，按市场数量精度取整。':
+    '1 means equal sizes; 2 targets twice the first order size for the final order, rounded to market precision.',
+  '可用额度包含交易所核定的自动借贷额度；成交可能产生借款与利息。偿债卖出仅释放已有抵押资产。':
+    'Available funds include exchange-approved borrowing capacity. Fills may create debt and interest. Repayment sells only release existing collateral.',
+  '上一笔划转结果待确认，请先核对资金记录':
+    'The previous transfer is unconfirmed. Check the funding record first.',
+  '资金记录已变化，未发送请求，请先核对':
+    'The funding record changed. No request was sent. Check the record first.',
+  '当前浏览器不支持资金操作锁，请使用新版浏览器':
+    'This browser cannot lock funding operations. Use an up-to-date browser.',
+  '资金操作正在处理，请稍候':
+    'A funding operation is in progress. Please wait.',
+  '滑点必须在 0% 至 100% 之间，最多两位小数':
+    'Slippage must be between 0% and 100%, with up to two decimals',
+  '滑点必须在 0% 至 100% 之间': 'Slippage must be between 0% and 100%',
+  余额数据无效: 'Invalid balance data',
+  划转来源与目标不能相同: 'Transfer source and destination must differ',
+  划转币种元数据无效: 'Invalid transfer asset metadata',
+  '划转 DEX 不存在': 'Transfer DEX is unavailable',
+  '划转币种与 DEX 抵押币不匹配': 'Transfer asset does not match DEX collateral',
+  '钱包已变化，请重新打开划转': 'Wallet changed. Reopen the transfer form.',
+  '划转币种信息已变化，请重新核对':
+    'Transfer asset metadata changed. Review it again.',
+  '价格区间过窄，多档价格舍入后重复':
+    'Price range is too narrow; rounded order prices overlap',
+  借贷余额数据无效: 'Invalid borrow/lend balances',
+  '独立账户划转仅适用于手动模式；共享账户无需在 DEX 之间划转':
+    'Independent transfers require manual mode; shared accounts do not need transfers between DEXs.',
+
+  预上线: 'Pre-launch',
+  '预上线合约仅支持逐仓，资金费参考近期标记价均值；请留意流动性、波动与清算风险。':
+    'Pre-launch perps use isolated margin and a recent average mark price for funding. Consider liquidity, volatility and liquidation risk.',
+  可用余额不足以支付订单: 'Insufficient available balance for the order',
+  可用余额不足以支付整笔订单:
+    'Insufficient available balance for the entire order',
+  市场或账户费率无效: 'Invalid market or account fee rate',
   '正在读取账户类型…': 'Loading account type…',
   '在手机 App 上交易': 'Trade in the mobile app',
   '先连接下方电脑钱包，再点「授权手机交易 / 管理设备」生成二维码。用 App 扫码并核对授权后，手机即可独立交易。':
@@ -444,14 +489,9 @@ export const en: Record<string, string> = {
   'IOC · 立即成交或取消': 'IOC · Immediate or cancel',
   'Post-only · 只挂单': 'Post only',
   '阶梯档数（2–50）': 'Number of levels (2–50)',
-  数量分配: 'Size distribution',
-  平均分配: 'Equal',
-  随价格递增: 'Increasing with price',
-  随价格递减: 'Decreasing with price',
   '执行时长（分钟，5–10080）': 'Duration (minutes, 5–10080)',
   随机执行: 'Randomize',
   'TWAP 触发价（可选）': 'TWAP trigger price (optional)',
-  'TWAP 触发方向': 'TWAP trigger direction',
   标记价高于触发价: 'Mark above trigger',
   标记价低于触发价: 'Mark below trigger',
   'TWAP 最高成交价（可选）': 'TWAP max execution price (optional)',

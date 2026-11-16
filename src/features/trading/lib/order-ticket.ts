@@ -10,14 +10,14 @@ import {
 export const orderKinds = [
   ['limit', '限价单'],
   ['market', '市价单'],
-  ['stop-market', '止损市价'],
-  ['stop-limit', '止损限价'],
-  ['take-market', '止盈市价'],
-  ['take-limit', '止盈限价'],
-  ['scale', '阶梯单'],
-  ['twap', 'TWAP'],
   ['chase', '追价单'],
+  ['scale', '阶梯单'],
+  ['stop-limit', '止损限价'],
+  ['stop-market', '止损市价'],
+  ['take-limit', '止盈限价'],
+  ['take-market', '止盈市价'],
   ['trailing', '移动止损'],
+  ['twap', 'TWAP'],
 ] as const
 export type OrderKind = (typeof orderKinds)[number][0]
 export function supportedOrderKinds(market: Pick<Market, 'kind'>) {
@@ -50,7 +50,9 @@ export interface TicketInput {
   stopLoss: string
   upperPrice: string
   levels: string
-  distribution: 'equal' | 'increasing' | 'decreasing'
+  sizeSkew: string
+  unit?: 'base' | 'usdc'
+  amount?: string
   minutes: string
   randomize: boolean
   twapTrigger: string
@@ -98,6 +100,52 @@ function validPrice(value: string, market: Market, label: string) {
     throw new Error(`${label}必须小于 1`)
   return price
 }
+export function scalePlan(
+  input: Pick<TicketInput, 'price' | 'upperPrice' | 'levels' | 'sizeSkew'>,
+  market: Market,
+) {
+  const start = new Money(validPrice(input.price, market, '开始价格'))
+  const end = new Money(validPrice(input.upperPrice, market, '结束价格'))
+  if (start.eq(end)) throw new Error('开始价格和结束价格不能相同')
+  const count = Number(input.levels)
+  if (!Number.isInteger(count) || count < 2 || count > 50)
+    throw new Error('总订单数为 2 至 50 的整数')
+  const skew = positiveDecimal(input.sizeSkew, '数量偏差')
+  const legs = Array.from({ length: count }, (_, i) => ({
+    price: formatOrderPrice(
+      start
+        .plus(
+          end
+            .minus(start)
+            .times(i)
+            .div(count - 1),
+        )
+        .toFixed(),
+      market,
+    ),
+    weight: new Money(1).plus(
+      skew
+        .minus(1)
+        .times(i)
+        .div(count - 1),
+    ),
+  }))
+  if (new Set(legs.map((leg) => leg.price)).size !== count)
+    throw new Error('价格区间过窄，多档价格舍入后重复')
+  const weight = legs.reduce((sum, leg) => sum.plus(leg.weight), new Money(0))
+  const cost = legs.reduce(
+    (sum, leg) => sum.plus(leg.weight.times(leg.price)),
+    new Money(0),
+  )
+  // 表单参考均价限制循环小数长度；实际逐档金额仍使用完整 cost。
+  return {
+    legs,
+    weight,
+    cost,
+    average: cost.div(weight).toSignificantDigits(30).toFixed(),
+  }
+}
+
 function triggerOrder(
   input: Pick<
     TicketInput,
@@ -254,58 +302,34 @@ export function prepareTicket(input: TicketInput): Ticket {
     }
   let orders: WireOrder[]
   if (input.kind === 'scale') {
-    const low = positiveDecimal(
-      validPrice(input.price, input.market, '最低价'),
-      '最低价',
-    )
-    const high = positiveDecimal(
-      validPrice(input.upperPrice, input.market, '最高价'),
-      '最高价',
-    )
-    const levels = Number(input.levels)
-    if (!Number.isInteger(levels) || levels < 2 || levels > 50)
-      throw new Error('阶梯档数为 2 至 50 的整数')
-    if (high.lte(low)) throw new Error('最高价必须高于最低价')
+    const scale = scalePlan(input, input.market)
     if (size.decimalPlaces() > input.market.szDecimals)
       throw new Error('数量精度超过市场允许的小数位')
-    const weights = Array.from({ length: levels }, (_, index) =>
-      input.distribution === 'equal'
-        ? 1
-        : input.distribution === 'increasing'
-          ? index + 1
-          : levels - index,
-    )
-    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0)
+    const amount =
+      input.unit === 'usdc' ? positiveDecimal(input.amount ?? '', '金额') : size
     let assigned = new Money(0)
-    orders = weights.map((weight, index) => {
-      const amount =
-        index === levels - 1
-          ? size.minus(assigned)
-          : size
-              .times(weight)
-              .div(totalWeight)
+    orders = scale.legs.map((leg, index) => {
+      const quantity =
+        input.unit === 'usdc'
+          ? amount
+              .times(leg.weight)
+              .div(scale.cost)
               .toDecimalPlaces(input.market.szDecimals, Money.ROUND_DOWN)
-      assigned = assigned.plus(amount)
-      const price = formatOrderPrice(
-        low
-          .plus(
-            high
-              .minus(low)
-              .times(index)
-              .div(levels - 1),
-          )
-          .toFixed(),
-        input.market,
-      )
+          : index === scale.legs.length - 1
+            ? amount.minus(assigned)
+            : amount
+                .times(leg.weight)
+                .div(scale.weight)
+                .toDecimalPlaces(input.market.szDecimals, Money.ROUND_DOWN)
+      assigned = assigned.plus(quantity)
       return prepareOrder({
         ...input,
         kind: 'limit',
-        price,
-        size: amount.toFixed(),
+        price: leg.price,
+        size: quantity.toFixed(),
       })
     })
-    if (new Set(orders.map((order) => order.p)).size !== levels)
-      throw new Error('价格区间过窄，多档价格舍入后重复')
+    base.size = assigned.toFixed()
   } else if (input.kind.startsWith('stop-') || input.kind.startsWith('take-')) {
     orders = [
       triggerOrder(

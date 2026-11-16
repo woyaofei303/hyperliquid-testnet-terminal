@@ -27,7 +27,10 @@ import type {
   TrailingAction,
   TwapAction,
 } from '../../features/trading/lib/order-ticket.ts'
-import type { Market } from '../../features/trading/lib/orders.ts'
+import {
+  type Market,
+  OrderNotSentError,
+} from '../../features/trading/lib/orders.ts'
 import {
   clearTradingConnection,
   loadTradingConnection,
@@ -68,6 +71,7 @@ export interface AccountSnapshot {
   state: AccountState
   dex: string
   spot: Awaited<ReturnType<typeof info.spotClearinghouseState>>
+  borrowReserves?: Awaited<ReturnType<typeof info.allBorrowLendReserveStates>>
   orders: OpenOrder[]
   fills: Fill[]
   at: number
@@ -82,7 +86,10 @@ export interface WalletSession {
   providerId?: string
   connectionSaved?: boolean
   lifecycle?: { active: boolean }
-  sendNative?: (action: TrailingAction | TwapAction) => Promise<number>
+  sendNative?: (
+    action: TrailingAction | TwapAction,
+    expiresAfter: number,
+  ) => Promise<number>
 }
 
 declare global {
@@ -139,6 +146,10 @@ export async function loadAccount(
   return {
     address,
     mode: parseAccountMode(mode),
+    borrowReserves:
+      mode === 'portfolioMargin'
+        ? await info.allBorrowLendReserveStates()
+        : undefined,
     dex,
     spot,
     state,
@@ -342,11 +353,17 @@ function tradingSession(
       return agent.signTypedData(params)
     },
   }
-  const nonceManager = () => nextTradingNonce(agent.address)
+  const nonceManager = async () => {
+    try {
+      return await nextTradingNonce(agent.address)
+    } catch (error) {
+      throw new OrderNotSentError(errorText(error), { cause: error })
+    }
+  }
   return {
     ...session,
     expiresAt,
-    async sendNative(input) {
+    async sendNative(input, expiresAfter) {
       // SDK 0.33 未暴露 trailingStop，且旧 TWAP schema 限 1 天；沿用其签名与传输，范围由 prepareTicket 校验。
       const action =
         input.type === 'twapOrder'
@@ -361,7 +378,8 @@ function tradingSession(
               activationPx: input.activationPx,
             }
       const nonce = await nonceManager()
-      const expiresAfter = Math.min(Date.now() + 60000, expiresAt)
+      if (Date.now() >= expiresAfter)
+        throw new OrderNotSentError('订单签名有效期已过，请重新预览')
       const signature = await signL1Action({
         wallet: signer,
         action,
@@ -369,6 +387,8 @@ function tradingSession(
         expiresAfter,
         isTestnet: true,
       })
+      if (Date.now() >= expiresAfter)
+        throw new OrderNotSentError('订单签名有效期已过，请重新预览')
       const response = await transport.request('exchange', {
         action,
         nonce,

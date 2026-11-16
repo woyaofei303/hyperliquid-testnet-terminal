@@ -2,10 +2,11 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import {
   cashBalances,
   cashTicketValue,
+  cashTwapPrice,
   loadCashFunds,
   prepareCashTicket,
-  validateCashTicketFunds,
 } from '@/features/trading/lib/cash-order'
+import { marketFees } from '@/features/trading/lib/market-fees'
 import {
   type BookPriceSelection,
   defaultOrderFields,
@@ -13,24 +14,23 @@ import {
 } from '@/features/trading/lib/order-form-fields'
 import {
   amountFromPercent,
+  quoteAmount,
   sizeFromAmount,
 } from '@/features/trading/lib/order-sizing'
 import {
   type OrderKind,
   prepareTicket,
+  scalePlan,
   supportedOrderKinds,
 } from '@/features/trading/lib/order-ticket'
 import {
   Money,
+  marketOrderPrice,
+  marketReferencePrice,
   positiveDecimal,
   slippageBps,
 } from '@/features/trading/lib/orders'
-import {
-  predictionEstimate,
-  predictionFees,
-  predictionScale,
-  preparePredictionTicket,
-} from '@/features/trading/lib/prediction-order'
+import { predictionEstimate } from '@/features/trading/lib/prediction-order'
 import {
   errorText,
   info,
@@ -43,7 +43,6 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
   const outcome = market.kind === 'outcome'
   const [fee, setFee] = useState<{
     user: string
-    rate: string
     data: Awaited<ReturnType<typeof info.userFees>>
   } | null>(null)
   useEffect(() => {
@@ -61,8 +60,9 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
   const selectedPercent = useRef<number | null>(null)
   const appliedBookPrice = useRef(model.bookPrice)
   const [previewing, setPreviewing] = useState(false)
-  const context = useRef({ model, active: true })
+  const context = useRef({ model, fields, active: true })
   context.current.model = model
+  context.current.fields = fields
   const { address, account } = model
   useEffect(() => {
     context.current.active = true
@@ -80,11 +80,6 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
             setFee({
               user: address,
               data,
-              rate: Money.max(
-                0,
-                data.userSpotCrossRate,
-                data.userSpotAddRate,
-              ).toFixed(),
             })
         })
         .catch((e) => {
@@ -119,9 +114,7 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
           const maximum = (
             fields.side === 'sell'
               ? new Money(balances.base)
-              : new Money(balances.quote).div(
-                  price.times(new Money(1).plus(rate)),
-                )
+              : new Money(balances.quote).div(price)
           )
             .toDecimalPlaces(market.szDecimals, Money.ROUND_DOWN)
             .toFixed()
@@ -140,35 +133,44 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
     } else {
       setFields((previous) => ({ ...previous, [key]: value }))
     }
+    if (key === 'twapTrigger') {
+      setFields((previous) => ({
+        ...previous,
+        twapAbove: Number(value) > Number(market.context.markPx),
+      }))
+    }
     setError('')
   }
   function setKind(kind: OrderKind) {
     if (supportedOrderKinds(market).some(([key]) => key === kind))
       change('kind', kind)
   }
-  const balances = account.snapshot?.spot
-    ? cashBalances(market, account.snapshot.spot.balances)
-    : null
+  let balances: ReturnType<typeof cashBalances> | null = null
+  let balanceError = ''
+  try {
+    if (account.snapshot?.spot)
+      balances = cashBalances(
+        market,
+        account.snapshot.spot.balances,
+        account.snapshot.mode === 'portfolioMargin'
+          ? account.snapshot.borrowReserves
+          : undefined,
+      )
+  } catch (e) {
+    balanceError = errorText(e)
+  }
   let rates: { taker: string; maker: string } | null = null
   let feeError = ''
   try {
-    if (fee?.user === address && outcome)
-      rates = predictionFees(market, fee.data, fields.side)
+    if (fee?.user === address) rates = marketFees(market, fee.data, fields.side)
   } catch (e) {
     feeError = errorText(e)
   }
   const rate =
-    fee?.user === address && !feeError
-      ? outcome
-        ? fields.side === 'buy'
-          ? '0'
-          : (rates?.taker ?? null)
-        : fee.rate
-      : null
+    rates && !feeError ? Money.max(0, rates.taker, rates.maker).toFixed() : null
   const effectivePrice =
     fields.kind === 'market'
-      ? (model.feed.book?.levels[fields.side === 'buy' ? 1 : 0][0]?.px ??
-        (outcome ? market.context.markPx : ''))
+      ? marketReferencePrice(model.feed.book, market.context.markPx)
       : fields.price
   let sizePrice =
     fields.kind === 'scale'
@@ -176,9 +178,33 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
       : fields.kind === 'twap'
         ? market.context.markPx
         : effectivePrice
-  if (outcome && fields.kind === 'scale') {
+  if (fields.kind === 'market' && fields.side === 'buy') {
     try {
-      sizePrice = predictionScale(fields, market).average
+      sizePrice = marketOrderPrice(
+        effectivePrice,
+        market,
+        'buy',
+        slippageBps(fields.slippage),
+      )
+    } catch {
+      sizePrice = ''
+    }
+  }
+  if (fields.kind === 'scale') {
+    try {
+      sizePrice = scalePlan(fields, market).average
+    } catch {
+      sizePrice = ''
+    }
+  }
+  if (fields.kind === 'twap') {
+    try {
+      sizePrice = cashTwapPrice(
+        market.context.markPx,
+        fields.side === 'buy',
+        fields.twapTrigger,
+        fields.twapLimit,
+      ).toFixed()
     } catch {
       sizePrice = ''
     }
@@ -203,8 +229,9 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
     size,
     slippageBps: slippageBps(fields.slippage),
   })
-  const prepare = () =>
-    outcome ? preparePredictionTicket(input()) : prepareTicket(input())
+  const prepare = () => prepareTicket(input())
+  const latestInput = useRef(input())
+  latestInput.current = input()
   let notional = '—',
     estimatedFee = '—',
     max = '0',
@@ -214,35 +241,24 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
       fields.kind === 'scale' ? fields.upperPrice : effectivePrice,
     )
     if (fields.kind === 'market' && fields.side === 'buy')
-      budgetPrice = budgetPrice.times(
-        new Money(1).plus(new Money(fields.slippage).div(100)),
-      )
-    if (outcome && fields.kind === 'market')
-      budgetPrice = Money.min('0.99999', budgetPrice)
-    if (outcome && fields.kind === 'scale')
+      budgetPrice = new Money(sizePrice)
+    if (fields.kind === 'scale')
       budgetPrice =
         fields.unit === 'usdc'
           ? new Money(sizePrice)
           : Money.max(fields.price, fields.upperPrice)
-    if (fields.kind === 'twap')
-      budgetPrice = fields.twapLimit
-        ? new Money(fields.twapLimit)
-        : Money.max(market.context.markPx, fields.twapTrigger || 0).times(
-            fields.side === 'buy' ? '1.03' : '0.97',
-          )
+    if (fields.kind === 'twap') budgetPrice = new Money(sizePrice)
     if (balances && rate != null) {
       if (fields.side === 'sell') max = balances.base
       else if (budgetPrice.gt(0))
-        max = new Money(balances.quote)
-          .div(budgetPrice.times(new Money(1).plus(rate)))
-          .toFixed()
+        max = new Money(balances.quote).div(budgetPrice).toFixed()
       max = new Money(max)
         .toDecimalPlaces(market.szDecimals, Money.ROUND_DOWN)
         .toFixed()
     }
     if (fields.amount) {
       const ticket = prepare()
-      if (outcome) size = ticket.size
+      size = ticket.size
       const estimate =
         outcome && fields.kind === 'market'
           ? predictionEstimate(
@@ -258,7 +274,12 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
             : new Money(size).times(effectivePrice)
           : cashTicketValue(ticket)
       notional = value.toFixed(4)
-      if (rate != null) estimatedFee = value.times(rate).toFixed(4)
+      if (rate != null)
+        estimatedFee = new Money(
+          !outcome && fields.side === 'buy' ? size : value,
+        )
+          .times(rate)
+          .toFixed(8)
     }
   } catch {
     /* 未完成的草稿不产生估算。 */
@@ -267,6 +288,24 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
     size && new Money(max).gt(0)
       ? Math.min(100, new Money(size).div(max).times(100).toNumber())
       : 0
+  useEffect(() => {
+    if (selectedPercent.current == null) return
+    try {
+      positiveDecimal(sizePrice, '价格')
+      const amount = amountFromPercent(
+        max,
+        selectedPercent.current,
+        fields.unit,
+        sizePrice,
+        market.szDecimals,
+      )
+      setFields((previous) =>
+        previous.amount === amount ? previous : { ...previous, amount },
+      )
+    } catch {
+      // 价格尚未完整时保留比例草稿。
+    }
+  }, [max, sizePrice, fields.unit, market.szDecimals])
   const applyBookPrice = useEffectEvent(
     (selection: BookPriceSelection | null) => {
       if (selection?.coin === market.name && fields.kind === 'limit')
@@ -280,13 +319,12 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
   }, [model.bookPrice])
 
   function setUnit(unit: 'base' | 'usdc') {
+    if (unit === fields.unit) return
     try {
       const amount = size
         ? unit === 'base'
           ? size
-          : new Money(size)
-              .times(positiveDecimal(sizePrice, '价格'))
-              .toFixed(6, Money.ROUND_DOWN)
+          : quoteAmount(size, sizePrice)
         : ''
       setFields((previous) => ({ ...previous, unit, amount }))
       setError('')
@@ -304,21 +342,27 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
       const latest = context.current.model
       if (
         !context.current.active ||
+        context.current.fields !== fields ||
         latest.address !== address ||
         latest.coin !== market.name ||
         !latest.canTrade ||
         latest.feed.stale
       )
         return
-      const ticket = outcome
-        ? prepare()
-        : prepareCashTicket(input(), funds.balances, funds.feeRate)
-      if (outcome)
-        validateCashTicketFunds(ticket, funds.balances, funds.feeRate)
+      const ticket = prepareCashTicket(
+        latestInput.current,
+        funds.balances,
+        funds.feeRate,
+      )
       latest.previewTicket(ticket)
       setError('')
     } catch (e) {
-      if (context.current.active && context.current.model.address === address)
+      if (
+        context.current.active &&
+        context.current.fields === fields &&
+        context.current.model.coin === market.name &&
+        context.current.model.address === address
+      )
         setError(errorText(e))
     } finally {
       if (context.current.active) setPreviewing(false)
@@ -331,7 +375,7 @@ export function useCashOrderForm(model: TerminalModel, market: MarketContext) {
     setKind,
     setUnit,
     percent,
-    error: error || feeError,
+    error: error || balanceError || feeError,
     rates,
     notional,
     estimatedFee,

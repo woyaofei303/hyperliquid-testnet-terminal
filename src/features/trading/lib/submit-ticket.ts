@@ -14,11 +14,18 @@ export function batchOrderResults(
   if (
     response?.status !== 'ok' ||
     response.response?.type !== 'order' ||
-    !Array.isArray(response.response.data?.statuses) ||
-    response.response.data.statuses.length !== orders.length
+    !Array.isArray(response.response.data?.statuses)
   )
     throw new Error('批量回报数量或类型异常，请核对每一笔订单')
-  return response.response.data.statuses.map((status, index) => {
+  const raw = response.response.data.statuses
+  // 交易所整批预校验失败时只返回一条错误，不能当作回报丢失。
+  const statuses =
+    raw.length === 1 && typeof raw[0] === 'object' && 'error' in raw[0]
+      ? orders.map(() => raw[0])
+      : raw
+  if (statuses.length !== orders.length)
+    throw new Error('批量回报数量或类型异常，请核对每一笔订单')
+  return statuses.map((status, index) => {
     if (status === 'waitingForFill' || status === 'waitingForTrigger')
       return {
         state: 'waiting',
@@ -57,7 +64,7 @@ export async function submitOrderTicket(
       cloid: cloid(),
       native: ticket.kind,
     })
-    const id = await wallet.sendNative(ticket.action)
+    const id = await wallet.sendNative(ticket.action, expiresAt)
     onPending(null)
     return {
       ...base,

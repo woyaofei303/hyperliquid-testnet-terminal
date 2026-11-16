@@ -81,18 +81,25 @@ export function CashOrderForm({
           {f.side === 'buy' ? quote : base}
         </span>
       </div>
+      {model.account.snapshot?.mode === 'portfolioMargin' && (
+        <p className="text-xs leading-5 text-muted">
+          {t(
+            '可用额度包含交易所核定的自动借贷额度；成交可能产生借款与利息。偿债卖出仅释放已有抵押资产。',
+          )}
+        </p>
+      )}
       {['limit', 'scale', 'chase'].includes(f.kind) && (
         <Input
           label={
             <HelpLabel
               helpKey={
                 f.kind === 'scale'
-                  ? '最低价格'
+                  ? '开始价格'
                   : f.kind === 'chase'
                     ? '追价边界'
                     : '价格'
               }
-              label={`${t(f.kind === 'scale' ? '最低价格' : f.kind === 'chase' ? (f.side === 'buy' ? '最高买入价' : '最低卖出价') : '价格')}${t('（')}${quote}${t('）')}`}
+              label={`${t(f.kind === 'scale' ? '开始价格' : f.kind === 'chase' ? (f.side === 'buy' ? '最高买入价' : '最低卖出价') : '价格')}${t('（')}${quote}${t('）')}`}
             />
           }
           value={f.price}
@@ -183,7 +190,7 @@ export function CashOrderForm({
             <HelpLabel label="预计手续费上限" />
           </dt>
           <dd>
-            {form.estimatedFee} {quote}
+            {form.estimatedFee} {f.side === 'buy' ? base : quote}
           </dd>
         </div>
       </dl>

@@ -5,20 +5,12 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { formatUnits } from 'viem'
-import { sharedAccount } from '@/features/assets/lib/account-types'
-import {
-  DEPOSIT_CHAIN,
-  fundingAmount,
-  transferAmount,
-} from '@/features/assets/lib/funding'
+import { TransferForm } from '@/features/assets/components/transfer-form'
+import { DEPOSIT_CHAIN, fundingAmount } from '@/features/assets/lib/funding'
 import type { TerminalModel } from '@/features/terminal/hooks/use-terminal'
-import { Money } from '@/features/trading/lib/orders'
 import { t, useLocale } from '@/i18n'
 import { display } from '@/shared/lib/display'
-import {
-  FundingRoute,
-  WithdrawalForm,
-} from '../../assets/components/withdrawal-form'
+import { WithdrawalForm } from '../../assets/components/withdrawal-form'
 
 const walletDownloads = [
   {
@@ -81,15 +73,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
   const attachPopover = useCallback((node: HTMLDivElement | null) => {
     setPopoverContainer(node?.closest<HTMLElement>('[role="dialog"]') ?? null)
   }, [])
-  const {
-    wallet,
-    funding: f,
-    busy,
-    web3Panel,
-    setWeb3Panel,
-    transferToPerp,
-    setTransferToPerp,
-  } = model
+  const { wallet, funding: f, busy, web3Panel, setWeb3Panel } = model
   const close = () => {
     f.cancelWithdrawal()
     setWeb3Panel(null)
@@ -104,29 +88,21 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
   }
   const sufficient =
     f.balances && f.balances.usdc >= units && f.balances.gas > 0n
-  const transferAvailable =
-    (transferToPerp ? f.core?.spot : f.core?.perp) ?? '0'
-  let transferError = ''
-  if (amount && web3Panel === 'transfer') {
-    try {
-      transferAmount(amount, transferAvailable)
-    } catch (e) {
-      transferError = e instanceof Error ? e.message : t('金额无效')
-    }
-  }
   const accountMode = model.account.snapshot?.mode
-  const canTransfer = !!accountMode && !sharedAccount(accountMode)
+  const canTransfer = ['default', 'disabled', 'dexAbstraction'].includes(
+    accountMode ?? '',
+  )
   useEffect(() => {
-    if (web3Panel === 'transfer' && accountMode && sharedAccount(accountMode))
+    if (web3Panel === 'transfer' && accountMode && !canTransfer)
       setWeb3Panel(null)
-  }, [web3Panel, accountMode, setWeb3Panel])
+  }, [web3Panel, accountMode, canTransfer, setWeb3Panel])
   const connectingView = !wallet || (web3Panel === 'wallet' && !authorized)
   const title = connectingView
     ? t('连接')
     : web3Panel === 'deposit'
       ? t('存款')
       : web3Panel === 'transfer'
-        ? t('划转 USDC')
+        ? t('划转')
         : web3Panel === 'withdraw'
           ? t('提款')
           : t('账户')
@@ -494,51 +470,7 @@ export function Web3Dialog({ model }: { model: TerminalModel }) {
             </>
           )}
           {web3Panel === 'transfer' && canTransfer && (
-            <>
-              <FundingRoute
-                from={transferToPerp ? t('现货账户') : t('合约账户')}
-                to={transferToPerp ? t('合约账户') : t('现货账户')}
-                onSwap={() => {
-                  setTransferToPerp(!transferToPerp)
-                  setAmount('')
-                }}
-                disabled={busy}
-              />
-              <Input
-                label={t('划转金额（USDC）')}
-                value={amount}
-                onChange={setAmount}
-                inputMode="decimal"
-                placeholder={t('输入划转金额')}
-                isDisabled={busy}
-                isInvalid={!!transferError}
-                errorMessage={transferError}
-                endContent={
-                  <Button
-                    variant="light"
-                    size="sm"
-                    isDisabled={busy || !f.core}
-                    onPress={() =>
-                      setAmount(
-                        new Money(transferAvailable)
-                          .toDecimalPlaces(6, Money.ROUND_DOWN)
-                          .toFixed(),
-                      )
-                    }
-                  >
-                    {t('最大值：')}
-                    {display(transferAvailable, 6)}
-                  </Button>
-                }
-              />
-              <Button
-                className="w-full"
-                isDisabled={busy || !f.core || !amount || !!transferError}
-                onPress={() => model.transferFunds(amount, transferToPerp)}
-              >
-                {busy ? t('等待钱包确认…') : t('确认划转')}
-              </Button>
-            </>
+            <TransferForm key={wallet?.address} model={model} />
           )}
           {web3Panel === 'withdraw' && <WithdrawalForm model={model} />}
           <FundingStatus model={model} />
@@ -576,11 +508,11 @@ function FundingStatus({ model }: { model: TerminalModel }) {
         {record.kind === 'approve'
           ? t('USDC 授权')
           : record.kind === 'transfer'
-            ? t('USDC 划转')
+            ? t('划转')
             : record.kind === 'withdraw'
               ? t('USDC 提款')
               : t('USDC 存款')}{' '}
-        · {record.amount} USDC
+        · {record.amount} {record.token ?? 'USDC'}
       </p>
       <p>
         {record.status === 'credited'
