@@ -7,7 +7,7 @@
   "dependencies": {
     "@fameex/utils": "0.0.0",
     "klinecharts": "10.1.0",
-    "ahooks": "3.9.6",
+    "ahooks": "3.11.0",
     "zustand": "4.5.7"
   }
 }
