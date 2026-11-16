@@ -1,0 +1,11 @@
+[Unit]
+Description=Close the staging phone pairing window after boot
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /etc/hyperliquid-staging-pairing/staging-pairing-window.sh off
+
+[Install]
+WantedBy=multi-user.target

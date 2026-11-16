@@ -15,6 +15,9 @@ files = [
     'deploy/compose.yml', 'deploy/nginx.conf', 'deploy/runtime-config.json',
     'deploy/staging/compose.yml', 'deploy/staging/nginx.conf', 'deploy/staging/Caddyfile',
     'deploy/staging/runtime-config.json', 'src/features/wallet/lib/runtime-config.ts',
+    'deploy/staging/pairing.compose.yml', 'deploy/probe-staging-pairing.mjs',
+    'deploy/staging-pairing-window.sh',
+    'deploy/staging/pairing-reset.service',
     'playwright.smoke.config.ts', 'tests/deploy-smoke.spec.ts',
 ]
 blocks = ['# 交付流程完整代码\n\n与[操作手册](ci-cd-handbook.md)配套。此文件由 `python3 scripts/sync-delivery-code.py` 生成；修改实现后必须重新生成。每个文件列出 SHA-256，代码不是伪代码。密钥不在本文中。\n']
