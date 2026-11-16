@@ -179,7 +179,7 @@ STATIC_EXPORT=1 npm run test:e2e -- --workers=2
 bash scripts/install-ci-tools.sh
 output-tdd/ci-tools/actionlint
 shellcheck deploy/*.sh scripts/install-ci-tools.sh
-output-tdd/ci-tools/gitleaks git --redact --no-banner
+output-tdd/ci-tools/gitleaks git --log-opts=HEAD --redact --no-banner
 npm audit --audit-level=high
 python3 scripts/sync-delivery-code.py --check
 ```
@@ -195,7 +195,7 @@ python3 scripts/sync-delivery-code.py --check
 完整工作流见代码附录。`.github/workflows/deploy-aliyun.yml` 对 PR 和 main push 只检查；只有 `workflow_dispatch` 且 ref 是 main 才能进入环境部署。
 
 - `verify`：锁文件安装、Biome、Node 单测、Python 发布测试、静态导出、类型、Chrome 模拟交互。最后生成清单，手动 deploy 才保存 Artifact。任何命令非零会停止后续步骤；测试证据用 `always()` 保留。
-- `security`：无安装脚本的依赖安装、High/Critical 阈值 audit、固定版本并校验下载哈希的 actionlint/Gitleaks、ShellCheck、Compose 校验。Gitleaks 扫完整提交历史。唯一历史放行是 `.gitleaksignore` 中公共合约地址的具体 fingerprint，不能放行整个测试目录。
+- `security`：无安装脚本的依赖安装、High/Critical 阈值 audit、固定版本并校验下载哈希的 actionlint/Gitleaks、ShellCheck、Compose 校验。Gitleaks 扫候选提交的完整祖先历史（PR 包含合并父提交）；显式指定 GITHUB_SHA，避免默认 --all 把无关分支或未合并演练样本混入。唯一历史放行是 `.gitleaksignore` 中公共合约地址的具体 fingerprint，不能放行整个测试目录。
 - `codeql`：JavaScript/TypeScript、Python、Actions 三种语言的安全扩展查询；最小 `security-events: write` 只用于扫描结果。它没有部署 SSH Secret。分析成功不代表没有高危告警，结果还须由 Ruleset 阻断。
 - `ci-required`：固定名称，依赖 verify/security/codeql，`always()` 后显式核对每个结果必须是 `success`。失败、取消或跳过都不能伪装通过。专用 rollback 不运行这条构建路径。
 - `attest`：所有必需检查通过，审查 SHA 与本次 SHA 一致，PR 链接属于本仓库；高风险要求确认专项验收记录。为 manifest 生成 GitHub 原生来源证明。

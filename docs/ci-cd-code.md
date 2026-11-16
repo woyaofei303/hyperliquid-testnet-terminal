@@ -4,7 +4,7 @@
 
 ## `.github/workflows/deploy-aliyun.yml`
 
-SHA-256：`fc7b54e71db372bd2c09714a41849a79c5b2f6b30348ca4cdad40a3233106ac5`
+SHA-256：`a18ad39717172c21dd7ea03821b17814c2d7d8bb6cc067eb2b133f85cdaa6417`
 
 ````yaml
 name: CI & Production
@@ -134,8 +134,8 @@ jobs:
           python3 scripts/sync-delivery-code.py --check
           docker compose -f deploy/compose.yml config --quiet
           docker compose -f deploy/staging/compose.yml config --quiet
-      - name: Scan all committed history for secrets
-        run: output-tdd/ci-tools/gitleaks git --redact --no-banner
+      - name: Scan the candidate commit and its complete history
+        run: output-tdd/ci-tools/gitleaks git --log-opts="$GITHUB_SHA" --redact --no-banner
 
   codeql:
     if: inputs.operation != 'rollback'
