@@ -43,6 +43,11 @@ test('仓位动作：限价和市价只减仓，反手恰好两倍仓位，移�
         assert.equal(result.orders[0].b, signed.startsWith('-'))
         assert.equal(result.orders[0].r, kind !== 'reverse')
         assert.equal(result.orders[0].s, kind === 'reverse' ? '0.02' : '0.004')
+        if (kind === 'market' || kind === 'reverse')
+          assert.equal(
+            result.orders[0].p,
+            signed.startsWith('-') ? '75600' : '64400',
+          )
       } else assert.fail('类型错误')
     }
   }

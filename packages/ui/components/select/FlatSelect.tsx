@@ -8,7 +8,6 @@ import {
   DropdownMenu,
   DropdownTrigger,
 } from '@heroui/react'
-import { useReducedMotion } from 'framer-motion'
 import {
   cloneElement,
   isValidElement,
@@ -68,7 +67,6 @@ export const FlatSelect = ({
   className,
   ...props
 }: FlatSelectProps) => {
-  const reduceMotion = useReducedMotion()
   const selectedItem = useMemo(() => {
     return items.find((item) => item.key === value)
   }, [items, value])
@@ -94,7 +92,8 @@ export const FlatSelect = ({
       // 下拉通过 portal 挂载到 body，需留在父弹窗的可访问范围内。
       data-react-aria-top-layer="true"
       isDisabled={isDisabled}
-      disableAnimation={Boolean(reduceMotion)}
+      // 关闭时立即释放 FocusScope，避免退出动画把后续输入焦点拉回按钮。
+      disableAnimation
       shouldCloseOnScroll={false}
       triggerScaleOnOpen={false}
       placement={placement}

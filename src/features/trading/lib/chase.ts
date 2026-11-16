@@ -1,7 +1,12 @@
 import { ApiRequestError } from '@nktkas/hyperliquid/api/exchange'
 import type { Book, WalletSession } from '../../../shared/lib/fameex-testnet.ts'
 import { chasePrice } from './order-ticket.ts'
-import { type Market, Money, type prepareOrder } from './orders.ts'
+import {
+  isOrderNotSent,
+  type Market,
+  Money,
+  type prepareOrder,
+} from './orders.ts'
 import {
   type PendingOrder,
   type PreparedOrder,
@@ -41,9 +46,9 @@ export async function placeChaseOrder(
   wallet: WalletSession,
   coin: string,
   order: PreparedOrder,
-  onPending: (value: PendingOrder | null) => void,
+  onPending: (value: PendingOrder | null, expectedCloid?: string) => void,
 ) {
-  let created = false
+  let cloid: string | undefined
   try {
     return await submitTrade(
       wallet,
@@ -57,12 +62,13 @@ export async function placeChaseOrder(
       },
       false,
       (value) => {
-        created = value !== null
-        onPending(value)
+        onPending(value, cloid)
+        cloid = value?.cloid
       },
     )
   } catch (error) {
-    if (created && error instanceof ApiRequestError) onPending(null)
+    if (cloid && (error instanceof ApiRequestError || isOrderNotSent(error)))
+      onPending(null, cloid)
     throw error
   }
 }

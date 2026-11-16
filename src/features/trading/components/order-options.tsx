@@ -42,8 +42,8 @@ export function OrderOptions({
           <Input
             label={
               <HelpLabel
-                label={t('最高价格（') + quote + t('）')}
-                helpKey="最高价格"
+                label={t('结束价格（') + quote + t('）')}
+                helpKey="结束价格"
               />
             }
             value={f.upperPrice}
@@ -56,25 +56,18 @@ export function OrderOptions({
             onChange={(value) => change('levels', value)}
             inputMode="numeric"
           />
-          <Select
-            label={<HelpLabel label="数量分配" />}
-            selectedKeys={[f.distribution]}
-            items={[
-              { key: 'equal', label: t('平均分配') },
-              { key: 'increasing', label: t('随价格递增') },
-              { key: 'decreasing', label: t('随价格递减') },
-            ]}
-            onSelectionChange={(keys) => {
-              const key = Array.from(keys)[0]
-              change(
-                'distribution',
-                key === 'increasing'
-                  ? 'increasing'
-                  : key === 'decreasing'
-                    ? 'decreasing'
-                    : 'equal',
-              )
-            }}
+          <Input
+            label={
+              <HelpLabel
+                label="数量偏差"
+                description={t(
+                  '1 表示等量；2 表示最后一单的目标数量为第一单的 2 倍，按市场数量精度取整。',
+                )}
+              />
+            }
+            value={f.sizeSkew}
+            onChange={(value) => change('sizeSkew', value)}
+            inputMode="decimal"
           />
         </>
       )}
@@ -99,17 +92,9 @@ export function OrderOptions({
             inputMode="decimal"
           />
           {f.twapTrigger && (
-            <Select
-              aria-label={t('TWAP 触发方向')}
-              selectedKeys={[f.twapAbove ? 'above' : 'below']}
-              items={[
-                { key: 'above', label: t('标记价高于触发价') },
-                { key: 'below', label: t('标记价低于触发价') },
-              ]}
-              onSelectionChange={(keys) =>
-                change('twapAbove', Array.from(keys)[0] !== 'below')
-              }
-            />
+            <p className="text-xs text-muted">
+              {t(f.twapAbove ? '标记价高于触发价' : '标记价低于触发价')}
+            </p>
           )}
           <Input
             label={

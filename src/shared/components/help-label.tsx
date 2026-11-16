@@ -20,8 +20,8 @@ const help: Record<string, [string, string]> = {
     'Randomizes TWAP slice timing instead of using perfectly regular intervals.',
   ],
   'TWAP 触发价（可选）': [
-    '在标记价格达到指定方向的触发条件后才开始 TWAP。留空表示立即开始。',
-    'Starts TWAP when the mark meets the selected trigger direction. Leave empty to start immediately.',
+    '输入时按触发价相对标记价确定向上或向下触发；留空立即开始。',
+    'Direction is determined when entering the trigger price relative to the mark. Leave empty to start immediately.',
   ],
   '激活价格（可选）': [
     '标记价格到达后才开始跟踪；留空立即开始跟踪最有利价格。',
@@ -36,13 +36,13 @@ const help: Record<string, [string, string]> = {
     '合约按标记价格判断触发条件，触发后提交对应市价或限价委托。',
     'Perpetual orders trigger on mark price and then submit the selected market or limit order.',
   ],
-  最高价格: [
-    '阶梯单价格区间的上界，必须高于最低价格。',
-    'Upper boundary of scale orders; it must exceed the lowest price.',
+  结束价格: [
+    '阶梯单最后一档的价格，可以低于开始价格，但不能相同。',
+    'Price of the final scale order. It may be below the start price, but cannot be equal.',
   ],
-  最低价格: [
-    '阶梯单价格区间的下界，各档委托在区间内分配。',
-    'Lower boundary of scale orders; order levels are distributed within the range.',
+  开始价格: [
+    '阶梯单第一档价格，各档委托依次分配到结束价格。',
+    'Price of the first scale order; subsequent levels progress toward the end price.',
   ],
   追价边界: [
     '追价单跟随最优报价，但不会超过指定买入上限或卖出下限。',
@@ -161,8 +161,8 @@ const help: Record<string, [string, string]> = {
     'Estimated from account fee rates. Maker/taker role, filled size and execution price determine actual fees.',
   ],
   预计手续费上限: [
-    '按预估订单金额和账户费率计算，实际扣费以交易所成交回报为准。',
-    'Estimated from order value and account fee rates; actual fees come from exchange fills.',
+    '买入现货从所得基础币扣费，卖出从所得报价币扣费；实际费用以成交回报为准。',
+    'Spot buy fees are deducted from the received base asset; sell fees from the received quote asset. Actual fees come from exchange fills.',
   ],
   最大滑点: [
     '市价单允许的最差成交价格边界；超出边界的剩余数量取消，不保证全部成交。',

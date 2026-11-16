@@ -17,6 +17,7 @@ const market = {
 }
 const input: TicketInput = {
   ...defaultOrderFields(market),
+  kind: 'limit' as const,
   market,
   mark: '70000',
   size: '0.00192',

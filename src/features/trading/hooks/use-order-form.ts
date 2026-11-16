@@ -1,6 +1,7 @@
 'use client'
 import { formatPrice } from '@nktkas/hyperliquid/utils'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { marketFees } from '@/features/trading/lib/market-fees'
 import {
   type BookPriceSelection,
   defaultOrderFields,
@@ -9,15 +10,18 @@ import {
 import {
   amountFromPercent,
   maximumOrderSize,
+  quoteAmount,
   sizeFromAmount,
 } from '@/features/trading/lib/order-sizing'
 import {
   type OrderKind,
   prepareTicket,
+  scalePlan,
   type Ticket,
 } from '@/features/trading/lib/order-ticket'
 import {
   Money,
+  marketReferencePrice,
   positiveDecimal,
   slippageBps,
 } from '@/features/trading/lib/orders'
@@ -52,8 +56,7 @@ export function useOrderForm({
   const appliedBookPrice = useRef(bookPrice)
   const [feeData, setFeeData] = useState<{
     user: string
-    maker: string
-    taker: string
+    data: Awaited<ReturnType<typeof info.userFees>>
   } | null>(null)
   const [feeError, setFeeError] = useState('')
   const user = current?.user
@@ -66,8 +69,7 @@ export function useOrderForm({
         if (active) {
           setFeeData({
             user,
-            maker: fees.userAddRate,
-            taker: fees.userCrossRate,
+            data: fees,
           })
           setFeeError('')
         }
@@ -139,11 +141,17 @@ export function useOrderForm({
     } else {
       setFields((previous) => ({ ...previous, [key]: value }))
     }
+    if (key === 'twapTrigger') {
+      setFields((previous) => ({
+        ...previous,
+        twapAbove: Number(value) > Number(market.context.markPx),
+      }))
+    }
     setError('')
   }
   const index = fields.side === 'buy' ? 0 : 1
-  const marketPrice = book?.levels[fields.side === 'buy' ? 1 : 0][0]?.px ?? ''
-  const price =
+  const marketPrice = marketReferencePrice(book, market.context.markPx)
+  let price =
     fields.kind === 'market'
       ? marketPrice
       : fields.kind.endsWith('-market')
@@ -153,6 +161,13 @@ export function useOrderForm({
           : fields.kind === 'scale'
             ? fields.upperPrice
             : fields.price
+  if (fields.kind === 'scale') {
+    try {
+      price = scalePlan(fields, market).average
+    } catch {
+      price = ''
+    }
+  }
   let size = ''
   let maxSize = '0'
   let notional = '—'
@@ -186,6 +201,7 @@ export function useOrderForm({
           size,
           slippageBps: 50,
         })
+        size = scale.size
         if (scale.kind === 'orders')
           value = scale.orders.reduce(
             (sum, order) => sum.plus(new Money(order.p).times(order.s)),
@@ -199,8 +215,9 @@ export function useOrderForm({
           ? value.div(current.leverage.value).toFixed(2)
           : '—'
       if (feeData && feeData.user === user) {
-        const maker = value.times(feeData.maker).toFixed(4)
-        const taker = value.times(feeData.taker).toFixed(4)
+        const rates = marketFees(market, feeData.data, fields.side)
+        const maker = value.times(rates.maker).toFixed(4)
+        const taker = value.times(rates.taker).toFixed(4)
         fee =
           (fields.tif === 'Alo' && fields.kind === 'limit') ||
           fields.kind === 'chase'
@@ -218,6 +235,24 @@ export function useOrderForm({
   } catch {
     /* 未完整的草稿不产生估算。 */
   }
+  useEffect(() => {
+    if (selectedPercent.current == null) return
+    try {
+      positiveDecimal(price, '价格')
+      const amount = amountFromPercent(
+        maxSize,
+        selectedPercent.current,
+        fields.unit,
+        price,
+        market.szDecimals,
+      )
+      setFields((previous) =>
+        previous.amount === amount ? previous : { ...previous, amount },
+      )
+    } catch {
+      // 价格尚未完整时保留比例草稿。
+    }
+  }, [maxSize, price, fields.unit, market.szDecimals])
   const reduceOnlyError =
     fields.reduceOnly && current
       ? maxSize === '0'
@@ -256,17 +291,15 @@ export function useOrderForm({
     }
   }
   function setUnit(unit: 'base' | 'usdc') {
+    if (unit === fields.unit) return
     let amount = ''
     try {
-      if (size)
-        amount =
-          unit === 'base'
-            ? size
-            : new Money(size).times(price).toFixed(6, Money.ROUND_DOWN)
+      if (size) amount = unit === 'base' ? size : quoteAmount(size, price)
     } catch {
       /* 无效草稿切单位时清空。 */
     }
     setFields((previous) => ({ ...previous, unit, amount }))
+    setError('')
   }
   function setKind(kind: OrderKind) {
     selectedPercent.current = null

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+
 import {
   availableBalance,
   prepareCashOrder,
@@ -8,10 +9,24 @@ import { type Market, prepareOrder } from '../../trading/lib/orders.ts'
 import {
   builderMarkets,
   cashMarkets,
+  isPrelaunch,
   predictionEvents,
   predictionMarkets,
   pricePrecision,
 } from './market-catalog.ts'
+
+test('预上线沿用官方原生 strictIsolated 分类，不混入 HIP-3、现货或普通 noCross 市场', () => {
+  const market = {
+    name: 'HYPE',
+    kind: 'perp' as const,
+    marginMode: 'strictIsolated' as const,
+  }
+  assert.equal(isPrelaunch(market), true)
+  assert.equal(isPrelaunch({ ...market, name: 'unit:ES', dex: 'unit' }), false)
+  assert.equal(isPrelaunch({ ...market, kind: 'spot' }), false)
+  assert.equal(isPrelaunch({ ...market, marginMode: 'noCross' }), false)
+  assert.equal(isPrelaunch({ ...market, name: 'CASHCAT' }), false)
+})
 
 test('预测事件归并选项、保留问题和后备编码，并关联实际行情与分类', () => {
   const markets = predictionMarkets(
@@ -183,7 +198,7 @@ const input = {
   reduceOnly: false,
   slippageBps: 50,
 }
-test('现货数量/价格精度、冻结余额、买单手续费和卖单持仓都参与校验', () => {
+test('现货数量/价格精度、冻结余额与卖单持仓校验，买入不重复预留报价币手续费', () => {
   assert.equal(pricePrecision(spot), 6)
   assert.equal(
     availableBalance(
@@ -197,9 +212,13 @@ test('现货数量/价格精度、冻结余额、买单手续费和卖单持仓�
     prepareCashOrder(input, { base: '8', quote: '100' }, '0.001').a,
     10007,
   )
+  assert.equal(
+    prepareCashOrder(input, { base: '8', quote: '40' }, '0.001').s,
+    '2',
+  )
   assert.throws(
-    () => prepareCashOrder(input, { base: '8', quote: '40' }, '0.001'),
-    /手续费/,
+    () => prepareCashOrder(input, { base: '8', quote: '39.99' }, '0.001'),
+    /余额/,
   )
   assert.throws(
     () =>

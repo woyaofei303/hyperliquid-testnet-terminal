@@ -2,6 +2,10 @@ import type {
   OrderParameters,
   OrderResponse,
 } from '@nktkas/hyperliquid/api/exchange'
+import {
+  AbstractWalletError,
+  CanonicalizeError,
+} from '@nktkas/hyperliquid/signing'
 import { formatPrice } from '@nktkas/hyperliquid/utils'
 import Decimal from 'decimal.js'
 import {
@@ -12,6 +16,16 @@ import {
 
 // 金额始终使用十进制；只有图表坐标和非交易统计才转为 number。
 export const Money = Decimal.clone({ precision: 50 })
+
+export class OrderNotSentError extends Error {}
+
+export function isOrderNotSent(error: unknown) {
+  return (
+    error instanceof OrderNotSentError ||
+    error instanceof AbstractWalletError ||
+    error instanceof CanonicalizeError
+  )
+}
 
 export interface Market {
   name: string
@@ -32,6 +46,9 @@ export interface Market {
   venue?: string
   feeScale?: string
   deployerFeeScale?: string
+  growthMode?: 'enabled'
+  stablePair?: boolean
+  alignedQuote?: boolean
   question?: number
   questionOutcomes?: number[]
   fallback?: boolean
@@ -79,10 +96,50 @@ export function positiveDecimal(value: string, label: string) {
 }
 
 export function slippageBps(value: string) {
-  const bps = positiveDecimal(value, '滑点').times(100)
-  if (!bps.isInteger() || bps.lt(1) || bps.gt(1000))
-    throw new Error('滑点必须在 0.01% 至 10% 之间，最多两位小数')
+  if (!/^(0|[1-9]\d*)(\.\d{1,2})?$/.test(value.trim()))
+    throw new Error('滑点必须在 0% 至 100% 之间，最多两位小数')
+  const bps = new Money(value.trim()).times(100)
+  if (!bps.isInteger() || bps.lt(0) || bps.gt(10000))
+    throw new Error('滑点必须在 0% 至 100% 之间，最多两位小数')
   return bps.toNumber()
+}
+
+export function marketReferencePrice(
+  book: { levels: { px: string }[][] } | null,
+  fallback: string,
+) {
+  const bid = book?.levels[0]?.[0]?.px,
+    ask = book?.levels[1]?.[0]?.px
+  return bid && ask
+    ? positiveDecimal(bid, '买一价')
+        .plus(positiveDecimal(ask, '卖一价'))
+        .div(2)
+        .toFixed()
+    : fallback
+}
+
+export function marketOrderPrice(
+  value: string,
+  market: Market,
+  side: 'buy' | 'sell',
+  slippage: number,
+) {
+  let price = positiveDecimal(value, '价格')
+  if (!Number.isInteger(slippage) || slippage < 0 || slippage > 10000)
+    throw new Error('滑点必须在 0% 至 100% 之间')
+  const rounding = Decimal.ROUND_FLOOR
+  if (side === 'sell' && market.kind !== 'outcome')
+    slippage = Math.min(slippage, 7000)
+  price = price
+    .times(new Money(10000).plus(side === 'buy' ? slippage : -slippage))
+    .div(10000)
+  price = price
+    .toSignificantDigits(5, rounding)
+    .toDecimalPlaces(pricePrecision(market), rounding)
+  if (market.kind === 'outcome')
+    price = Money.min('0.99999', Money.max('0.00001', price))
+  if (price.lte(0)) throw new Error('滑点价格低于最小报价精度')
+  return price.toFixed()
 }
 
 /** 构建开仓和 reduce-only 平仓请求，不静默截断用户输入。 */
@@ -107,27 +164,9 @@ export function prepareOrder(input: OrderInput) {
     throw new Error('数量精度超过市场允许的小数位')
   let price = positiveDecimal(input.price, '价格')
   if (input.kind === 'market') {
-    if (
-      !Number.isInteger(input.slippageBps) ||
-      input.slippageBps < 1 ||
-      input.slippageBps > 1000
+    price = new Money(
+      marketOrderPrice(input.price, market, input.side, input.slippageBps),
     )
-      throw new Error('滑点必须在 0.01% 至 10% 之间')
-    const rounding =
-      input.side === 'buy' ? Decimal.ROUND_FLOOR : Decimal.ROUND_CEIL
-    price = price
-      .times(
-        new Money(10000).plus(
-          input.side === 'buy' ? input.slippageBps : -input.slippageBps,
-        ),
-      )
-      .div(10000)
-    price = price
-      .toSignificantDigits(5, rounding)
-      .toDecimalPlaces(pricePrecision(market), rounding)
-    if (market.kind === 'outcome')
-      price = Money.min('0.99999', Money.max('0.00001', price))
-    if (price.lte(0)) throw new Error('滑点价格低于最小报价精度')
   } else if (
     market.kind === 'outcome'
       ? price.decimalPlaces() > 5

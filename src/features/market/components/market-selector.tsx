@@ -3,6 +3,7 @@ import { useReducedMotion } from 'framer-motion'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   baseName,
+  isPrelaunch,
   marketLabel,
   pricePrecision,
 } from '@/features/market/lib/market-catalog'
@@ -124,6 +125,7 @@ function MarketList({
           )
             return false
           if (category === 'hip3' && !m.dex) return false
+          if (category === 'prelaunch' && !isPrelaunch(m)) return false
           return `${marketLabel(m)} ${m.name} ${m.dex ?? ''}`
             .toLowerCase()
             .includes(query.trim().toLowerCase())
@@ -225,6 +227,7 @@ function MarketList({
           ['outcome', t('预测')],
           ['hip3', 'HIP-3'],
           ['hip4', 'HIP-4'],
+          ['prelaunch', t('预上线')],
         ].map(([key, label]) => (
           <Tab key={key} title={t(label)} />
         ))}

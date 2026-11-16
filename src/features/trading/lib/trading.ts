@@ -8,6 +8,8 @@ import {
   conversionKinds,
   prepareConversion,
 } from '../../assets/lib/outcome-conversion.ts'
+import { isCash } from '../../market/lib/market-catalog.ts'
+import { validateOrderCapacity } from './order-sizing.ts'
 import type { Ticket } from './order-ticket.ts'
 import type { Market } from './orders.ts'
 import { orderResult, type prepareOrder } from './orders.ts'
@@ -121,6 +123,31 @@ export async function submitTrade(
   if (!wallet.exchange || Date.now() >= wallet.expiresAt)
     throw new Error('请先完成钱包连接')
   const base = { account: next.account, coin: next.coin }
+  if (
+    (next.kind === 'order' && !/^[@#]/.test(next.coin)) ||
+    (next.kind === 'ticket' && !isCash(next.ticket.market))
+  ) {
+    if (hasPending || loadPending(wallet.address))
+      throw new Error('请先查询上一笔未确认订单')
+    const [current, state] = await Promise.all([
+      info.activeAssetData({ user: wallet.address, coin: next.coin }),
+      info.clearinghouseState({
+        user: wallet.address,
+        dex: next.coin.includes(':') ? next.coin.split(':')[0] : '',
+      }),
+    ])
+    if (
+      current.user.toLowerCase() !== wallet.address.toLowerCase() ||
+      current.coin !== next.coin
+    )
+      throw new Error('账户或市场已变化，请重新预览')
+    validateOrderCapacity(
+      next,
+      current,
+      state.assetPositions.find(({ position }) => position.coin === next.coin)
+        ?.position.szi ?? '0',
+    )
+  }
   if (next.kind === 'outcome') {
     if (hasPending || loadPending(wallet.address))
       throw new Error('请先查询上一笔未确认请求')

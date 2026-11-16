@@ -18,7 +18,7 @@ const input: TicketInput = {
   stopLoss: '',
   upperPrice: '73000',
   levels: '3',
-  distribution: 'equal',
+  sizeSkew: '1',
   minutes: '30',
   randomize: true,
   twapTrigger: '',
@@ -28,6 +28,31 @@ const input: TicketInput = {
   retracementUnit: 'pct',
   activationPrice: '',
 }
+test('普通合约阶梯允许降序价格和连续数量偏差，金额输入不得超过预算', () => {
+  const ticket = prepareTicket({
+    ...input,
+    kind: 'scale',
+    price: '73000',
+    upperPrice: '70000',
+    sizeSkew: '2',
+    unit: 'usdc',
+    amount: '100',
+  })
+  if (ticket.kind !== 'orders') throw new Error('订单类型错误')
+  assert.deepEqual(
+    ticket.orders.map((order) => order.p),
+    ['73000', '71500', '70000'],
+  )
+  assert.ok(new Money(ticket.orders[2].s).gt(ticket.orders[0].s))
+  assert.ok(
+    ticket.orders
+      .reduce(
+        (total, order) => total.plus(new Money(order.p).times(order.s)),
+        new Money(0),
+      )
+      .lte(100),
+  )
+})
 test('限价有效方式与四种条件单分别使用正确 wire 类型', () => {
   const limit = prepareTicket({ ...input, tif: 'Alo' })
   assert.equal(limit.kind, 'orders')
@@ -72,12 +97,12 @@ test('附带 TP/SL 反向只减仓，并与父订单按 normalTpsl 分组', () =
   )
 })
 test('阶梯分配保持总数量，每档遵循价格和数量精度，拒绝不足最小金额', () => {
-  for (const distribution of ['equal', 'increasing', 'decreasing'] as const) {
+  for (const sizeSkew of ['1', '2', '0.5']) {
     const ticket = prepareTicket({
       ...input,
       kind: 'scale',
       size: '0.03101',
-      distribution,
+      sizeSkew,
     })
     if (ticket.kind !== 'orders') throw new Error('订单类型错误')
     assert.equal(
@@ -97,7 +122,7 @@ test('阶梯分配保持总数量，每档遵循价格和数量精度，拒绝�
   )
   assert.throws(
     () => prepareTicket({ ...input, kind: 'scale', levels: '1' }),
-    /档数/,
+    /订单数/,
   )
 })
 test('TWAP 校验 5 分钟到 7 天、100 USDC，并保留触发/成交价边界', () => {
@@ -124,6 +149,7 @@ test('TWAP 校验 5 分钟到 7 天、100 USDC，并保留触发/成交价边界
     /100 USDC/,
   )
 })
+
 test('移动止损生成原生 trailingStop，追价不会跨过对手价或用户限价', () => {
   const ticket = prepareTicket({
     ...input,

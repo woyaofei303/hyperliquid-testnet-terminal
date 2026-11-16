@@ -12,18 +12,17 @@ export type OrderFormFields = Omit<
   unit: 'base' | 'usdc'
   slippage: string
   protection: boolean
-  sizeSkew: string
 }
 export const defaultOrderFields = (market: MarketContext): OrderFormFields => ({
   side: 'buy',
-  kind: market.kind === 'outcome' ? 'market' : 'limit',
+  kind: 'market',
   price: market.context.markPx
     ? formatOrderPrice(market.context.markPx, market)
     : '',
   amount: '',
   unit: market.kind === 'outcome' ? 'usdc' : 'base',
   reduceOnly: false,
-  slippage: market.kind === 'outcome' ? '8' : '0.5',
+  slippage: '8',
   protection: false,
   tif: 'Gtc',
   trigger: '',
@@ -31,7 +30,6 @@ export const defaultOrderFields = (market: MarketContext): OrderFormFields => ({
   stopLoss: '',
   upperPrice: '',
   levels: '5',
-  distribution: 'equal',
   sizeSkew: '1',
   minutes: '30',
   randomize: true,

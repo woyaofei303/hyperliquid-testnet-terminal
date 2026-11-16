@@ -40,3 +40,35 @@ test('批量回报逐笔处理部分拒绝与等待激活，不能误报全部�
     /数量/,
   )
 })
+
+test('批量预校验只有一条错误时整批拒绝，非错误的缺项回报仍要求核对', () => {
+  const response = {
+    status: 'ok' as const,
+    response: {
+      type: 'order' as const,
+      data: { statuses: [{ error: 'Tick size invalid' }] },
+    },
+  }
+  const results = batchOrderResults(response, [order, order, order])
+  assert.deepEqual(
+    results.map((result) => result.state),
+    ['rejected', 'rejected', 'rejected'],
+  )
+  assert.ok(
+    results.every((result) => result.message.includes('Tick size invalid')),
+  )
+  assert.throws(
+    () =>
+      batchOrderResults(
+        {
+          status: 'ok',
+          response: {
+            type: 'order',
+            data: { statuses: [{ resting: { oid: 1 } }] },
+          },
+        },
+        [order, order],
+      ),
+    /数量/,
+  )
+})

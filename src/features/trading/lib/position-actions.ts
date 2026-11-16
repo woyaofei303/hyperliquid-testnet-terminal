@@ -1,7 +1,7 @@
 import type { MarketContext } from '../../../shared/lib/fameex-testnet.ts'
 import { defaultOrderFields } from './order-form-fields.ts'
 import { prepareTicket, type Ticket } from './order-ticket.ts'
-import { Money, positiveDecimal } from './orders.ts'
+import { Money, positiveDecimal, slippageBps } from './orders.ts'
 
 export type PositionActionKind = 'limit' | 'market' | 'trailing' | 'reverse'
 export interface PositionActionOptions {
@@ -30,8 +30,9 @@ export function preparePositionAction(
     positiveDecimal(size, '平仓数量').gt(signed.abs())
   )
     throw new Error('平仓数量超过当前仓位')
+  const defaults = defaultOrderFields(market)
   return prepareTicket({
-    ...defaultOrderFields(market),
+    ...defaults,
     market,
     mark: market.context.markPx,
     side: signed.gt(0) ? 'sell' : 'buy',
@@ -39,7 +40,7 @@ export function preparePositionAction(
     price: options.kind === 'limit' ? (options.price ?? '') : price,
     size,
     reduceOnly: options.kind !== 'reverse',
-    slippageBps: 50,
+    slippageBps: slippageBps(defaults.slippage),
     retracement: options.retracement ?? '',
     retracementUnit: options.retracementUnit ?? 'pct',
     activationPrice: options.activationPrice ?? '',

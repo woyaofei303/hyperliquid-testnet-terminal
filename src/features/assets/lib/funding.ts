@@ -47,14 +47,6 @@ export function fundingAmount(value: string) {
     throw new Error('单笔充值须至少 5 USDC，且小于 10,000,000 USDC')
   return parseUnits(amount.toFixed(), 6)
 }
-export function transferAmount(value: string, available: string) {
-  const amount = usdcAmount(value)
-  const balance = new Money(available)
-  if (!balance.isFinite() || balance.lt(0))
-    throw new Error('可用余额无效，请刷新后重试')
-  if (amount.gt(balance)) throw new Error('划转金额超过可用余额')
-  return amount.toFixed()
-}
 export function depositParameters(address: `0x${string}`, amount: string) {
   return {
     address: TOKEN_MESSENGER,
@@ -203,7 +195,10 @@ export interface FundingRecord {
   account: `0x${string}`
   amount: string
   kind: FundingWrite | 'transfer' | 'withdraw'
-  sourceDex?: '' | 'spot'
+  sourceDex?: string
+  destinationDex?: string
+  token?: string
+  decimals?: number
   nonce?: number
   toPerp?: boolean
   hash?: `0x${string}`
@@ -275,7 +270,22 @@ export function parseFundingRecord(
     (record.hash && !/^0x[0-9a-fA-F]{64}$/.test(record.hash))
   )
     throw new Error('本地资金记录格式异常，请先在官方页面核对')
-  usdcAmount(record.amount)
+  if (record.kind === 'transfer' && record.token != null) {
+    if (
+      typeof record.token !== 'string' ||
+      !record.token ||
+      typeof record.sourceDex !== 'string' ||
+      typeof record.destinationDex !== 'string' ||
+      record.sourceDex === record.destinationDex ||
+      !Number.isInteger(record.decimals) ||
+      record.decimals < 0 ||
+      record.decimals > 18 ||
+      !Number.isSafeInteger(record.nonce) ||
+      record.nonce <= 0 ||
+      positiveDecimal(record.amount, '金额').decimalPlaces() > record.decimals
+    )
+      throw new Error('本地划转记录格式异常，请先在官方页面核对')
+  } else usdcAmount(record.amount)
   return record
 }
 

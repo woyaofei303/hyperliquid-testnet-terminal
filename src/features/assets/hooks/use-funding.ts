@@ -21,13 +21,17 @@ import {
   sendDeposit,
   spotAvailable,
   switchDepositChain,
-  transferAmount,
   type WithdrawalQuote,
   withdrawalAmount,
   withdrawalParameters,
   withdrawalQuote,
   withdrawalTransaction,
 } from '@/features/assets/lib/funding'
+import {
+  internalTransferAmount,
+  loadTransferQuote,
+  type TransferQuote,
+} from '@/features/assets/lib/internal-transfer'
 import { Money } from '@/features/trading/lib/orders'
 import {
   assertSession,
@@ -85,7 +89,7 @@ export function useFunding(
     }
   }, [owner])
   const save = useCallback((next: FundingRecord) => {
-    // 本地记录只用于展示进度，不作为后续资金操作的锁。
+    // 划转回报未知时保留 nonce，直到账本核对完成。
     let stored: FundingRecord | null = null
     try {
       stored = parseFundingRecord(
@@ -179,14 +183,38 @@ export function useFunding(
       return
     if (
       !record ||
-      record.kind === 'transfer' ||
-      (!record.hash && record.kind !== 'withdraw')
+      (record.kind === 'transfer' && record.nonce == null) ||
+      (!record.hash && record.kind !== 'withdraw' && record.kind !== 'transfer')
     ) {
       refreshAccount()
       return
     }
     checking.current = true
     try {
+      if (record.kind === 'transfer' && record.nonce != null) {
+        const ledger = await info.userNonFundingLedgerUpdates({
+          user: record.account,
+          startTime: Math.max(0, record.at - 60000),
+        })
+        if (
+          ledger.some(
+            ({ delta }) =>
+              delta.type === 'send' &&
+              delta.nonce === record.nonce &&
+              delta.user.toLowerCase() === record.account.toLowerCase() &&
+              delta.destination.toLowerCase() ===
+                record.account.toLowerCase() &&
+              delta.sourceDex === record.sourceDex &&
+              delta.destinationDex === record.destinationDex &&
+              delta.token === record.token &&
+              new Money(delta.amount).eq(record.amount),
+          )
+        )
+          save({ ...record, status: 'confirmed' })
+        await refresh()
+        refreshAccount()
+        return
+      }
       if (record.kind === 'withdraw') {
         const response = await fetch(
           `https://dev.indexer.api.across.to/hyperliquid-transfers?direction=out&user=${record.account.toLowerCase()}`,
@@ -258,7 +286,9 @@ export function useFunding(
     if (
       !record ||
       !isFundingPending(record) ||
-      (!record.hash && record.kind !== 'withdraw')
+      (!record.hash &&
+        record.kind !== 'withdraw' &&
+        !(record.kind === 'transfer' && record.nonce != null))
     )
       return
     void check()
@@ -273,6 +303,12 @@ export function useFunding(
     setError('')
     setNotification(null)
     try {
+      if (
+        record?.kind === 'transfer' &&
+        record.nonce != null &&
+        isFundingPending(record)
+      )
+        throw new Error('上一笔划转结果待确认，请先核对资金记录')
       await action()
       return true
     } catch (e) {
@@ -336,37 +372,57 @@ export function useFunding(
     })
     if (completed) void refresh()
   }
-  async function transfer(amount: string, toPerp: boolean) {
+  async function transfer(amount: string, preview: TransferQuote) {
     if (!wallet) return
     return run(async () => {
       let next: FundingRecord | null = null
       try {
-        const mode = await info.userAbstraction({ user: wallet.address })
-        if (mode === 'unifiedAccount' || mode === 'portfolioMargin')
-          throw new Error('统一账户使用共享抵押品，请在官方页面管理资金')
-        const [perp, spot] = await Promise.all([
-          info.clearinghouseState({ user: wallet.address }),
-          info.spotClearinghouseState({ user: wallet.address }),
-        ])
-        const available = toPerp
-          ? spotAvailable(spot, 'USDC', false)
-          : perp.withdrawable
-        const value = transferAmount(amount, available)
+        if (preview.user !== wallet.address)
+          throw new Error('钱包已变化，请重新打开划转')
+        const fresh = await loadTransferQuote(wallet.address, preview)
+        if (
+          fresh.asset.tokenId !== preview.asset.tokenId ||
+          fresh.asset.weiDecimals !== preview.asset.weiDecimals
+        )
+          throw new Error('划转币种信息已变化，请重新核对')
+        const value = internalTransferAmount(
+          amount,
+          fresh.available,
+          fresh.asset,
+        )
         await assertSession(wallet)
+        const nonce = Date.now()
         next = {
           account: wallet.address,
           amount: value,
           kind: 'transfer',
-          toPerp,
+          sourceDex: fresh.sourceDex,
+          destinationDex: fresh.destinationDex,
+          token: fresh.asset.name,
+          decimals: fresh.asset.weiDecimals,
+          nonce,
           at: Date.now(),
           status: 'unknown',
         }
         save(next)
-        await masterExchange(wallet).usdClassTransfer({ amount: value, toPerp })
+        await masterExchange(wallet, nonce).sendAsset({
+          destination: wallet.address,
+          sourceDex: fresh.sourceDex,
+          destinationDex: fresh.destinationDex,
+          token: `${fresh.asset.name}:${fresh.asset.tokenId}`,
+          amount: value,
+          fromSubAccount: '',
+        })
         save({ ...next, status: 'confirmed' })
         await refresh()
+        refreshAccount()
       } catch (e) {
-        if (next && (isUserRejection(e) || e instanceof ApiRequestError))
+        if (
+          next &&
+          (isUserRejection(e) ||
+            (e instanceof ApiRequestError &&
+              !/nonce|already|timed? ?out/i.test(e.message)))
+        )
           save({ ...next, status: 'reverted' })
         throw e
       }

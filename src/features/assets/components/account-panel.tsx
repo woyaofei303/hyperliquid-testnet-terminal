@@ -17,13 +17,24 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
 
   const { account, wallet, busy } = model
   const cash = isCash(model.market)
-  const balances =
-    model.market && account.snapshot?.spot
-      ? cashBalances(model.market, account.snapshot.spot.balances)
-      : null
+  let balances: ReturnType<typeof cashBalances> | null = null
+  try {
+    if (cash && model.market && account.snapshot?.spot)
+      balances = cashBalances(
+        model.market,
+        account.snapshot.spot.balances,
+        account.snapshot.mode === 'portfolioMargin'
+          ? account.snapshot.borrowReserves
+          : undefined,
+      )
+  } catch {
+    // 无效余额由下单区报告，概览不显示可交易额度。
+  }
   const state = account.snapshot?.state
   const shared = sharedAccount(account.snapshot?.mode)
-  const canTransfer = !!account.snapshot && !shared
+  const canTransfer = ['default', 'disabled', 'dexAbstraction'].includes(
+    account.snapshot?.mode ?? '',
+  )
   const quote = quoteName(model.market)
   const collateral = account.snapshot?.spot.balances.find(
     (item) => item.coin === quote,
@@ -62,7 +73,7 @@ export function AccountPanel({ model }: { model: TerminalModel }) {
           ? [
               [t('报价资产'), display(balances?.quote, 6)],
               [
-                t('持有数量'),
+                t('可卖数量'),
                 display(balances?.base, model.market?.szDecimals ?? 5),
               ],
             ]

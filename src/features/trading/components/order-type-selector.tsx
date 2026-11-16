@@ -63,8 +63,8 @@ export function OrderTypeSelector({
             'mb-1.5 font-medium text-3 group-data-[selected=true]:text-1',
         }}
       >
-        <Tab key="limit" title={t('限价单')} />
         <Tab key="market" title={t('市价单')} />
+        <Tab key="limit" title={t('限价单')} />
       </Tabs>
       <Dropdown
         placement="bottom-start"

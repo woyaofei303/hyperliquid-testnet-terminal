@@ -49,6 +49,7 @@ export const Select = ({
   variant = 'flat',
   trigger,
   onItemPress,
+  popoverProps,
   ref,
   ...props
 }: SelectProps) => {
@@ -72,11 +73,13 @@ export const Select = ({
     <BaseSelect
       ref={ref}
       popoverProps={{
+        shouldCloseOnScroll: false,
         // 保持 portal 下拉在父弹窗的可访问范围内。
         ...{ 'data-react-aria-top-layer': 'true' },
         classNames: {
           content: 'p-0 rounded-[8px] overflow-hidden',
         },
+        ...popoverProps,
       }}
       {...props}
       className={classNames(baseStyle(), className)}

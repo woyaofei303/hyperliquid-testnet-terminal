@@ -2,12 +2,19 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { predictionMarkets } from '../../market/lib/market-catalog.ts'
 import { cashTicketValue } from './cash-order.ts'
+import { marketFees } from './market-fees.ts'
 import { defaultOrderFields } from './order-form-fields.ts'
-import {
-  predictionEstimate,
-  predictionFees,
-  preparePredictionTicket,
-} from './prediction-order.ts'
+import { sizeFromAmount } from './order-sizing.ts'
+import { prepareTicket, scalePlan } from './order-ticket.ts'
+import { predictionEstimate } from './prediction-order.ts'
+
+test('阶梯循环均价可用于报价币换算，不被用户输入长度校验误拒绝', () => {
+  const plan = scalePlan(
+    { price: '0.6', upperPrice: '0.4', levels: '3', sizeSkew: '2' },
+    market,
+  )
+  assert.equal(sizeFromAmount('100', 'usdc', plan.average, 0), '209')
+})
 
 const market = {
   name: '#120',
@@ -33,7 +40,7 @@ const draft = {
   slippageBps: 800,
 }
 test('预测分段订单按首尾数量偏差分配，并允许价格从高到低排列', () => {
-  const ticket = preparePredictionTicket(draft)
+  const ticket = prepareTicket(draft)
   assert.equal(ticket.kind, 'orders')
   if (ticket.kind !== 'orders') throw new Error('订单类型错误')
   assert.deepEqual(
@@ -44,7 +51,7 @@ test('预测分段订单按首尾数量偏差分配，并允许价格从高到�
       ['0.7', '14'],
     ],
   )
-  const reverse = preparePredictionTicket({
+  const reverse = prepareTicket({
     ...draft,
     price: '0.7',
     upperPrice: '0.3',
@@ -60,7 +67,7 @@ test('预测分段订单按首尾数量偏差分配，并允许价格从高到�
   )
 })
 test('预测分段订单的 USDC 总额按加权价格换算，取整后不超输入金额', () => {
-  const ticket = preparePredictionTicket({
+  const ticket = prepareTicket({
     ...draft,
     unit: 'usdc',
     amount: '30',
@@ -100,16 +107,16 @@ test('预测买入免费，卖出使用市场费率与用户折扣，拒绝异�
   const [feeMarket] = predictionMarkets(metadata, [])
   assert.equal(feeMarket.deployerFeeScale, '10')
   assert.equal(feeMarket.feeScale, '1')
-  assert.deepEqual(predictionFees(feeMarket, fees, 'buy'), {
+  assert.deepEqual(marketFees(feeMarket, fees, 'buy'), {
     taker: '0',
     maker: '0',
   })
-  assert.deepEqual(predictionFees(feeMarket, fees, 'sell'), {
+  assert.deepEqual(marketFees(feeMarket, fees, 'sell'), {
     taker: '0.014',
     maker: '0.008',
   })
   assert.throws(
-    () => predictionFees({ ...market, feeScale: '-1' }, fees, 'sell'),
+    () => marketFees({ ...market, feeScale: '-1' }, fees, 'sell'),
     /费率/,
   )
 })
@@ -142,5 +149,11 @@ test('预测分段拒绝错误价格、档数、偏差、小数份额和过小�
     { amount: '2' },
     { upperPrice: '0.30001', levels: '5' },
   ])
-    assert.throws(() => preparePredictionTicket({ ...draft, ...invalid }))
+    assert.throws(() =>
+      prepareTicket({
+        ...draft,
+        ...invalid,
+        size: invalid.amount ?? draft.size,
+      }),
+    )
 })

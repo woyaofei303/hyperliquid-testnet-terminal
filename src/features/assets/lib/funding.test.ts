@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Log } from 'viem'
 import type { FundingRecord } from './funding.ts'
-import { depositParameters, fundingAmount, transferAmount } from './funding.ts'
+import { depositParameters, fundingAmount } from './funding.ts'
 
 const user = '0x1111111111111111111111111111111111111111'
 test('CCTP 固定测试网目标、收款人和 USDC 精度，拒绝低于最低充值额或超限', () => {
@@ -18,12 +18,6 @@ test('CCTP 固定测试网目标、收款人和 USDC 精度，拒绝低于最低
     assert.throws(() => fundingAmount(amount))
   assert.equal(fundingAmount('5'), 5000000n)
 })
-test('划转校验可用余额而非总余额，不截断用户金额', () => {
-  assert.equal(transferAmount('1.000001', '2'), '1.000001')
-  assert.throws(() => transferAmount('3', '2'), /余额/)
-  assert.throws(() => transferAmount('0.0000001', '2'), /精度/)
-})
-
 test('资金请求持久化只接受当前账户和合法交易记录', async () => {
   const { parseFundingRecord } = await import('./funding.ts')
   const record = {
@@ -59,7 +53,6 @@ test('提款固定 CCTP 域 3、当前收款地址，校验最低金额与可提
     assert.throws(() => withdrawalAmount(value, '20000000'))
   assert.throws(() => withdrawalAmount('1.1', '1'), /余额/)
   assert.throws(() => withdrawalAmount('1', 'NaN'), /余额/)
-  assert.throws(() => transferAmount('1', 'Infinity'), /余额/)
   assert.deepEqual(withdrawalParameters(user, '10', 'spot'), {
     token: 'USDC',
     amount: '10',

@@ -20,5 +20,9 @@ test('资金提示区分源链确认和到账，不把待确认或授权成功�
   assert.equal(fundingFeedback('withdraw', 'submitted').tone, 'info')
   assert.equal(fundingFeedback('withdraw', 'reverted').tone, 'error')
   assert.equal(fundingFeedback('transfer', 'confirmed').tone, 'success')
+  assert.equal(
+    fundingFeedback('transfer', 'confirmed', 'HYPE').text,
+    'HYPE 划转已确认。',
+  )
   assert.match(fundingFeedback('approve', 'confirmed').text, /授权已确认/)
 })

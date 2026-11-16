@@ -1,13 +1,59 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { orderResult, prepareOrder, slippageBps } from './orders.ts'
+import {
+  AbstractWalletError,
+  CanonicalizeError,
+} from '@nktkas/hyperliquid/signing'
+import {
+  isOrderNotSent,
+  marketOrderPrice,
+  marketReferencePrice,
+  OrderNotSentError,
+  orderResult,
+  prepareOrder,
+  slippageBps,
+} from './orders.ts'
+
+test('市价参考盘口中间价，单边盘口回退标记价', () => {
+  assert.equal(
+    marketReferencePrice(
+      { levels: [[{ px: '19.99' }], [{ px: '20.01' }]] },
+      '21',
+    ),
+    '20',
+  )
+  assert.equal(
+    marketReferencePrice({ levels: [[{ px: '19.99' }], []] }, '21'),
+    '21',
+  )
+  assert.equal(marketReferencePrice(null, '21'), '21')
+  assert.throws(() =>
+    marketReferencePrice({ levels: [[{ px: 'NaN' }], [{ px: '20' }]] }, '21'),
+  )
+})
 
 test('滑点设置保留价格保护范围，并拒绝小于一个基点的精度', () => {
   assert.equal(slippageBps('0.01'), 1)
   assert.equal(slippageBps('0.5'), 50)
   assert.equal(slippageBps('10'), 1000)
-  for (const value of ['', '0', '-1', '0.001', '10.01', 'Infinity'])
+  assert.equal(slippageBps('0'), 0)
+  assert.equal(slippageBps('100'), 10000)
+  for (const value of ['', '-1', '0.001', '100.01', 'Infinity'])
     assert.throws(() => slippageBps(value))
+})
+
+test('官方市价卖出普通资产最多使用 70% 价格折扣，预测价格仍限制在有效区间', () => {
+  const market = { name: 'BTC', asset: 3, szDecimals: 5, maxLeverage: 40 }
+  assert.equal(marketOrderPrice('70000', market, 'sell', 10000), '21000')
+  assert.equal(
+    marketOrderPrice(
+      '0.5',
+      { ...market, kind: 'outcome', szDecimals: 0 },
+      'sell',
+      10000,
+    ),
+    '0.00001',
+  )
 })
 
 test('用户输入超过市场数量精度时，在签名前拒绝下单', () => {
@@ -42,7 +88,7 @@ test('开仓不足 10 USDC 时拒绝，不能用低精度浮点数绕过金额�
   )
 })
 
-test('市场单使用带滑点边界的 IOC，卖出价格不能向下舍入突破边界', () => {
+test('市场单使用带滑点边界的 IOC，价格按官方规则向下取到有效报价', () => {
   const order = prepareOrder({
     market: { name: 'ETH', asset: 1, szDecimals: 4, maxLeverage: 25 },
     side: 'sell',
@@ -53,7 +99,7 @@ test('市场单使用带滑点边界的 IOC，卖出价格不能向下舍入突�
     slippageBps: 50,
   })
   assert.equal(order.t.limit.tif, 'Ioc')
-  assert.equal(order.p, '3194.4')
+  assert.equal(order.p, '3194.3')
   assert.equal(order.r, true)
 })
 
@@ -137,4 +183,13 @@ test('拒绝负数、NaN、指数、空输入和零数量', () => {
       }),
     )
   }
+})
+
+test('只将明确发送前错误归为未发送，网络和未知异常保留核对保护', () => {
+  assert.equal(isOrderNotSent(new OrderNotSentError('本地序号失败')), true)
+  assert.equal(isOrderNotSent(new AbstractWalletError('wallet failed')), true)
+  assert.equal(isOrderNotSent(new CanonicalizeError('invalid payload')), true)
+  assert.equal(isOrderNotSent(new Error('network timeout')), false)
+  assert.equal(isOrderNotSent(new Error('invalid response')), false)
+  assert.equal(isOrderNotSent({ name: 'AbstractWalletError' }), false)
 })

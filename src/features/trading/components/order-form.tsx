@@ -2,7 +2,11 @@
 
 import { Button, Checkbox, Input, Tab, Tabs } from '@fameex/ui'
 import { type ReactNode, useState } from 'react'
-import { baseName, quoteName } from '@/features/market/lib/market-catalog'
+import {
+  baseName,
+  isPrelaunch,
+  quoteName,
+} from '@/features/market/lib/market-catalog'
 import { useMarginSettings } from '@/features/trading/hooks/use-margin-settings'
 import { useOrderForm } from '@/features/trading/hooks/use-order-form'
 import type { BookPriceSelection } from '@/features/trading/lib/order-form-fields'
@@ -85,6 +89,13 @@ export function OrderForm({
       <h2 className="sr-only">
         {t('交易')} {base}
       </h2>
+      {isPrelaunch(market) && (
+        <p className="mb-3 text-xs leading-5 text-muted">
+          {t(
+            '预上线合约仅支持逐仓，资金费参考近期标记价均值；请留意流动性、波动与清算风险。',
+          )}
+        </p>
+      )}
       <MarginSettings
         market={market}
         settings={settings}
@@ -164,14 +175,14 @@ export function OrderForm({
                 <HelpLabel
                   helpKey={
                     f.kind === 'scale'
-                      ? '最低价格'
+                      ? '开始价格'
                       : f.kind === 'chase'
                         ? '追价边界'
                         : '价格'
                   }
                   label={
                     f.kind === 'scale'
-                      ? t('最低价格（') + quote + t('）')
+                      ? t('开始价格（') + quote + t('）')
                       : f.kind === 'chase'
                         ? f.side === 'buy'
                           ? t('最高买入价（') + quote + t('）')
