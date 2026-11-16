@@ -4,23 +4,18 @@
 
 在电脑打开 `/connect`，连接测试钱包后点击「生成手机授权二维码」。此页连接钱包只读取公开地址，不预先申请网页交易权限。App 的入口是「资产 → 连接钱包 → 扫码连接」，打开相机前会显示电脑访问链接和完整步骤。已有有效授权时，App 可直接连接已保存的钱包，不必重新扫码。
 
-线上两端都配置 `https://app.fameex-testnet.xyz`。Web 的 CI 在构建时写入该地址，Nginx 把 `/pairings` 请求转到独立配对容器；配置和首次安装步骤见 RN 工程的 `deploy/README.md`。下面的局域网地址只用于本机联调。
+生产配对地址为本站 `https://app.fameex-testnet.xyz`。Web 先读取 `/runtime-config.json`，只接受 `schemaVersion: 1` 和布尔 `phonePairingEnabled: true`，请求使用当前站点同源 `/pairings`。预发布默认为 false，Nginx 直接拒绝配对；构建失败或配置损坏不会回退生产地址。详细配置与完整代码见[交付手册](ci-cd-handbook.md)。
 
-先启动 RN 工程提供的配对服务，再给两个客户端配置同一个服务地址。Web `.env.example` 中新增 `NEXT_PUBLIC_PHONE_PAIRING_URL`，RN 对应 `EXPO_PUBLIC_PHONE_PAIRING_URL`。这些地址是公开配置，不是私钥。不要覆盖原有 `.env.local`；可以像下面这样只给启动进程传参。
+本地 `public/runtime-config.json` 默认关闭。CI 使用显式模拟配置与同源网络拦截，不依赖外部配对服务，不再使用 `NEXT_PUBLIC_PHONE_PAIRING_URL`。本地单独运行模拟验收：
 
-```sh
-cd /Users/julian/Documents/Codex/2026-11-05/to/outputs/hyperliquid-native
-PAIRING_HOST=0.0.0.0 PAIRING_PORT=3211 PAIRING_ORIGINS=http://localhost:3210,http://127.0.0.1:3210 npm run pairing:relay
+```bash
+npm run build:static
+STATIC_EXPORT=1 npm run test:e2e -- --workers=2 --grep '手机'
 ```
 
-另开终端，将示例 IP 替换为电脑实际局域网 IP，再启动 Web：
+真机联调需要能被手机访问的独立 HTTPS 域名，Web 和 relay 在该域名下分别代理页面与 `/pairings`，并提供启用配对的运行配置。RN 配置必须指向这个隔离域名，不能指向生产；RN 协议 version 保持 1。具体 relay 安装、RN 配置和相机权限仍按 RN 仓库指南执行。联调前记录隔离账号与逐笔签名授权；本次没有搭建真机隔离服务或执行真实签名。环回 HTTP 仅适用于同一台电脑的本地测试，手机扫描 localhost 无法访问电脑服务。
 
-```sh
-cd /Users/julian/Documents/Codex/2026-11-02/hyperliquid-testnet-terminal
-NEXT_PUBLIC_PHONE_PAIRING_URL=http://192.168.1.20:3211 npm run dev
-```
-
-电脑打开 `http://127.0.0.1:3210/connect`，连接钱包后生成二维码。手机扫码，两端显示相同的账户与六位核对码；核对完成后直接点击「在主钱包确认授权」，请求主钱包签名。二维码五分钟内有效，不要转发。正式构建要求配对服务使用 HTTPS；`build:static` 只导出网页，不包含独立配对服务。
+电脑打开 `/connect`，连接钱包后生成二维码。两端核对账户和六位码后，用户明确确认主钱包授权。二维码五分钟内有效，不要转发；`build:static` 只导出网页，不包含独立配对服务。
 
 如果签名后网络断开，只点击「查询授权结果（不重复签名）」。Web 查询 `extraAgents`，核对设备名、公钥和期限；回执重复发送时沿用相同密文，不会重新签名。即使配对过期或页面关闭，手机仍可从本机保存的钥匙查询并恢复已经存在的授权。
 

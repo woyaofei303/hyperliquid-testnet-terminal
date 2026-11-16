@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 3210",
     "build": "next build --webpack",
-    "build:static": "STATIC_EXPORT=1 next build --webpack",
+    "build:static": "STATIC_EXPORT=1 next build --webpack && rm -f out/runtime-config.json",
     "start": "next start --hostname 127.0.0.1 --port 3210",
     "lint": "biome check .",
     "format": "biome check --write .",
@@ -20,7 +20,9 @@
     "verify:read": "node scripts/verify-read.ts",
     "collect:opportunities": "node scripts/collect-opportunities.ts",
     "campaign:opportunities": "node scripts/campaign-opportunities.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:deploy": "python3 -m unittest discover -s deploy -p \"test_*.py\"",
+    "test:smoke": "playwright test --config playwright.smoke.config.ts"
   },
   "dependencies": {
     "@fameex/kline": "0.0.0",
