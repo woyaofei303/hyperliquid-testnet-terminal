@@ -1,0 +1,123 @@
+name: Deploy verified environment
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      operation:
+        type: string
+        required: true
+      release_id:
+        type: string
+        required: true
+      artifact_id:
+        type: string
+        default: ''
+      expected_current:
+        type: string
+        required: true
+      production_current:
+        type: string
+        default: ''
+      review_url:
+        type: string
+        default: ''
+permissions:
+  contents: read
+  actions: read
+  attestations: read
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ inputs.environment == 'aliyun-production' && 'https://app.fameex-testnet.xyz' || 'https://staging-app.fameex-testnet.xyz' }}
+    env:
+      HUSKY: '0'
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_ID: ${{ inputs.release_id }}
+      EXPECTED_CURRENT: ${{ inputs.expected_current }}
+      OPERATION: ${{ inputs.operation }}
+      DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+      SMOKE_BASE_URL: ${{ inputs.environment == 'aliyun-production' && 'https://app.fameex-testnet.xyz' || 'https://staging-app.fameex-testnet.xyz' }}
+      EXPECTED_RELEASE_ID: ${{ inputs.release_id }}
+      EXPECT_PHONE_PAIRING: ${{ inputs.environment == 'aliyun-production' && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check candidate identity
+        if: inputs.operation == 'deploy'
+        env:
+          ARTIFACT_ID: ${{ inputs.artifact_id }}
+        run: |
+          [[ "$ARTIFACT_ID" =~ ^[0-9]+$ ]]
+          test "$RELEASE_ID" = "$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" > artifact.json
+          jq -e --arg sha "$GITHUB_SHA" --arg run "$GITHUB_RUN_ID" --arg name "release-$RELEASE_ID" \
+            '.expired == false and .name == $name and .workflow_run.head_sha == $sha and (.workflow_run.id|tostring) == $run and .workflow_run.head_branch == "main"' artifact.json
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: inputs.operation == 'deploy'
+        with:
+          artifact-ids: ${{ inputs.artifact_id }}
+          path: candidate
+          merge-multiple: true
+      - name: Verify signed manifest and every file
+        if: inputs.operation == 'deploy'
+        run: |
+          gh attestation verify candidate/release-manifest.json --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/deploy-aliyun.yml" \
+            --source-ref refs/heads/main --source-digest "$GITHUB_SHA"
+          python3 deploy/release.py "$RELEASE_ID" --verify candidate
+      - name: Publish or roll back
+        env:
+          DEPLOY_HOST: ${{ vars.ALIYUN_HOST }}
+          DEPLOY_USER: ${{ vars.ALIYUN_USER }}
+          DEPLOY_PORT: ${{ vars.ALIYUN_PORT || '22' }}
+          PRIVATE_KEY: ${{ secrets.ALIYUN_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.ALIYUN_SSH_KNOWN_HOSTS }}
+        run: bash deploy/publish.sh
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: inputs.operation == 'deploy'
+        with:
+          node-version: '24'
+          cache: npm
+      - if: inputs.operation == 'deploy'
+        run: npm ci
+      - if: inputs.operation == 'deploy'
+        run: npx playwright install --with-deps chrome
+      - name: Read-only smoke
+        if: inputs.operation == 'deploy'
+        run: npm run test:smoke
+      - name: Candidate approval evidence
+        if: inputs.environment == 'aliyun-staging'
+        env:
+          REVIEW_URL: ${{ inputs.review_url }}
+          ARTIFACT_ID: ${{ inputs.artifact_id }}
+          PRODUCTION_CURRENT: ${{ inputs.production_current }}
+        run: |
+          actual=$(curl --fail --silent --show-error --max-time 15 https://app.fameex-testnet.xyz/version.txt)
+          test "$actual" = "$PRODUCTION_CURRENT"
+          digest=$(sha256sum candidate/release-manifest.json | cut -d ' ' -f1)
+          printf '## 生产审批证据\n\n提交：%s\n\n发布 ID：%s\n\nArtifact ID：%s\n\n清单 SHA-256：%s\n\n审查记录：%s\n\nCI 与测试报告：https://github.com/%s/actions/runs/%s\n\n预发布：https://staging-app.fameex-testnet.xyz\n\n当前生产 / 上线后回滚目标：%s\n\n预发布 smoke 已通过；配对默认关闭。资金与真机专项结果、未验证项见 PR，由批准人逐项核对。\n' \
+            "$GITHUB_SHA" "$RELEASE_ID" "$ARTIFACT_ID" "$digest" "$REVIEW_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$actual" >> "$GITHUB_STEP_SUMMARY"
+      - name: Observe production for 15 minutes
+        if: inputs.environment == 'aliyun-production' && inputs.operation == 'deploy'
+        run: |
+          for attempt in $(seq 1 15); do
+            echo "Production observation $attempt/15"
+            sleep 60
+            actual=$(curl --fail --silent --show-error --retry 2 --max-time 15 "$SMOKE_BASE_URL/version.txt")
+            test "$actual" = "$EXPECTED_RELEASE_ID"
+          done
+      - name: Save failed smoke evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: smoke-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: output-tdd/playwright/deployment-smoke/
+          retention-days: 7
+          if-no-files-found: ignore

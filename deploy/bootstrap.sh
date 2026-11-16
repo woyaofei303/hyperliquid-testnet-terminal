@@ -29,13 +29,13 @@ if [[ -f $task_extra ]]; then cp -p "$task_extra" "$task_backup/extra-sites.cadd
 
 useradd --create-home --shell /bin/bash hyperliquid-deploy
 install -d -m 755 -o hyperliquid-deploy -g hyperliquid-deploy \
-  /srv/hyperliquid /srv/hyperliquid/releases /srv/hyperliquid/shared
+  /srv/hyperliquid /srv/hyperliquid/releases /srv/hyperliquid/incoming /srv/hyperliquid/shared
 install -d -m 700 -o hyperliquid-deploy -g hyperliquid-deploy /home/hyperliquid-deploy/.ssh
 { printf 'restrict '; cat "$1"; } > /home/hyperliquid-deploy/.ssh/authorized_keys
 chown hyperliquid-deploy:hyperliquid-deploy /home/hyperliquid-deploy/.ssh/authorized_keys
 chmod 600 /home/hyperliquid-deploy/.ssh/authorized_keys
 install -d -m 755 /srv/hyperliquid/config
-install -m 644 "$task_source/compose.yml" "$task_source/nginx.conf" /srv/hyperliquid/config/
+install -m 644 "$task_source/compose.yml" "$task_source/nginx.conf" "$task_source/runtime-config.json" /srv/hyperliquid/config/
 docker compose -f /srv/hyperliquid/config/compose.yml config --quiet
 docker compose -f /srv/hyperliquid/config/compose.yml up -d web
 

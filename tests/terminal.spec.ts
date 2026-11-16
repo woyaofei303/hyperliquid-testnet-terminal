@@ -4,6 +4,14 @@ import { expect, type Page, test } from '@playwright/test'
 import { recoverTypedDataAddress, serializeSignature } from 'viem'
 import { cctpFixture, coreWallet } from './cctp-fixtures'
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/runtime-config.json', (route) =>
+    route.fulfill({
+      json: { schemaVersion: 1, phonePairingEnabled: true },
+    }),
+  )
+})
+
 test('持续高频行情、资源回收与连接复用 @benchmark', async ({
   page,
   browser,
@@ -1895,6 +1903,50 @@ test('响应丢失后刷新仍阻止重复下单，通过 cloid 核对恢复', a
   expect(await chart.boundingBox()).toEqual(before)
   expect(writes).toHaveLength(1)
 })
+
+for (const failure of ['保存', '清除'] as const) {
+  test(`待确认记录${failure}失败不会丢失防重复提交保护`, async ({ page }) => {
+    const { writes } = await mockExchange(page)
+    await ready(page)
+    await page.evaluate((failure) => {
+      const original =
+        failure === '保存'
+          ? Storage.prototype.setItem
+          : Storage.prototype.removeItem
+      if (failure === '保存')
+        Storage.prototype.setItem = function (key, value) {
+          if (key.startsWith('hl-testnet-pending-order:'))
+            throw new DOMException(
+              'pending storage failed',
+              'QuotaExceededError',
+            )
+          return original.call(this, key, value)
+        }
+      else
+        Storage.prototype.removeItem = function (key) {
+          if (key.startsWith('hl-testnet-pending-order:'))
+            throw new DOMException(
+              'pending storage failed',
+              'QuotaExceededError',
+            )
+          return original.call(this, key, '')
+        }
+    }, failure)
+    await page.getByLabel('数量（BTC）', { exact: true }).fill('0.001')
+    await page.getByRole('button', { name: '下单', exact: true }).click()
+    await confirmOrder(page)
+    await expect(
+      page.locator('output').filter({ hasText: 'pending storage failed' }),
+    ).toBeVisible()
+    expect(writes).toHaveLength(failure === '保存' ? 0 : 1)
+    await page.reload()
+    if (failure === '清除')
+      await expect(
+        page.getByRole('button', { name: '查询未确认订单' }),
+      ).toBeEnabled()
+    expect(writes).toHaveLength(failure === '保存' ? 0 : 1)
+  })
+}
 
 test('用户拒绝会话授权后保持只读，不发送交易请求', async ({ page }) => {
   const { writes } = await mockExchange(page, 'deny-signature')
@@ -8338,10 +8390,6 @@ for (const mode of [
   '旧密钥重用',
 ] as const) {
   test(`手机设备：${mode}，确认释放名额后才生成二维码`, async ({ page }) => {
-    test.skip(
-      !process.env.NEXT_PUBLIC_PHONE_PAIRING_URL,
-      '需要配置配对服务地址',
-    )
     const exchange = await mockExchange(page)
     if (mode === '旧密钥重用')
       await page.addInitScript(() => {
@@ -8425,7 +8473,7 @@ for (const mode of [
           })
       },
     )
-    const relay = process.env.NEXT_PUBLIC_PHONE_PAIRING_URL as string
+    const relay = new URL(page.url()).origin
     const offer = {
       version: 1 as const,
       relay,
@@ -8435,7 +8483,7 @@ for (const mode of [
       account: address as `0x${string}`,
       expiresAt: Date.now() + 300000,
     }
-    await page.route(`${relay}/**`, async (route) => {
+    await page.route(`${relay}/pairings**`, async (route) => {
       const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Authorization, Content-Type',
@@ -8542,11 +8590,10 @@ for (const mode of [
 }
 
 for (const failure of ['通知丢失', '代理满额', '提交失败'] as const) {
-  test(`手机配对：${failure}可恢复，查询不重复签名`, async ({ page }) => {
-    test.skip(
-      !process.env.NEXT_PUBLIC_PHONE_PAIRING_URL,
-      '显式配置本地配对服务地址才运行扫码场景',
-    )
+  test(`手机配对：${failure}可恢复，查询不重复签名`, async ({
+    page,
+    baseURL,
+  }) => {
     const { encryptPairing, decryptPairing, pairingCode } = await import(
       '../src/features/wallet/lib/phone-pairing'
     )
@@ -8567,7 +8614,7 @@ for (const failure of ['通知丢失', '代理满额', '提交失败'] as const)
         return array
       }
     })
-    const relay = process.env.NEXT_PUBLIC_PHONE_PAIRING_URL as string
+    const relay = new URL(baseURL || '').origin
     const offer = {
       version: 1 as const,
       relay,
@@ -8590,7 +8637,7 @@ for (const failure of ['通知丢失', '代理满额', '提交失败'] as const)
     let deleted = 0
     let responseEnvelope = ''
     let publishCalls = 0
-    await page.route(`${relay}/**`, async (route) => {
+    await page.route(`${relay}/pairings**`, async (route) => {
       const request = route.request()
       const headers = {
         'Access-Control-Allow-Origin': '*',
@@ -8842,4 +8889,65 @@ test('手机连接页没有钱包时展示安装与电脑操作说明', async ({
   await expect(
     page.getByRole('button', { name: '生成手机授权二维码' }),
   ).toHaveCount(0)
+})
+
+for (const mode of ['关闭', '版本错误', '加载失败'] as const) {
+  test(`手机配置${mode}：不请求配对、不签名或撤销设备`, async ({ page }) => {
+    const exchange = await mockExchange(page)
+    let reads = 0
+    let writes = 0
+    await page.route('**/runtime-config.json', (route) => {
+      reads++
+      return route.fulfill({
+        status: mode === '加载失败' ? 503 : 200,
+        json: {
+          schemaVersion: mode === '版本错误' ? 2 : 1,
+          phonePairingEnabled: mode !== '关闭',
+        },
+      })
+    })
+    await page.route('**/pairings**', (route) => {
+      writes++
+      return route.abort()
+    })
+    await page.addInitScript(() => {
+      const provider = window.ethereum
+      if (!provider) throw new Error('Missing mock wallet')
+      const request = provider.request.bind(provider) as (params: {
+        method: string
+        params?: unknown[]
+      }) => Promise<unknown>
+      provider.request = ((params: { method: string; params?: unknown[] }) => {
+        if (params.method.includes('sign'))
+          throw new Error('配置无效时不允许签名')
+        return request(params)
+      }) as typeof provider.request
+    })
+    await page.goto('/connect')
+    await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+    await expect.poll(() => reads).toBeGreaterThan(0)
+    await expect(
+      page.getByRole('button', { name: '生成手机授权二维码' }),
+    ).toBeDisabled()
+    expect(exchange.agentRegistrations()).toBe(0)
+    expect(exchange.writes).toHaveLength(0)
+    expect(writes).toBe(0)
+  })
+}
+
+test('生成配对前重新读取配置，关闭后停止自动撤销和签名', async ({ page }) => {
+  const exchange = await mockExchange(page)
+  await page.goto('/connect')
+  await page.getByRole('button', { name: '浏览器钱包 连接 →' }).click()
+  const create = page.getByRole('button', { name: '生成手机授权二维码' })
+  await expect(create).toBeEnabled()
+  await page.route('**/runtime-config.json', (route) =>
+    route.fulfill({ json: { schemaVersion: 1, phonePairingEnabled: false } }),
+  )
+  await create.click()
+  await expect(
+    page.getByText('手机配对服务暂不可用，请稍后重试。'),
+  ).toBeVisible()
+  expect(exchange.agentRegistrations()).toBe(0)
+  expect(exchange.writes).toHaveLength(0)
 })
